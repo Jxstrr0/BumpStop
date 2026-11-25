@@ -1,0 +1,24 @@
+# Adapted from Mainline .github/dependabot.yml (25 November 2026)
+# Dependabot: one grouped pull request a month for minor and patch updates.
+# Major versions and three.js are skipped: those get done by hand.
+# Security alerts are separate and still arrive for everything.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    # Wait a week after a release before proposing it (GitHub's own default is 3 days): a package
+    # published by mistake, or by someone who took over an account, is usually pulled within days.
+    # Security fixes don't wait; they still arrive at once.
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "three"
+      - dependency-name: "@types/three"
