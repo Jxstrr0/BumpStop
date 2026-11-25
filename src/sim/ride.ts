@@ -105,6 +105,27 @@ export interface TraceSample {
   compression: number[]
 }
 
+/**
+ * What each corner felt on one step, for the wear model (`src/sim/wear.ts`).
+ * Filled in by `stepRide` when asked; arrays are per corner.
+ */
+export interface StepForces {
+  /** Spring, bump stop, hard limit, strap, anti-roll bar and damper together: what the mounts carry (N, positive = squashing). */
+  strut: number[]
+  /** The metal-to-metal part of that, only while bottomed out (N). */
+  hardStop: number[]
+  /** Tire pushing up on the wheel (N, 0 = in the air). */
+  tire: number[]
+  /** How far the tire is squashed (m). */
+  tireSquash: number[]
+  /** Wheel travel from ride height (m, positive = up towards the body). */
+  compression: number[]
+}
+
+export function emptyForces(): StepForces {
+  return { strut: [0, 0, 0, 0], hardStop: [0, 0, 0, 0], tire: [0, 0, 0, 0], tireSquash: [0, 0, 0, 0], compression: [0, 0, 0, 0] }
+}
+
 export function axleOf(setup: RideSetup, corner: number): AxleSetup {
   return corner < 2 ? setup.front : setup.rear
 }
@@ -236,9 +257,16 @@ const compSpeed = [0, 0, 0, 0]
 
 /**
  * Move the truck one step (1/500 s) along `profile` at `speed` (m/s).
- * Changes `s` in place. Adds to `stats` if given.
+ * Changes `s` in place. Adds to `stats` if given, and fills in `forces` if given.
  */
-export function stepRide(s: RideState, p: RideParams, profile: Profile, speed: number, stats?: RideStats): void {
+export function stepRide(
+  s: RideState,
+  p: RideParams,
+  profile: Profile,
+  speed: number,
+  stats?: RideStats,
+  forces?: StepForces,
+): void {
   // Where each corner of the body is, and how fast it moves.
   for (let i = 0; i < CORNERS; i++) {
     const cx = p.cornerX[i] as number
@@ -270,8 +298,9 @@ export function stepRide(s: RideState, p: RideParams, profile: Profile, speed: n
     if (e > 0) load += ax.bumpStopRate * e + (p.bumpStopRise[i] as number) * e * e
     // Hard limit: metal to metal. Bottoming out.
     const hard = c - ax.bumpTravel
+    const hardForce = hard > 0 ? ax.hardStopRate * hard : 0
     if (hard > 0) {
-      load += ax.hardStopRate * hard
+      load += hardForce
       if (!s.bottomed[i]) {
         s.bottomed[i] = true
         if (stats) stats.bottomOuts[i] = (stats.bottomOuts[i] as number) + 1
@@ -316,6 +345,14 @@ export function stepRide(s: RideState, p: RideParams, profile: Profile, speed: n
     // Heat: the damper's work goes into the oil; air flowing past takes some away.
     const cool = coolingRate(dm, speed) * (temp - s.airTemp)
     s.oilTemp[i] = temp + ((power - cool) * DT) / dm.heatCapacity
+
+    if (forces) {
+      forces.strut[i] = strut
+      forces.hardStop[i] = hardForce
+      forces.tire[i] = tire
+      forces.tireSquash[i] = squash > 0 ? squash : 0
+      forces.compression[i] = c
+    }
 
     if (stats) {
       stats.damperEnergy[i] = (stats.damperEnergy[i] as number) + power * DT
