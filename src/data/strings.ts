@@ -6,7 +6,7 @@ const STRINGS = {
   'game.name': 'Bump Stop',
   'game.tagline': 'Build a rally truck, find the speed where it breaks, then go racing.',
   'preview.kicker': 'A rally-raid truck builder',
-  'preview.note': 'This is a look preview. The ride sim comes next, then wear and breaks, then the build screen.',
+  'preview.note': 'This is a preview. The ride sim is in; wear and breaks come next, then the build screen.',
 
   'loop.title': 'The loop',
   'loop.build': 'Build it',
@@ -27,18 +27,34 @@ const STRINGS = {
   'roadbook.tulipRight': 'Keep right',
   'roadbook.tulipLeft': 'Sharp left',
 
-  'trace.title': 'Rear damper oil temperature',
-  'trace.lead': 'Every lap of the washboard ladder runs 5 km/h faster. Hot oil damps less, and the wheels start to skip.',
-  'trace.axisX': 'Lap',
-  'trace.axisY': '°C',
   'trace.redline': 'Red line',
   'trace.cool': 'Normal',
   'trace.warm': 'Warm',
   'trace.hot': 'Over the limit',
-  'trace.verdict': 'Damper fade on lap 6',
-  'trace.sample': 'Sample numbers, not the sim yet.',
-  'trace.alt':
-    'Line chart: oil temperature climbs from 40 °C on lap 1 to 150 °C on lap 6, crossing the 130 °C red line on lap 6.',
+
+  'sim.title': 'Ride sim: test stage',
+  'sim.lead':
+    'The real ride sim drives a 12 km test stage, 500 steps a second. Every bump turns into heat in the dampers, and hot oil damps less. Pick a truck.',
+  'sim.anotherRoad': 'Another road',
+  'sim.road': 'Road {n}',
+  'sim.chartTitle': 'Hottest damper oil temperature',
+  'sim.axis': 'km → · °C ↑',
+  'sim.alt': 'Line chart of the hottest damper oil temperature along the {km} km test stage, peaking at {temp} °C at km {at}.',
+  'sim.peak': 'Peak {temp} °C at km {at}.',
+  'sim.details': 'Bottomed out {bumps} times, {air} s with all four wheels in the air.',
+  'sim.timing': 'Worked out in {ms} ms on this device.',
+  'sim.segment': '{ground}, {speed} km/h',
+  'sim.long': 'Run a 300 km stage',
+  'sim.running': 'Running…',
+  'sim.longResult':
+    '300 km worked out in {ms} ms, finishing at {temp} °C. Only {pct}% ran in full detail; the rest was scaled from those samples.',
+
+  'ground.graded': 'Graded road',
+  'ground.washboard': 'Washboard',
+  'ground.whoops': 'Whoops',
+  'ground.rocks': 'Rock garden',
+  'ground.jumps': 'Jumps',
+  'ground.iceHeaves': 'Frost heaves',
 
   'classes.title': 'Three classes',
   'class.light4x4': 'Light 4x4',
@@ -57,4 +73,9 @@ export type StringKey = keyof typeof STRINGS
 
 export function t(key: StringKey): string {
   return STRINGS[key]
+}
+
+/** A string with {name} gaps filled in: tf('sim.peak', { temp: '96', at: '7.2' }). */
+export function tf(key: StringKey, vars: Record<string, string>): string {
+  return STRINGS[key].replace(/\{(\w+)\}/g, (all, name: string) => vars[name] ?? all)
 }

@@ -23,7 +23,8 @@ function code(file: string): string {
 
 const BANNED: [RegExp, string][] = [
   [/Math\.random/, 'Math.random (use the seeded RNG)'],
-  [/Date\.now|new Date\(/, 'the wall clock (the sim has its own time step)'],
+  [/\bDate\b/, 'the wall clock (the sim has its own time step)'],
+  [/\bcrypto\b/, 'crypto randomness (use the seeded RNG)'],
   [/performance\.now/, 'performance.now'],
   [/from\s+['"]three/, 'three.js'],
   [/\b(document|window|navigator|localStorage)\./, 'the DOM'],
