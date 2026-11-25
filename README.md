@@ -13,12 +13,18 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
 - The ride sim's numbers (test trucks, damper heat, long stages):
   `src/data/ride.ts`. The ground recipes: `src/data/ground.ts`. How the sim
   works, in plain words: `docs/RIDE-SIM.md`.
+- How strong the test trucks' parts are, and how wear adds up:
+  `src/data/wear.ts`. What each failure is called and where to fix it:
+  `src/data/failures.ts`. The test loops: `src/data/rigs.ts`. The balance
+  bot's checks: `src/data/balance.ts`. In plain words: `docs/WEAR.md`.
 - Colours: the top of `src/style.css`.
 - The plan: `docs/BUMP-STOP-PLAN.md`. Where it's up to: `docs/STATUS.md`.
 - Names: `docs/NAMES.md`.
 
 Every change goes on a branch and a pull request. The **deploy** check runs
-lint, tests and a build; when it's green, merging publishes the game.
+lint, tests (including the balance bot) and a build; when it's green,
+merging publishes the game. The balance bot's results are in each run's
+summary on the Actions tab.
 
 ## On a computer
 
