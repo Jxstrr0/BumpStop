@@ -6,6 +6,9 @@ import { botRun, breakKmh, describe as say, fixTweak, noteRow, weakTweak, writeS
 
 const RIG_IDS: readonly RigId[] = ['washboardLadder', 'tortureLoop']
 
+/** Each check drives a few full-detail lap runs: a couple of seconds here, slower on a shared CI runner. */
+const BOT_TIMEOUT = 60_000
+
 /** The balance bot's checks for one class (see `src/data/balance.ts`). */
 export function balanceSuite(cls: ClassId): void {
   describe(`balance bot: ${cls}`, () => {
@@ -21,7 +24,7 @@ export function balanceSuite(cls: ClassId): void {
         expect(breakKmh(run)).toBeGreaterThanOrEqual(lo)
         expect(breakKmh(run)).toBeLessThanOrEqual(hi)
       }
-    })
+    }, BOT_TIMEOUT)
 
     it.each(BOT_BUILDS)('$id: breaks by $expect first, and the fix helps', (b) => {
       const weak = BOT_SEEDS.map((seed) => botRun(cls, b.rig, weakTweak(b, cls), seed))
@@ -35,6 +38,6 @@ export function balanceSuite(cls: ClassId): void {
         const helped = fix.broken?.kind !== b.expect || fix.brokenLap > run.brokenLap
         expect(helped, `${b.id} fixed, seed ${BOT_SEEDS[k]}: ${say(fix)}`).toBe(true)
       })
-    })
+    }, BOT_TIMEOUT)
   })
 }

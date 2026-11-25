@@ -196,7 +196,7 @@ describe('the ride model with wear watching', () => {
   })
 })
 
-describe('lap runs and traces', () => {
+describe('lap runs and traces', { timeout: 30_000 }, () => {
   const light = () => runLaps(TEST_MULES.light4x4, MULE_WEAR.light4x4, RIGS.tortureLoop, 11, { airTemp: AIR })
 
   it('runs the same twice with the same seed, trace and all', () => {
@@ -258,7 +258,8 @@ describe('lap runs and traces', () => {
   })
 })
 
-describe('wear on long stages', () => {
+// These drive whole stages in full detail to compare against, which takes a few seconds on a CI runner.
+describe('wear on long stages', { timeout: 30_000 }, () => {
   const jumps = (length: number): StageSpec => ({ airTemp: AIR, segments: [{ ground: 'jumps', length, speed: 16 }] })
 
   it('a stage without a wear setup has no wear', () => {
