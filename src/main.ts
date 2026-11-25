@@ -1,7 +1,8 @@
 /**
  * Bump Stop's entry point. For now it shows one screen: a preview of the
- * "roadbook" look (plan PR 0), then hides the loading screen. The ride sim
- * (plan PR 1) and the build screen (plan PR 3) replace it step by step.
+ * "roadbook" look (plan PR 0) with a test bench for the ride sim (plan
+ * PR 1), then hides the loading screen. The build screen (plan PR 3) and the
+ * rigs (plan PR 4) replace it step by step.
  */
 import '@fontsource/space-grotesk/latin-500.css'
 import '@fontsource/big-shoulders/latin-700.css'
@@ -13,7 +14,8 @@ import { CLASSES } from './data/classes'
 import { t } from './data/strings'
 import { el, num } from './ui/dom'
 import { bindLoadingScreen } from './ui/loading'
-import { roadbookStrip, tracePreview } from './ui/preview'
+import { roadbookStrip } from './ui/preview'
+import { rideCheckPanel } from './ui/rideCheck'
 
 const loading = bindLoadingScreen()
 
@@ -69,7 +71,7 @@ function previewScreen(app: HTMLElement): void {
     head,
     loopPanel(),
     roadbookStrip(),
-    tracePreview(),
+    rideCheckPanel(),
     classesPanel(),
     el('p', 'note', t('preview.note')),
     footer(),
