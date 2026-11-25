@@ -3,8 +3,8 @@
  * N, W, J and kelvin. Convert only for display (see `src/sim/units.ts`).
  *
  * Each class gets one "test mule": a plain truck with sensible springs and
- * dampers, so the sim has something to drive before the parts arrive in plan
- * PR 3. PR 3 builds these same numbers from the parts the player picks.
+ * dampers. The parts the player picks (plan PR 3, `src/data/parts.ts`) are
+ * multipliers on these numbers, and `src/sim/build.ts` puts them together.
  *
  * How to read a corner:
  * - "Wheel rate" is the spring's stiffness measured at the wheel (N per metre

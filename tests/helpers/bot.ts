@@ -8,14 +8,15 @@ import { appendFileSync } from 'node:fs'
 import { BOT_AIR_C, type BotBuild, type Tweak } from '../../src/data/balance'
 import type { ClassId } from '../../src/data/classes'
 import { RIGS, type RigId } from '../../src/data/rigs'
-import { TEST_MULES } from '../../src/data/ride'
-import { MULE_WEAR } from '../../src/data/wear'
+import { buildTruck, stockBuild } from '../../src/sim/build'
 import { runLaps, type LapRun } from '../../src/sim/laps'
 import { fromCelsius, msToKmh } from '../../src/sim/units'
 import { combine, tweaked } from './tweak'
 
+/** The class's stock build (plan PR 3), with the tweak on top, driven round a rig. */
 export function botRun(id: ClassId, rig: RigId, tweak: Tweak, seed: number): LapRun {
-  const { ride, wear } = tweaked(TEST_MULES[id], MULE_WEAR[id], tweak)
+  const stock = buildTruck(stockBuild(id))
+  const { ride, wear } = tweaked(stock.ride, stock.wear, tweak)
   return runLaps(ride, wear, RIGS[rig], seed, { airTemp: fromCelsius(BOT_AIR_C), trace: false })
 }
 

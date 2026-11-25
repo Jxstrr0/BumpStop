@@ -11,9 +11,9 @@
  * all. That is how steel behaves: lots of small knocks are fine, a few big
  * ones add up fast.
  *
- * Until the parts arrive (plan PR 3), each class has "test mule" parts here,
- * to match the test mules in `src/data/ride.ts`. PR 3 builds these numbers
- * from the parts the player picks.
+ * Each class has "test mule" parts here, to match the test mules in
+ * `src/data/ride.ts`. The parts the player picks (plan PR 3,
+ * `src/data/parts.ts`) are multipliers on these numbers.
  */
 import type { ClassId } from './classes'
 

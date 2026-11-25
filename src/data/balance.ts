@@ -1,6 +1,6 @@
 /**
  * The balance bot's builds and targets (plan PR 2). The bot runs in CI on
- * every pull request (`tests/balance.test.ts`) and checks, for every class:
+ * every pull request (`tests/balance.*.test.ts`) and checks, for every class:
  *
  * 1. The test mule lasts a few laps on each rig before something lets go,
  *    and breaks inside the class's speed window (not on the first lap, and
@@ -10,8 +10,8 @@
  * 3. The fix the report would suggest works: the same build with that fix
  *    goes faster before it breaks, or doesn't break that way.
  *
- * Until the parts arrive (plan PR 3), a "build" is the test mule with a few
- * numbers scaled. Every scale multiplies the mule's own number.
+ * A "build" is the class's stock build (`src/data/kit.ts`, plan PR 3) with a
+ * few numbers scaled. Every scale multiplies the stock build's own number.
  */
 import type { ClassId } from './classes'
 import type { RigId } from './rigs'
@@ -53,13 +53,18 @@ export const BOT_BUILDS: readonly BotBuild[] = [
   { id: 'small dampers', rig: 'washboardLadder', tweak: { damperSize: 0.6 }, expect: 'fade', fix: { damperSize: 1.6 } },
   { id: 'short bump stops', rig: 'tortureLoop', tweak: { bumpStopLength: 0.35 }, expect: 'bottoming', fix: { bumpStopLength: 2.6 },
     // Slamming a heavy truck's hard stop that hard cuts its tires first; a milder cut still finds the bottoming.
-    classTweak: { heavy: { bumpStopLength: 0.55 } } },
-  { id: 'weak mounts', rig: 'tortureLoop', tweak: { mountStrength: 0.6 }, expect: 'mount', fix: { mountStrength: 1.5 } },
+    // The side-by-side has 29 cm of bump travel, so it needs soft springs as well to reach the stop before its dampers fade.
+    classTweak: { heavy: { bumpStopLength: 0.55 }, sxs: { bumpStopLength: 0.3, springRate: 0.65 } } },
+  { id: 'weak mounts', rig: 'tortureLoop', tweak: { mountStrength: 0.6 }, expect: 'mount', fix: { mountStrength: 1.5 },
+    // The side-by-side's dampers fade at about 55 km/h, so its weak spots have to be weaker to go first.
+    classTweak: { sxs: { mountStrength: 0.45 } } },
   { id: 'long droop', rig: 'tortureLoop', tweak: { droopTravel: 1.8 }, expect: 'axle', fix: { droopTravel: 0.6 } },
   { id: 'low pressure', rig: 'tortureLoop', tweak: { tireRate: 0.5 }, expect: 'tire', fix: { tireRate: 1.8 },
     // Truck tires are tough: it takes a lot less air to cut one.
     classTweak: { heavy: { tireRate: 0.35 } } },
-  { id: 'soft frame', rig: 'tortureLoop', tweak: { frameStrength: 0.6 }, expect: 'frame', fix: { frameStrength: 1.5 } },
+  { id: 'soft frame', rig: 'tortureLoop', tweak: { frameStrength: 0.6 }, expect: 'frame', fix: { frameStrength: 1.5 },
+    // A side-by-side's long travel soaks up the twist that cracks frames, so it takes a much softer one.
+    classTweak: { sxs: { frameStrength: 0.3 } } },
 ]
 
 /** Lap speeds (km/h) where each class's test mule should first break, per rig. */
