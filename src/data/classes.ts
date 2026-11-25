@@ -1,7 +1,8 @@
 /**
  * The three truck classes, all in from day one (Kelbo, 25 November 2026).
  * Weights are the class limits in kilograms, from the plan's Classes table.
- * Their parts, ranges and rivals arrive in plan PR 3.
+ * Their parts and settings are in `src/data/parts.ts` and `src/data/kit.ts`;
+ * their rivals arrive with the raids.
  */
 import type { StringKey } from './strings'
 

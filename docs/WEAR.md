@@ -44,8 +44,8 @@ preview page's break test shows the main one.
 
 ## The test mules' parts
 
-Until the parts arrive (plan PR 3), each class has one set of "test mule"
-parts in `src/data/wear.ts`, set from what the balance bot measured: each
+Each class has one set of "test mule" parts in `src/data/wear.ts`, which the
+real parts (plan PR 3, `docs/BUILD.md`) scale from, set from what the balance bot measured: each
 part's breaking load sits above the biggest loads the mule sees in its first
 few laps.
 
@@ -100,19 +100,20 @@ it on a phone from the Actions tab.
 - **Softer springs alone didn't bottom harder.** In the ride sim, travel is
   measured from ride height, so a softer spring didn't lose any. A real
   softer spring sags more and sits lower, so the bot's builds now move the
-  ride height with the sag (`tests/helpers/tweak.ts`). Plan PR 3 should
-  build each corner's travel from the shock's stroke minus the sag, and tie
-  the joint angles to the same place. Even then, soft springs bottom more
-  often rather than harder, which is why bottoming adds up over hits.
+  ride height with the sag (`tests/helpers/tweak.ts`). Plan PR 3 now builds
+  each corner's travel from the stroke minus the sag, with the joint angles
+  tied to the same place (`docs/BUILD.md`). Even then, soft springs bottom
+  more often rather than harder, which is why bottoming adds up over hits.
 - **A heavy truck slamming its hard stops cuts tires.** The force of the
   hit goes through the tire into the rocks. The bot's "short bump stops"
   build uses a milder cut for the heavy truck so it finds the bottoming.
 - **On the washboard ladder, the light and heavy mules bottom out on the
   whoops before their dampers fade.** Plan PR 4 should tune the ladder (fewer
   or smaller whoops) so it finds fade, as its name says.
-- **Tire pressure isn't a setting yet.** The bot lowers the tire's stiffness
-  instead. Plan PR 3 should work out the tire's stiffness from its pressure,
-  and the trace can then show the pressure too.
+- **Tire pressure is a setting now** (plan PR 3): the tire's stiffness comes
+  from its pressure (`docs/BUILD.md`). The bot still lowers the stiffness
+  directly; the trace can show the pressure once the rigs use builds (plan
+  PR 4).
 
 ## Tests
 

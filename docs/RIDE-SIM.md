@@ -15,8 +15,9 @@ push, so wheels can leave the ground.
 It runs 500 steps a second. Each step works out every force, moves
 everything a tiny bit, and turns the damper's work into heat.
 
-Until the parts arrive (plan PR 3), each class has a plain "test mule" in
-`src/data/ride.ts`: masses, spring rates, damper settings, travel, tires.
+Each class has a plain "test mule" in `src/data/ride.ts`: masses, spring
+rates, damper settings, travel, tires. The parts a player picks (plan PR 3)
+scale from it; see `docs/BUILD.md`.
 
 ## The ground
 
