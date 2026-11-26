@@ -467,3 +467,29 @@ input[type='range'] {
   background: var(--panel-2);
 }
 .rig-caption { margin-top: 6px; }
+
+/* The raids (plan PR 7b). */
+.raid-sub { margin: 16px 0 8px; font-family: var(--head); font-size: 20px; font-weight: 700; text-transform: uppercase; }
+.raid-day { margin: 0 0 4px; }
+.raid-day:focus { outline: none; }
+.raid-day:focus-visible { outline: 3px solid var(--focus); }
+.raid-book .rb-row { grid-template-columns: 64px 1fr; padding: 6px 0; }
+.raid-book .rb-num { font-size: 18px; }
+.raid-book .rb-cp .rb-note { font-style: normal; font-weight: 700; color: var(--accent-text); }
+.raid-list { margin: 0; padding-left: 20px; font-size: 15px; }
+.raid-log { margin: 8px 0; padding-left: 20px; font-size: 14px; }
+.raid-log li { margin: 4px 0; }
+.raid-card:not(:empty) { margin-top: 12px; padding: 12px; border: 2px solid var(--ink); border-radius: 6px; background: var(--panel-2); }
+.raid-card .raid-sub { margin-top: 0; }
+.retire-btn { margin-top: 12px; }
+.raid-table { width: 100%; border-collapse: collapse; margin: 0 0 8px; font-size: 15px; }
+.raid-table td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.raid-table .pos { width: 2em; font-family: var(--mono); color: var(--muted); }
+.raid-table .time { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.raid-table tr.you td { font-weight: 700; box-shadow: inset 0 -3px 0 var(--accent); }
+.rival-note { display: block; font-weight: 400; }
+.job-list { list-style: none; margin: 8px 0 12px; padding: 0; display: grid; gap: 8px; }
+.job-btn .fix-what::after { content: ''; }
+.job-btn[aria-pressed='true'] { background: var(--panel-2); box-shadow: inset 6px 0 0 var(--accent), 0 0 0 2px var(--accent); }
+.job-btn[aria-pressed='true'] .fix-what::before { content: '✓ '; }
+.job-btn:disabled { opacity: 0.55; cursor: not-allowed; }
