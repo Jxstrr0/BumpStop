@@ -187,6 +187,8 @@ const STRINGS = {
   'ground.rocks': 'Rock garden',
   'ground.jumps': 'Jumps',
   'ground.iceHeaves': 'Frost heaves',
+  'ground.ice': 'Ice road',
+  'ground.snow': 'Packed snow',
 
   'class.light4x4': 'Light 4x4',
   'class.light4x4Text': 'Nimble, fragile and cheap to fix. The career starts here.',
@@ -398,6 +400,10 @@ const STRINGS = {
   'part.rallyTiresText': 'Made for rough gravel.',
   'part.heavyPly': 'Heavy-ply tires',
   'part.heavyPlyText': 'A thick casing that shrugs off rocks, but stiff and heavy.',
+  'part.studdedRally': 'Studded rally tires',
+  'part.studdedRallyText': 'Rally tires with steel studs: they bite on ice and snow, and do nothing on gravel.',
+  'part.studdedPly': 'Studded heavy-ply tires',
+  'part.studdedPlyText': 'The tough casing with studs, for frozen roads with rock in them. The heaviest tire.',
 
   'part.noGuards': 'No protection',
   'part.noGuardsText': 'Nothing under the truck.',
