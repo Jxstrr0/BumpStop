@@ -27,6 +27,13 @@ Each save carries a format number (`v`); when the format changes, the
 | 2 | PR 9a | The career (`career`, null in an older garage). A career raid also keeps its year's road seed, the rivals entered and the crew's bivouac hours. A rival team's truck that can't be read is bought again for its year rather than failing the save, and an own-raid job with no raid saved is dropped. |
 | 3 | PR 13d | Six raids a year instead of eight. The career's `next` (its place in the calendar) moves onto the new calendar: the same raid where it's still there, otherwise the next one that is (`SAVE.calendarV2`). A job already under way at a raid that left the calendar carries on and is settled at that next raid. |
 
+Added without a new format number (so it never clashes with other work on
+the save format): since 1.5.0.0 a raid keeps its truck's condition (`cond`:
+shock oil, bushings and springs per axle), the money spent on parts at the
+bivouacs (`spent`) and, for a career raid, the money it had for parts
+(`entry.budget`). A raid saved before that reads back with a fresh truck and
+nothing spent, in `readRaid`.
+
 ## Three slots
 
 Each phone keeps three garages (`src/persist/slots.ts`): IndexedDB database

@@ -22,6 +22,7 @@
  * names players see live only in `src/data/strings.ts` (`raid.*.name`).
  */
 import type { ClassId } from './classes'
+import type { CondPart } from './condition'
 import type { GroundId } from './ground'
 import type { SpareId } from './parts'
 import type { StringKey } from './strings'
@@ -164,28 +165,44 @@ export const ROADSIDE: Readonly<Record<Exclude<FailureKind, 'fade'>, RoadsideFix
 /** The part a job works on, by its fatigue count in the wear model. */
 export type JobPart = 'tire' | 'bottoming' | 'axle' | 'mount' | 'frame'
 
-export type JobKind = 'newTire' | 'patchTire' | 'newShock' | 'rebuildShock' | 'newCv' | 'weldMount' | 'weldFrame'
+export type JobKind =
+  | 'newTire' | 'patchTire' | 'newShock' | 'rebuildShock' | 'newCv' | 'weldMount' | 'weldFrame'
+  | 'freshOil' | 'newBushings' | 'resetSprings' | 'newSprings'
 
 export interface JobSpec {
-  part: JobPart
+  /** A part by its fatigue count (per corner, or frame zone), or a kind of slow wear (per axle, `src/data/condition.ts`). */
+  part: JobPart | CondPart
   /** Mechanic hours (times `CLASS_WORK`). */
   hours: number
   /** The spare it uses, or null. */
   spare: SpareId | null
+  /**
+   * Money for the parts and oil, for a light 4x4 (cr., times `CLASS_MONEY`).
+   * Jobs that fit a spare cost nothing more here: the spare is already paid for.
+   */
+  cost: number
   /** Damage left afterwards, as a share of the damage now: 0 is a new part. */
   keep: number
   name: StringKey
 }
 
-/** Every job, in the order the bivouac lists them for a part. */
+/**
+ * Every job, in the order the bivouac lists them for a part. The last four
+ * (bivouac breakdowns, after 1.2) work on a whole axle: both shocks' oil,
+ * both sets of bushings, both springs.
+ */
 export const JOBS: Readonly<Record<JobKind, JobSpec>> = {
-  newTire: { part: 'tire', hours: 0.5, spare: 'tire', keep: 0, name: 'job.newTire' },
-  patchTire: { part: 'tire', hours: 0.75, spare: null, keep: 0.5, name: 'job.patchTire' },
-  newShock: { part: 'bottoming', hours: 1.5, spare: 'shock', keep: 0, name: 'job.newShock' },
-  rebuildShock: { part: 'bottoming', hours: 1.25, spare: null, keep: 0.5, name: 'job.rebuildShock' },
-  newCv: { part: 'axle', hours: 1.5, spare: 'cv', keep: 0, name: 'job.newCv' },
-  weldMount: { part: 'mount', hours: 2, spare: null, keep: 0.3, name: 'job.weldMount' },
-  weldFrame: { part: 'frame', hours: 3, spare: null, keep: 0.4, name: 'job.weldFrame' },
+  newTire: { part: 'tire', hours: 0.5, spare: 'tire', cost: 0, keep: 0, name: 'job.newTire' },
+  patchTire: { part: 'tire', hours: 0.75, spare: null, cost: 25, keep: 0.5, name: 'job.patchTire' },
+  newShock: { part: 'bottoming', hours: 1.5, spare: 'shock', cost: 0, keep: 0, name: 'job.newShock' },
+  rebuildShock: { part: 'bottoming', hours: 1.25, spare: null, cost: 150, keep: 0.5, name: 'job.rebuildShock' },
+  newCv: { part: 'axle', hours: 1.5, spare: 'cv', cost: 0, keep: 0, name: 'job.newCv' },
+  weldMount: { part: 'mount', hours: 2, spare: null, cost: 40, keep: 0.3, name: 'job.weldMount' },
+  weldFrame: { part: 'frame', hours: 3, spare: null, cost: 80, keep: 0.4, name: 'job.weldFrame' },
+  freshOil: { part: 'oil', hours: 1, spare: null, cost: 120, keep: 0, name: 'job.freshOil' },
+  newBushings: { part: 'bushing', hours: 1.5, spare: null, cost: 180, keep: 0, name: 'job.newBushings' },
+  resetSprings: { part: 'spring', hours: 0.5, spare: null, cost: 0, keep: 0.5, name: 'job.resetSprings' },
+  newSprings: { part: 'spring', hours: 2, spare: null, cost: 450, keep: 0, name: 'job.newSprings' },
 }
 
 export const JOB_KINDS = Object.keys(JOBS) as JobKind[]

@@ -477,6 +477,8 @@ input[type='range'] {
 .raid-book .rb-num { font-size: 18px; }
 .raid-book .rb-cp .rb-note { font-style: normal; font-weight: 700; color: var(--accent-text); }
 .raid-list { margin: 0; padding-left: 20px; font-size: 15px; }
+/* Bivouac breakdowns: what tired oil, cracked bushings or sagged springs do, under the line. */
+.raid-list .cond-effect { display: block; margin: 0 0 4px; color: var(--muted); }
 .raid-log { margin: 8px 0; padding-left: 20px; font-size: 14px; }
 .raid-log li { margin: 4px 0; }
 .raid-card:not(:empty) { margin-top: 12px; padding: 12px; border: 2px solid var(--ink); border-radius: 6px; background: var(--panel-2); }

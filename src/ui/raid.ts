@@ -22,12 +22,14 @@ import { CLASSES } from '../data/classes'
 import { SPARE_IDS, type SpareId } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, FREE_RAID_IDS, JOBS, PACES, RAID, RAIDS, RIVALS, type DriverId, type PaceId, type RaidId, type Rival } from '../data/raids'
 import { t, tf, type StringKey } from '../data/strings'
+import { COND_PARTS, type CondPart } from '../data/condition'
 import { checkBuild, partIn } from '../sim/build'
+import { conditionEffect } from '../sim/condition'
 import { driverName } from '../sim/career'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
-  advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isRestDay, leaveCheckpoint,
-  parTime, raidOf, raidTruck, stageKm, standings, startStage, 
+  advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isCondPart, isRestDay, leaveCheckpoint,
+  partsBudget, partsMoney, parTime, raidOf, raidTruck, stageKm, standings, startStage,
   type IceNote, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
 } from '../sim/raid'
 import type { BuildStore } from './buildStore'
@@ -90,9 +92,20 @@ export function raidTable(rows: { who: string; time: number }[], rec: StageRecor
   return table
 }
 
+const money = (n: number) => tf('career.money', { n: num(Math.round(n)) })
+
 function partName(part: Job['part'], index: number): string {
+  if (isCondPart(part)) return tf(`raidUi.part.${part}` as StringKey, { axle: t(`axleName.${index}` as StringKey) })
   if (part === 'frame') return tf('raidUi.part.frame', { zone: t(`zone.${['front', 'centre', 'rear'][index] ?? 'centre'}` as StringKey) })
   return tf(`raidUi.part.${part}` as StringKey, { corner: t(`cornerName.${index}` as StringKey) })
+}
+
+/** What tired oil, cracked bushings or sagged springs do to the truck, in plain words. */
+function effectText(part: CondPart, value: number): string {
+  const e = conditionEffect(part, value)
+  if (part === 'oil') return tf('raidUi.effect.oil', { pct: num(e.damping * 100), k: num(e.fadeSooner) })
+  if (part === 'bushing') return tf('raidUi.effect.bushing', { pct: num(e.mount * 100) })
+  return tf('raidUi.effect.spring', { pct: num(e.travel * 100) })
 }
 
 function sparesList(spares: Record<SpareId, number>): string {
@@ -297,9 +310,20 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     for (const part of ['tire', 'bottoming', 'axle', 'mount'] as const) s.wear[part].forEach((f, index) => worn.push({ part, index, damage: f.damage }))
     s.wear.frame.forEach((f, index) => worn.push({ part: 'frame', index, damage: f.damage }))
     const shown = worn.filter((w) => w.damage >= RAID.jobFrom).sort((a, b) => b.damage - a.damage)
-    if (!shown.length) list.append(el('li', 'small', t('raidUi.allGood')))
+    // Bivouac breakdowns: tired oil, cracked bushings and sagged springs, per axle, with what each does.
+    const tired: { part: CondPart; index: number; value: number }[] = []
+    for (const part of COND_PARTS) s.cond[part].forEach((value, index) => tired.push({ part, index, value }))
+    const tiredShown = tired.filter((c) => c.value >= RAID.jobFrom).sort((a, b) => b.value - a.value)
+    if (!shown.length && !tiredShown.length) list.append(el('li', 'small', t('raidUi.allGood')))
     for (const w of shown) {
       const li = el('li', `${bandOf(w.damage, 0.5, 0.85)}-text`, tf('raidUi.wornLine', { part: partName(w.part, w.index), pct: num(w.damage * 100) }))
+      list.append(li)
+    }
+    for (const c of tiredShown) {
+      const li = el('li', `${bandOf(c.value, 0.5, 0.85)}-text`, tf('raidUi.tiredLine', {
+        part: partName(c.part, c.index), pct: num(c.value * 100), state: t(`raidUi.state.${c.part}` as StringKey),
+      }))
+      li.append(el('span', 'small cond-effect', effectText(c.part, c.value)))
       list.append(li)
     }
     return list
@@ -642,6 +666,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     const hoursFill = el('div', 'live-fill')
     hoursBar.append(hoursFill)
     const sparesLine = el('p', 'small')
+    const moneyLine = el('p', 'small')
+    const inCareer = s.entry.budget !== undefined
     const list = el('ul', 'job-list')
     const rows = jobs.map((job) => {
       const li = el('li')
@@ -669,16 +695,25 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       const left = { ...s.spares }
       for (const j of chosen) if (j.spare) left[j.spare]--
       sparesLine.textContent = tf('raidUi.sparesLine', { list: sparesList(left) })
+      const cashLeft = partsMoney(s) - chosen.reduce((sum, j) => sum + j.cost, 0)
+      moneyLine.textContent = inCareer
+        ? tf('raidUi.moneyCareer', { left: money(cashLeft) })
+        : tf('raidUi.moneyLine', { left: money(cashLeft), total: money(partsBudget(s)) })
       for (const { job, b, meta } of rows) {
         const on = picked.has(job)
         b.setAttribute('aria-pressed', String(on))
         const others = chosen.filter((j) => j !== job && !(j.part === job.part && j.index === job.index))
         const problem = on ? null : checkJobs(s, [...others, job])
         b.disabled = problem !== null
-        let text = tf('raidUi.jobLine', { hours: num(job.hours, 2).replace(/\.?0+$/, ''), pct: num(job.damage * 100), after: num(job.after * 100) })
+        const hours = num(job.hours, 2).replace(/\.?0+$/, '')
+        let text = isCondPart(job.part)
+          ? tf('raidUi.condJobLine', { hours, pct: num(job.damage * 100), after: num(job.after * 100), state: t(`raidUi.state.${job.part}` as StringKey) })
+          : tf('raidUi.jobLine', { hours, pct: num(job.damage * 100), after: num(job.after * 100) })
         if (job.spare) text += tf('raidUi.jobSpare', { spare: t(`raidUi.spare.${job.spare}` as StringKey) })
+        if (job.cost > 0) text += tf('raidUi.jobCost', { n: money(job.cost) })
         if (problem?.kind === 'spare') text = tf('raidUi.jobNoSpare', { spare: t(`raidUi.spare.${problem.spare}` as StringKey) })
         if (problem?.kind === 'hours') text = `${text} · ${t('raidUi.jobNoHours')}`
+        if (problem?.kind === 'money') text = `${text} · ${t('raidUi.jobNoMoney')}`
         meta.textContent = text
       }
     }
@@ -691,7 +726,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     show(
       head,
       el('p', 'small', tf(rest ? 'raidUi.restDayLead' : 'raidUi.bivouacLead', { hours: num(bivouacHours(s)) })),
-      hoursLine, hoursBar, sparesLine,
+      hoursLine, hoursBar, sparesLine, moneyLine,
+      el('p', 'small', t('raidUi.slowWearNote')),
       jobs.length ? list : el('p', 'small', t('raidUi.noJobs')),
       done, retireButton(),
     )

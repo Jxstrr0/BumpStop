@@ -579,6 +579,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
       add('career.paid.prize', s.prize)
       add('career.paid.repairs', s.repairs)
       add('career.paid.spares', s.spares)
+      add('career.paid.bivouac', s.bivouac)
       ul.append(el('li', 'readout-line', tf('career.paid.total', { n: signed(s.money) })))
       ul.append(el('li', 'small', tf('career.paid.rep', { n: String(s.rep) })))
       card.append(ul)
