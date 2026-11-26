@@ -23,7 +23,9 @@ use another slot to keep playing free.
   - **Prep a privateer's truck:** three offers (the ones you haven't the
     reputation for are greyed out). Take one and the build screen locks to
     their class and budget, with a line at the top saying whose truck it is.
-    Build it until it's legal, then **Hand it over**: the privateer races
+    The card says what the privateer changed themselves (soft tires, say):
+    their truck comes set up their way, which hurts it, so putting it right
+    is part of the job. Build it until it's legal, then **Hand it over**: the privateer races
     it there and then, a stage at a time, and the results card shows the
     table, the fee and the bonus. **Give the contract back** (tap twice)
     lets it go.
@@ -31,10 +33,13 @@ use another slot to keep playing free.
     the prize money and anything stopping you are listed. **Enter the raid**
     hands over to the Raids panel below, which runs it as usual. At the end
     (or if you retire), **Back to the garage** brings you back here to the
-    results: prize money, repairs, spares and reputation.
+    results: prize money, the sponsor's money, the entry and driver fees,
+    repairs, spares, and **All told**, which is how much the bank went up or
+    down because of the raid, fees included (it left them out before the
+    playtest of 26 November 2026).
   - **Sit this one out** (tap twice).
 - **The calendar** for the year (folded away).
-- **Your truck:** buy one (stock, at its price), sell it (tap twice), and
+- **Your truck:** buy one (stock, at its price; tap twice), sell it (tap twice), and
   when broke, sell its parts down to the cheapest for money back. Its
   **logbook** sits under it, and the trucks you sold under **Old trucks**
   (`docs/LOGBOOK.md`).
@@ -57,13 +62,15 @@ This goes through the build store's bench (`setBench` in
 
 ## The shape of it
 
-You start on day 15 of 1985: a two-person garage with 8,000 in the bank
+You start on day 15 of 1985: a two-person garage with 10,000 in the bank
 and no truck. Every year has six raids, two of them in winter (`CALENDAR`), and at each one the
 garage does **one job**:
 
 1. **A prep contract.** A privateer brings a class, a budget and a driver.
    You build their truck on the bench, under their budget, with the parts
-   that are out that year. They race it (the ride sim drives it; the
+   that are out that year. It arrives as they last ran it, with one of
+   their own changes (two at the bigger raids) that hurts it; the first job
+   comes as the factory set it. They race it (the ride sim drives it; the
    privateer calls Steady all the way and the crew does the worst jobs
    first each night). You get a fee whatever happens, plus a bonus for the
    best of: finishing without a tow, a class podium, a class win.
@@ -109,20 +116,26 @@ because the rivals' budgets grow and better parts come out.
 - **Your truck** costs its class's stock price to buy. Changing a part
   costs the new part minus half what the old one cost (it's sold back);
   selling a part down to a cheaper one gives money back. Settings are free.
-  The whole truck sells for half its parts' price.
+  The whole truck sells for 90% of its parts' price until its first raid,
+  8% less after each raid, down to half (`CAREER.truckResale`); never more
+  than you paid with a sponsor's discount.
 - **Heavy trucks cost about 3.5 times a light 4x4, side-by-sides 0.6
   times** (`CLASS_MONEY`): parts, fees and prize money alike.
 - **Entry fees and prize money** depend on the size of the raid (`TIERS`):
-  a regional win in a light 4x4 pays 6,000, a national win 15,000, the Long
-  One 40,000.
+  a regional win in a light 4x4 pays 10,000 (third 5,000), a national win
+  20,000, the finale 50,000. The fees (entry 1,000, 3,000 and 7,000, and
+  drivers times 0.6, 1 and 2) are set so a podium in a stock truck about
+  pays its way and a win pays well (`docs/BALANCE.md`).
 - **Drivers** charge a fee per raid, more for bigger raids. The charger and
   the gravel ace only drive for a garage with a name (`DRIVER_TERMS`).
-- **Repairs:** after your own raid, each worn part costs 60% of its price
+- **Repairs:** after your own raid, each worn part costs 45% of its price
   times how worn it was (a quarter of the set for one corner), and every
   spare used is bought again.
 - **Contracts:** the privateer's budget is 62% to 95% of the class's test
-  budget (more at bigger raids). Your fee is 11% of it; the bonus is 30%,
-  80% or 150% of the fee.
+  budget (more at bigger raids). Your fee is 8% of it; the bonus is 25%,
+  60% or 100% of the fee. Their own changes (`QUIRKS`): tires let well
+  down or pumped up hard, the shortest bump stops, or the softest springs
+  with no preload. **Back to stock** on the build screen undoes them all.
 
 ## Reputation
 

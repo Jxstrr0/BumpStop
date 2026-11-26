@@ -12,7 +12,7 @@
  */
 import type { ClassId } from './classes'
 import { FIRST_YEAR, LAST_YEAR, type SlotId } from './parts'
-import type { DriverId, RaidId, RivalTrouble } from './raids'
+import type { DriverId, RaidId, RivalTrouble, Season } from './raids'
 import type { StringKey } from './strings'
 
 // ── The calendar ──
@@ -53,14 +53,21 @@ export const TRAVEL_DAYS = 2
 export const CAREER = {
   firstYear: FIRST_YEAR,
   lastYear: LAST_YEAR,
-  /** In the bank on day one: the garage, two people and not much else. */
-  startMoney: 8000,
+  /** In the bank on day one: the garage, two people and not much else (was 8,000 before the playtest of 26 November 2026). */
+  startMoney: 10000,
   /** The career starts on this day of 1985, a few weeks before the first raid (the Cold Start 300). */
   startDay: 15,
-  /** Selling a part (or the truck) back gets this share of its price. */
+  /** Selling a part back gets this share of its price; so does a truck that has raced a lot (`truckResale`). */
   resale: 0.5,
-  /** After a raid, putting a worn part right costs this share of its price for each unit of damage (1 = broken). */
-  repairShare: 0.6,
+  /**
+   * A truck that hasn't raced yet sells back for this share of what its
+   * parts cost, and loses `perRaid` more for every raid it runs, down to
+   * `resale` (playtest, 26 November 2026: it used to be worth half the
+   * moment you bought it).
+   */
+  truckResale: { new: 0.9, perRaid: 0.08 },
+  /** After a raid, putting a worn part right costs this share of its price for each unit of damage (1 = broken). Was 0.6. */
+  repairShare: 0.45,
   /** Most news and results kept in the career's log. */
   logLength: 40,
 } as const
@@ -81,12 +88,22 @@ export interface TierRules {
   repFor: { finish: number; podium: number; win: number }
 }
 
+/**
+ * Playtest, 26 November 2026: your own truck lost money even on the podium
+ * (a regional third paid 2,000 against 2,700 or more in fees, before the
+ * repairs). Now the fees are lower and the prizes bigger, so a podium in a
+ * stock truck about pays its way and a win pays well; finishing off the
+ * podium still costs money. Before: regional fee 1,500, prizes 6,000 /
+ * 3,500 / 2,000, drivers ×1; national 4,000, 15,000 / 9,000 / 5,000 /
+ * 2,500, ×1.6; the finale 9,000, 40,000 / 22,000 / 12,000 / 6,000 / 3,000,
+ * ×3. How it was checked: `docs/BALANCE.md`.
+ */
 export const TIERS: Readonly<Record<Tier, TierRules>> = {
-  regional: { entryFee: 1500, prizes: [6000, 3500, 2000], rep: 0, driverFee: 1,
+  regional: { entryFee: 1000, prizes: [10000, 7000, 5000], rep: 0, driverFee: 0.6,
     repFor: { finish: 1, podium: 3, win: 5 } },
-  national: { entryFee: 4000, prizes: [15000, 9000, 5000, 2500], rep: 15, driverFee: 1.6,
+  national: { entryFee: 3000, prizes: [20000, 13000, 8500, 4500], rep: 15, driverFee: 1,
     repFor: { finish: 2, podium: 4, win: 7 } },
-  long: { entryFee: 9000, prizes: [40000, 22000, 12000, 6000, 3000], rep: 60, driverFee: 3,
+  long: { entryFee: 7000, prizes: [50000, 30000, 18000, 9000, 4500], rep: 60, driverFee: 2,
     repFor: { finish: 3, podium: 8, win: 15 } },
 }
 
@@ -161,10 +178,14 @@ export const CONTRACTS = {
   perEvent: 3,
   /** The privateer's budget, as a share of the class's test budget (`KITS`): the least and the most. */
   budget: [0.62, 0.95] as const,
-  /** Your fee, paid when you hand the truck over, as a share of their budget. */
-  fee: 0.11,
+  /**
+   * Your fee, paid when you hand the truck over, as a share of their budget.
+   * Was 0.11, with bonuses of 0.3, 0.8 and 1.5: an untouched stock truck
+   * paid more than your own truck's podium (playtest, 26 November 2026).
+   */
+  fee: 0.08,
   /** Paid on top by result, as shares of the fee: finished without a tow, on the class podium, won the class. */
-  bonus: { finish: 0.3, podium: 0.8, win: 1.5 },
+  bonus: { finish: 0.25, podium: 0.6, win: 1 },
   /** Money rounds to this. */
   round: 250,
   /** Reputation it takes before each class's privateers come to you. */
@@ -177,7 +198,51 @@ export const CONTRACTS = {
    * with a budget that leaves room for studded tires on the winter raid.
    */
   firstJob: { cls: 'light4x4' as ClassId, budget: 0.85 },
+  /**
+   * The most of the privateer's own changes (`QUIRKS`) their truck comes
+   * with: as many as hurt it in the raid's season, up to this. The first job
+   * comes as the factory set it.
+   */
+  quirks: 2,
 } as const
+
+// ── The privateer's own changes ──
+
+/**
+ * Playtest, 26 November 2026: a stock contract truck handed over untouched
+ * finished second and third for the full pay. Now each privateer brings
+ * their truck as they last ran it, with a setting or two of their own that
+ * hurts it (measured with `scripts/harness/quirks.harness.ts`: each one
+ * makes the stock truck slower, with more stops, on summer or winter
+ * stages). The card says what they changed; putting it right is the job.
+ */
+export type QuirkId = 'softTires' | 'hardTires' | 'shortStops' | 'softSprings'
+
+export interface Quirk {
+  id: QuirkId
+  /**
+   * The classes it hurts in each season, from the sweep: soft tires cut and
+   * bottom on summer rock and slide in winter; hard tires and short bump
+   * stops only hurt on summer ground; soft springs don't hurt a
+   * side-by-side, which is soft anyway.
+   */
+  hurts: Readonly<Record<Season, readonly ClassId[]>>
+  /** Tire pressure: this share of the way from the factory's to the lowest (minus) or the highest (plus). */
+  pressure?: number
+  /** Bump stops at their shortest. */
+  shortStops?: boolean
+  /** Springs at their softest, with no preload. */
+  softSprings?: boolean
+  text: StringKey
+}
+
+export const QUIRKS: Readonly<Record<QuirkId, Quirk>> = {
+  softTires: { id: 'softTires', hurts: { summer: ['light4x4', 'sxs'], winter: ['light4x4', 'sxs'] }, pressure: -0.8, text: 'quirk.softTires' },
+  hardTires: { id: 'hardTires', hurts: { summer: ['light4x4', 'heavy', 'sxs'], winter: [] }, pressure: 0.8, text: 'quirk.hardTires' },
+  shortStops: { id: 'shortStops', hurts: { summer: ['light4x4', 'heavy', 'sxs'], winter: [] }, shortStops: true, text: 'quirk.shortStops' },
+  softSprings: { id: 'softSprings', hurts: { summer: ['light4x4', 'heavy'], winter: ['light4x4', 'heavy'] }, softSprings: true, text: 'quirk.softSprings' },
+}
+export const QUIRK_IDS = Object.keys(QUIRKS) as QuirkId[]
 
 // ── Rival teams ──
 

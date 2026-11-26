@@ -12,7 +12,7 @@
  * It moves old formats up to the newest one first, so a save made by an
  * older version of Bump Stop still loads. Pure: no DOM, no storage.
  */
-import { CALENDAR, TEAM_IDS, UPGRADES, type UpgradeId } from '../data/career'
+import { CALENDAR, QUIRK_IDS, TEAM_IDS, UPGRADES, type QuirkId, type UpgradeId } from '../data/career'
 import { CLASSES, type ClassId } from '../data/classes'
 import { KITS, type AxleSettings, type TruckBuild } from '../data/kit'
 import { LOGBOOK } from '../data/logbook'
@@ -245,6 +245,11 @@ function readContract(raw: unknown): Contract {
   for (const k of ['number', 'budget', 'fee', 'rep'] as const) finite(raw[k], `contract ${k}`)
   const bonus = isObj(raw.bonus) ? raw.bonus : fail('contract has no bonus')
   for (const k of ['finish', 'podium', 'win'] as const) finite(bonus[k], `contract ${k} bonus`)
+  // The privateer's own changes (playtest, 26 November 2026): older saves have none; unknown ones are dropped.
+  if (raw.quirks !== undefined) {
+    if (!Array.isArray(raw.quirks)) fail('contract quirks are not a list')
+    raw.quirks = raw.quirks.filter((q) => QUIRK_IDS.includes(q as QuirkId))
+  }
   return raw as unknown as Contract
 }
 
@@ -253,7 +258,11 @@ function readJob(raw: unknown): CareerJob | null {
   if (!isObj(raw)) fail('career job is not a job')
   if (raw.kind === 'own') {
     if (!DRIVER_IDS.includes(raw.driver as never)) fail('career job driver is unknown')
-    return { kind: 'own', driver: raw.driver as DriverId }
+    // What it paid at entry (playtest, 26 November 2026): older saves have none.
+    const paid = isObj(raw.paid) && Number.isFinite(raw.paid.entry) && Number.isFinite(raw.paid.sponsor)
+      ? { entry: raw.paid.entry as number, sponsor: raw.paid.sponsor as number }
+      : undefined
+    return paid ? { kind: 'own', driver: raw.driver as DriverId, paid } : { kind: 'own', driver: raw.driver as DriverId }
   }
   if (raw.kind === 'contract') {
     const contract = readContract(raw.contract)

@@ -8,6 +8,7 @@
  */
 import { CONDITION, type CondPart } from '../data/condition'
 import type { BuiltTruck } from './build'
+import type { PaceId } from '../data/raids'
 
 /** Each list is [front, rear], 0 (fresh) to 1 (worn out). */
 export type Condition = Record<CondPart, number[]>
@@ -34,6 +35,8 @@ export interface ConditionLoad {
   /** Metres driven, and the ground. */
   distance: number
   harsh: boolean
+  /** The pace call it was driven at (Steady if left out): harsh kilometres age springs and bushings faster at Push. */
+  pace?: PaceId
 }
 
 /** Add one piece of a stage's wear to the condition (changes `c`). */
@@ -52,7 +55,7 @@ export function tireCondition(c: Condition, truck: BuiltTruck, load: ConditionLo
     }
     // The two shocks share one service, so the axle's oil is the average of the pair.
     c.oil[axle] = cap((c.oil[axle] as number) + oil / 2)
-    const harshKm = load.harsh ? km : 0
+    const harshKm = load.harsh ? km * CONDITION.paceLoad[load.pace ?? 'steady'] : 0
     c.spring[axle] = cap((c.spring[axle] as number) + hits * CONDITION.spring.perBottomOut + harshKm * CONDITION.spring.perHarshKm)
     c.bushing[axle] = cap((c.bushing[axle] as number) + hits * CONDITION.bushing.perBottomOut + harshKm * CONDITION.bushing.perHarshKm)
   }

@@ -26,7 +26,8 @@ import { COND_PARTS, type CondPart } from '../data/condition'
 import type { WeatherId } from '../data/weather'
 import type { WearState } from '../sim/wear'
 import { checkBuild, partIn } from '../sim/build'
-import { conditionEffect } from '../sim/condition'
+import { conditionEffect, wornTruck } from '../sim/condition'
+import { groundsToCheck } from '../sim/paceCheck'
 import { driverName } from '../sim/career'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
@@ -38,6 +39,7 @@ import { forecastAt, forecastWord, weatherOn, type StageWeather } from '../sim/w
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, bandOf, lineChart, type LineChart } from './charts'
 import { el, num } from './dom'
+import { paceCheckBlock } from './paceCheck'
 import { BREAK_RATE, raidView } from './raidView'
 
 const C0 = 273.15
@@ -446,6 +448,9 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       )
     }
 
+    // The pace check (playtest, 26 November 2026): what each pace call does to this truck on today's rough ground.
+    const checkBox = paceCheckBlock(wornTruck(truck, s.cond), s.entry.driver, groundsToCheck(spec.segments.map((x) => x.ground)), spec.airC, 'paceCheck.leadRaid')
+
     const settings = el('p', 'small', store.cls() === s.entry.build.cls ? t('raidUi.settingsNote') : t('raidUi.otherClass'))
     let pace: PaceId = 'steady'
     const paceText = el('p', 'small')
@@ -465,7 +470,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       el('h4', 'raid-sub', t('raidUi.roadbook')), book, weatherBox, iceBox,
       el('h4', 'raid-sub', t('raidUi.condition')), conditionList(s),
       el('p', 'small', tf('raidUi.sparesLine', { list: sparesList(s.spares) })), settings,
-      el('h4', 'raid-sub', t('raidUi.paceCall')), paceRow, paceText, start, retireButton(),
+      checkBox, el('h4', 'raid-sub', t('raidUi.paceCall')), paceRow, paceText, start, retireButton(),
     )
     focusHead(head)
   }

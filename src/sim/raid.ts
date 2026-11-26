@@ -542,7 +542,7 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     // The slow wear: oil cooked by this piece's heat, springs and bushings by its hits and harsh kilometres.
     tireCondition(run.cond, run.truck, {
       damperEnergy: res.damperEnergy, peakTemp: res.peakTemp, bottomOuts: res.bottomOuts,
-      distance: driven, harsh: RAID.harshGround.includes(ground),
+      distance: driven, harsh: RAID.harshGround.includes(ground), pace: currentPace(run),
     })
     // The shore track is longer than the ice road it stands in for.
     run.time += (driven / speed) * lineFactor(driver, ground) * (ground !== seg.ground ? ICE_ROAD.shoreLength : 1)

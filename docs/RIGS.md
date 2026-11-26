@@ -101,6 +101,20 @@ the wheels hop, what that means on washboard, and jumps to the spring rate
 (moves the bounce) and the rebound clicks (calms the hop; the dampers part
 if they have no adjuster).
 
+## What it means on a raid
+
+Playtest, 26 November 2026: the rigs didn't predict the raids. The ladder
+climbs 5 km/h a lap on short laps, so the oil never has time to settle:
+a stock light 4x4 fades at 90 to 100 km/h there, while a raid drives rough
+gravel at 44 km/h (Steady) for many kilometres at a time, with oil that
+tires over the days. So under the washboard ladder's and the torture
+loop's reports there's now a **pace check** (`docs/RAIDS.md`): the ride sim
+drives 5 km of the raid ground the rig stands for (washboard and rough
+gravel for the ladder; whoops, rocks and jumps for the torture loop) at
+Conserve, Steady and Push speeds, in 20 °C, with this truck and an average
+driver, and says how hot the shocks settle and how fast the worst part
+wears at each. Same lines as the raid morning's.
+
 ## Ghost runs
 
 The last finished run on each rig, for each class, is saved with the garage

@@ -49,6 +49,14 @@ paid for already). Hours scale by class as before; money by `CLASS_MONEY`.
 A new or rebuilt shock, at the roadside or the bivouac, goes in with fresh
 oil, so that axle's oil is half as tired (the other shock is still old).
 
+## Push ages it faster
+
+Since the playtest of 26 November 2026, harsh kilometres wear the springs
+and bushings by the pace call too (`CONDITION.paceLoad`): 1.7 times as
+fast at Push, 0.6 times at Conserve, Steady as before. The oil already
+cooked faster at Push through its heat. So a Push day leaves the crew more
+to do that night (`docs/RAIDS.md`, "The pace check and what Push costs").
+
 ## How it was tuned
 
 The stock trucks of each class drove the Washboard 800 (five days) and
