@@ -1064,7 +1064,7 @@ const STRINGS = {
   'credits.fonts': 'Fonts: Big Shoulders, Overpass Mono and Space Grotesk, under the SIL Open Font License.',
   'credits.code': '3D drawn with three.js (MIT licence). The trucks are built by the game’s own Blender script.',
   'credits.sound': 'Every sound is made live by the game itself: no recordings.',
-  'credits.soundMixed': 'The engine and every other sound are made live by the game itself. Recordings:',
+  'credits.soundMixed': 'The engine is made live by the game itself. The other sounds were made for Bump Stop with ElevenLabs:',
   'credits.recording': '“{title}” by {author} ({licence}), {source}',
 
   'card.title': 'Truck card',

@@ -6,9 +6,10 @@ is in `src/data/sound.ts`.
 ## Made sounds, and recordings on top
 
 Every sound is made live in the browser from numbers and from what the sim
-is doing, so the game never needs a sound file to make noise. Real
-recordings can stand in for the short sounds and the hot-shock hiss; see
-"Recordings" below. The engine always stays made in code, because it
+is doing, so the game never needs a sound file to make noise. Recordings
+stand in for the short sounds and the hot-shock hiss (since v1.2.0.0, 17
+made with ElevenLabs); see "Recordings" below. `?sound=made` plays only the
+made sounds, to compare. The engine always stays made in code, because it
 follows every engine part's firing pattern and speed exactly.
 
 ## What you hear
@@ -101,8 +102,29 @@ They're listed in `src/data/recordings.ts`; the files live in
   or down against the made sound.
 - Two or more recordings for the same sound take turns, and the cues still
   vary their pitch a little, so repeats don't all sound alike.
-- Only CC0 and CC BY recordings (CLAUDE.md, Content rules). The Settings
-  panel's Credits lists every recording with its author, licence and page.
+- Downloaded recordings must be CC0 or CC BY (CLAUDE.md, Content rules).
+  Sounds made for Bump Stop with ElevenLabs' sound-effect maker are allowed
+  too (Kelbo, 26 November 2026), with the licence `Made for Bump Stop`. The
+  Settings panel's Credits lists every recording with its author, licence
+  and page.
+
+### What's in now (v1.2.0.0)
+
+17 sounds made with ElevenLabs (in the Bump Stop flow in Kelbo's
+ElevenLabs workspace): two takes each of the tick, knock, tire strike, rock
+strike and bump-stop clunk, one of each of the six breaks, and a 6-second
+hot-shock hiss loop. They were made as one joined file with a second of
+silence between them, then cut apart on the silences and saved mono,
+22.05 kHz, 48 kbps MP3 (248 KB for all 17; the offline copy fetches them
+up front with everything else). To remake one, cut it the same way:
+
+```
+ffmpeg -ss <start> -t <length> -i joined.mp3 -af "afade=t=in:d=0.005,afade=t=out:st=<length-0.04>:d=0.04,aresample=22050" \
+  -ac 1 -c:a libmp3lame -b:a 48k -map_metadata -1 public/sounds/<name>-v2.mp3
+```
+
+(the hiss loop without the fades: the game blends its end into its start).
+Give a changed file a new name, so phones don't keep the old copy.
 - Add `?sound=made` to the address to hear the made sounds only, for a
   side-by-side.
 

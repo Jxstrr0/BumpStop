@@ -52,8 +52,16 @@ export const RECORDED_SOUNDS: readonly RecordedSound[] = [
   'tick', 'knock', 'strike', 'rockStrike', 'clunk', 'hissOut', 'clang', 'crack', 'bang', 'pop', 'groan', 'hissLoop',
 ]
 
-/** The licences Bump Stop may use (CLAUDE.md, Content rules). */
-export type Licence = 'CC0' | 'CC BY 3.0' | 'CC BY 4.0'
+/**
+ * The licences Bump Stop may use: downloaded recordings must be CC0 or CC BY
+ * (CLAUDE.md, Content rules). `Made for Bump Stop` is a sound made for this
+ * game with ElevenLabs' sound-effect maker, which Kelbo approved on
+ * 26 November 2026.
+ */
+export type Licence = 'CC0' | 'CC BY 3.0' | 'CC BY 4.0' | 'Made for Bump Stop'
+
+/** Every licence above, for the test and the credits. */
+export const LICENCES: readonly Licence[] = ['CC0', 'CC BY 3.0', 'CC BY 4.0', 'Made for Bump Stop']
 
 export interface Recording {
   /** Which sound it stands in for. */
@@ -71,8 +79,35 @@ export interface Recording {
   gain: number
 }
 
-/** Every recording in the game. Empty: every sound is still made in code. */
-export const RECORDINGS: readonly Recording[] = []
+/** Made for Bump Stop with ElevenLabs (all 17 share these). */
+const ELEVENLABS = { author: 'ElevenLabs', licence: 'Made for Bump Stop', source: 'https://elevenlabs.io/sound-effects' } as const
+
+/**
+ * Every recording in the game: 17 sounds made for Bump Stop with ElevenLabs
+ * (26 November 2026). Two takes each for the sounds that repeat a lot.
+ * `gain` is a first guess by ear: the rattles a touch quieter so they don't
+ * crowd the engine, the quiet crack and tire cut a little louder, the hiss
+ * loop well down because it plays for a long time.
+ */
+export const RECORDINGS: readonly Recording[] = [
+  { sound: 'tick', file: 'sounds/tick-1.mp3', title: 'Suspension tick', gain: 0.8, ...ELEVENLABS },
+  { sound: 'tick', file: 'sounds/tick-2.mp3', title: 'Suspension tick', gain: 0.8, ...ELEVENLABS },
+  { sound: 'knock', file: 'sounds/knock-1.mp3', title: 'Suspension knock', gain: 0.8, ...ELEVENLABS },
+  { sound: 'knock', file: 'sounds/knock-2.mp3', title: 'Suspension knock', gain: 0.8, ...ELEVENLABS },
+  { sound: 'strike', file: 'sounds/strike-1.mp3', title: 'Tire strike', gain: 1, ...ELEVENLABS },
+  { sound: 'strike', file: 'sounds/strike-2.mp3', title: 'Tire strike', gain: 1, ...ELEVENLABS },
+  { sound: 'rockStrike', file: 'sounds/rock-strike-1.mp3', title: 'Rock strike', gain: 1, ...ELEVENLABS },
+  { sound: 'rockStrike', file: 'sounds/rock-strike-2.mp3', title: 'Rock strike', gain: 1, ...ELEVENLABS },
+  { sound: 'clunk', file: 'sounds/clunk-1.mp3', title: 'Bump stop clunk', gain: 1, ...ELEVENLABS },
+  { sound: 'clunk', file: 'sounds/clunk-2.mp3', title: 'Bump stop clunk', gain: 1, ...ELEVENLABS },
+  { sound: 'hissOut', file: 'sounds/hiss-out.mp3', title: 'Damper fade', gain: 1, ...ELEVENLABS },
+  { sound: 'clang', file: 'sounds/clang.mp3', title: 'Bottom-out clang', gain: 1, ...ELEVENLABS },
+  { sound: 'crack', file: 'sounds/crack.mp3', title: 'Mount crack', gain: 1.3, ...ELEVENLABS },
+  { sound: 'bang', file: 'sounds/bang.mp3', title: 'Axle snap', gain: 1, ...ELEVENLABS },
+  { sound: 'pop', file: 'sounds/pop.mp3', title: 'Tire cut', gain: 1.2, ...ELEVENLABS },
+  { sound: 'groan', file: 'sounds/groan.mp3', title: 'Frame groan', gain: 1, ...ELEVENLABS },
+  { sound: 'hissLoop', file: 'sounds/hiss-loop.mp3', title: 'Hot shock hiss', gain: 0.6, ...ELEVENLABS },
+]
 
 /** How each recording is tidied when it loads. */
 export const RECORDING_PREP = {
