@@ -115,17 +115,26 @@ export interface Driver {
   skillTime: number
   /** Roadside fixes take this long (share of the usual). */
   fixTime: number
+  /**
+   * The people who do this job (Kelbo, 26 November 2026): each career hires
+   * one of them (`driverName` in `src/sim/career.ts`); free play has the first.
+   */
+  pool: readonly StringKey[]
 }
 
 export const DRIVERS: Readonly<Record<DriverId, Driver>> = {
   veteran: { id: 'veteran', name: 'driver.veteran', text: 'driver.veteranText',
-    speed: 0.97, hardness: -1, skill: ['rocks', 'ice'], skillTime: 0.9, fixTime: 1 },
+    speed: 0.97, hardness: -1, skill: ['rocks', 'ice'], skillTime: 0.9, fixTime: 1,
+    pool: ['driverName.arne', 'driverName.bud', 'driverName.oldMac', 'driverName.gus'] },
   charger: { id: 'charger', name: 'driver.charger', text: 'driver.chargerText',
-    speed: 1.03, hardness: 1, skill: ['whoops', 'jumps'], skillTime: 0.93, fixTime: 1 },
+    speed: 1.03, hardness: 1, skill: ['whoops', 'jumps'], skillTime: 0.93, fixTime: 1,
+    pool: ['driverName.dee', 'driverName.rory', 'driverName.kit', 'driverName.nell'] },
   gravelAce: { id: 'gravelAce', name: 'driver.gravelAce', text: 'driver.gravelAceText',
-    speed: 1.01, hardness: 0, skill: ['graded', 'washboard', 'rough', 'snow'], skillTime: 0.98, fixTime: 1 },
+    speed: 1.01, hardness: 0, skill: ['graded', 'washboard', 'rough', 'snow'], skillTime: 0.98, fixTime: 1,
+    pool: ['driverName.sami', 'driverName.benny', 'driverName.ida', 'driverName.lou'] },
   mechanic: { id: 'mechanic', name: 'driver.mechanic', text: 'driver.mechanicText',
-    speed: 0.99, hardness: -0.5, skill: [], skillTime: 1, fixTime: 0.7 },
+    speed: 0.99, hardness: -0.5, skill: [], skillTime: 1, fixTime: 0.7,
+    pool: ['driverName.ozzie', 'driverName.hank', 'driverName.fran', 'driverName.doc'] },
 }
 
 // ── Roadside fixes ──

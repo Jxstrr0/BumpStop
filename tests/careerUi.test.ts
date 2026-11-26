@@ -11,7 +11,7 @@ describe('the career screens', () => {
     const { dateText, newsText, whoName } = await import('../src/ui/career')
     expect(dateText(1985, 1)).toBe('1 January')
     expect(dateText(1985, 130)).toBe('10 May')
-    expect(whoName('brannigan7')).toBe('Brannigan Brothers #7')
+    expect(whoName('brannigan7')).toBe('Tundra Dogs #7')
     expect(whoName('privateer31')).toBe('Privateer #31')
     expect(whoName('you')).toBe('Your truck')
     expect(whoName('you', 44)).toContain('#44')

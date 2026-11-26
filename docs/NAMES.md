@@ -4,8 +4,8 @@
 25 November 2026 (over two Finnish-flavoured options); the names below are
 proposals in that style. **Birchland** is settled. Kelbo turned down the
 antler and the first raid names, then on 26 November 2026 **picked the money
-(cr.) and the raid names** (set A, below). Teams, drivers, sponsors and
-privateers still use plain working names (see each section). Propose any new name
+(cr.) and the raid names** (set A, below). On the same day he picked the rival teams, the drivers and the sponsors.
+Privateers are still known by their race number. Propose any new name
 to Kelbo before using it, and add it here.
 
 Every name the game shows lives in `src/data/strings.ts`, so a new pick is
@@ -84,34 +84,58 @@ the Muskeg 800, the Birchland Traverse.
 
 ## Rival teams
 
-Three or four rival teams with their own trucks and habits, who copy what
-wins (plan, The career). Each starts in one class and spreads to the others.
-Still proposed. The raids (plan PR 7) show them as placeholders, with
-privateer entries known only by their race number (`team.*` in
-`src/data/strings.ts`).
+**Picked by Kelbo on 26 November 2026.** Four teams with their own trucks
+and habits, who copy what wins (plan, The career). Each starts in one class
+and spreads to the others. The names live in `team.*` and `habit.*` in
+`src/data/strings.ts`; the ids in the code stay the old working names, so
+saves keep working. Privateer entries are known by their race number.
 
-| Team | Starts in | Habit |
-| --- | --- | --- |
-| **Hardpan Haulage Works** | Heavy truck | A trucking firm's works team: slow, steady, never quits, over-builds everything |
-| **Brannigan Brothers** | Light 4x4 | Privateers turned pros: push hard, break things, fix them by the roadside |
-| **Jackrabbit Sport** | Side-by-side | Quick and light; their dampers cook in the heat |
-| **Highbank Racing** | Light 4x4, later all three | New money: buys the newest parts the year they come out |
+| Team | Id (old working name) | Starts in | Habit |
+| --- | --- | --- | --- |
+| **Ironwood Brothers** | `hardpan` (Hardpan Haulage Works) | Heavy truck | Two brothers and a welder: slow, steady, never quits, over-builds everything |
+| **Tundra Dogs** | `brannigan` (Brannigan Brothers) | Light 4x4 | Scrappy privateers: push hard, break things, copy whatever won last |
+| **Jackrabbit Sport** | `jackrabbit` | Side-by-side | Quick and light; their dampers cook in the heat |
+| **Goldpan Racing** | `highbank` (Highbank Racing) | Light 4x4, later all three | Rich and flashy: buys the newest parts the year they come out |
+
+Offered and not used: Northline Works ("North-" names clash with Northwind
+and Northlight) and Kettle Rock Racing (Bump Stop stays off kettles).
 
 ## Drivers
 
-The hired drivers (plan PR 7) go by their trade until Kelbo picks names:
-the veteran, the charger, the gravel ace and the mechanic
-(`driver.*` in `src/data/strings.ts`).
+**Picked by Kelbo on 26 November 2026:** a pool of four for each trade, and
+each career hires one from each pool (`driverName` in `src/sim/career.ts`,
+from the career's seed), so replays meet new faces. Free play has the first
+of each. Names in `driverName.*` in `src/data/strings.ts`; the trade
+(`driver.*`) shows under the name.
 
-## Sponsors (plan PR 9)
+| Trade | Pool |
+| --- | --- |
+| The veteran | Arne Lindqvist, Bud Halloran, "Old Mac" Tierney, Gus Brekke |
+| The charger | Dee Rask, Rory Swift, Kit Marchetti, Nell Dagger |
+| The gravel ace | Sami Rautio, Benny Stone, Ida Grimsrud, Lou Cobble |
+| The mechanic | Ozzie Wrenn, Hank Ratchet, Fran Holt, Doc Pelletier |
 
-Unnamed for now: **a local sponsor**, **a regional sponsor** and **a works
-deal** (`sponsor.*` in `src/data/strings.ts`). Privateers who bring prep
-contracts are known by their race number.
+Jo "Flatout" Kessler was offered as a charger, but Scrapline already has a
+rival called Rudi Kessler, so Dee Rask (from Kelbo's first round of picks)
+took the place. Also offered in that first round: Hal "Gramps" Okerlund, Mo
+Tallis, Pat Fennimore.
 
-## Still to name (later PRs)
+## Sponsors
 
-Drivers, rival teams (still proposals), sponsors and parts makers, the crew
-at the garage, privateer customers. The money and the raids are picked
-(above). Each gets checked the same way and proposed to Kelbo first, before
-1.0.
+**Picked by Kelbo on 26 November 2026:** two for each level, and each career
+gets one of the pair (`sponsorName` in `src/sim/career.ts`). Names in
+`sponsor.*` in `src/data/strings.ts`.
+
+| Level | Reputation | Pair |
+| --- | --- | --- |
+| Local | 10 | Two Pines Hardware, Loonlight Diner |
+| Regional | 35 | Muskeg Tire Co., Hoarfrost Cola |
+| The works deal (a quarter off parts) | 120 | Boreal Bolt & Nut, Ptarmigan Lard Oil |
+
+Northern Lard Oil was offered and became Ptarmigan Lard Oil (no "North-"
+names).
+
+## Still to name
+
+Parts makers, the crew at the garage, privateer customers (known by race
+number for now). Each gets checked the same way and proposed to Kelbo first.
