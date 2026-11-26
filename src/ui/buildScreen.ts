@@ -142,7 +142,12 @@ export function buildPanel(store: BuildStore): HTMLElement {
   const problems = el('ul', 'problems')
   // The career's note under the money (plan PR 9): e.g. what the changes cost, and "Buy these parts".
   const benchNote = el('div', 'bench-note')
-  summary.append(weightLine, weightBar, moneyLine, moneyBar, problems, benchNote)
+  // Weight and money each get a box, so a short (landscape) screen can set them side by side.
+  const weightBox = el('div', 'sum-weight')
+  weightBox.append(weightLine, weightBar)
+  const moneyBox = el('div', 'sum-money')
+  moneyBox.append(moneyLine, moneyBar)
+  summary.append(weightBox, moneyBox, problems, benchNote)
   const benchLabel = el('p', 'bench-label')
 
   const partsHolder = el('div', 'slots')
@@ -179,7 +184,7 @@ export function buildPanel(store: BuildStore): HTMLElement {
     weightLine.replaceChildren(
       el('span', 'label', t('build.weight')),
       ` ${num(truck.mass)} kg `,
-      el('span', 'small', tf('build.window', { min: num(cls.minMass), max: num(cls.maxMass) })),
+      el('span', 'small sum-range', tf('build.window', { min: num(cls.minMass), max: num(cls.maxMass) })),
       ' ',
       el('span', `chip ${wBand}`, t(heavy ? 'build.tooHeavy' : light ? 'build.tooLight' : 'build.inWindow')),
     )
