@@ -34,7 +34,7 @@ import {
 } from '../data/career'
 import { KITS, type TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR, PARTS, SLOTS, SPARE_IDS, type SlotId } from '../data/parts'
-import { DRIVER_IDS, DRIVERS, RAID, RAIDS, type DriverId, type PaceId, type RaidId } from '../data/raids'
+import { DRIVER_IDS, DRIVERS, JOBS, RAID, RAIDS, type DriverId, type PaceId, type RaidId } from '../data/raids'
 import type { StringKey } from '../data/strings'
 import {
   changeCost, checkBuild, massAndCost, partIn, partsFor, stockBuild, tidyBuild, type BuildProblem, type BuildRules,
@@ -469,7 +469,10 @@ export function enterOwn(c: CareerState, driver: DriverId, bench?: TruckBuild): 
   c.job = { kind: 'own', driver }
   // The bench's settings (same parts) go on the raid.
   const b = bench ? { ...own, front: bench.front, rear: bench.rear } : own
-  return enterRaid(e.raid, b, driver, { seed: eventSeed(c), field: careerField(c.teams, cls, e.tier, c.year), hours: crewHours(c) })
+  // Parts at the bivouacs come out of the garage's own money (none when broke), and are settled after the raid.
+  return enterRaid(e.raid, b, driver, {
+    seed: eventSeed(c), field: careerField(c.teams, cls, e.tier, c.year), hours: crewHours(c), budget: Math.max(0, c.money),
+  })
 }
 
 // ── Driving without the player: privateers, and the bot ──
@@ -512,6 +515,8 @@ export interface Settlement {
   bonus: number
   repairs: number
   spares: number
+  /** Parts and oil bought at the bivouacs (bivouac breakdowns). */
+  bivouac: number
   /** Money in and out, all told (fees paid at entry aren't in here). */
   money: number
   rep: number
@@ -539,6 +544,13 @@ export function repairBill(c: CareerState, state: RaidState): { repairs: number;
     repairs += w.mount[i]!.damage * susp / 2
   }
   for (const f of w.frame) repairs += (f.damage * price('frame')) / 3
+  // Tired oil, cracked bushings and sagged springs left at the end: the price of the bivouac job that puts each right.
+  const job = (kind: 'freshOil' | 'newBushings' | 'newSprings') => JOBS[kind].cost * CLASS_MONEY[cls]
+  for (let axle = 0; axle < 2; axle++) {
+    repairs += (state.cond.oil[axle] ?? 0) * job('freshOil')
+    repairs += (state.cond.bushing[axle] ?? 0) * job('newBushings')
+    repairs += (state.cond.spring[axle] ?? 0) * job('newSprings')
+  }
   const carried = partIn(b, 'spares').carries
   let spares = 0
   for (const s of SPARE_IDS) spares += Math.max(0, carried[s] - state.spares[s]) * SPARE_PRICE[s] * CLASS_MONEY[cls]
@@ -587,7 +599,7 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
   const repBefore = c.rep
   const out: Settlement = {
     raid: e.raid, job: state ? job!.kind : null, pos: null, of: 0, finished: false,
-    prize: 0, fee: 0, bonus: 0, repairs: 0, spares: 0, money: 0, rep: 0,
+    prize: 0, fee: 0, bonus: 0, repairs: 0, spares: 0, bivouac: 0, money: 0, rep: 0,
     winners: {} as Record<ClassId, string>, copies: [], wonLongOne: false, story: null,
   }
   const rng = new Rng(hashString(`${c.seed}:${c.season}:${c.next}:settle`))
@@ -615,6 +627,7 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
       const bill = repairBill(c, state)
       out.repairs = bill.repairs
       out.spares = bill.spares
+      out.bivouac = state.spent
       out.rep = earned ? tier.repFor[earned] : 0
       c.stats.raids++
       if (pos === 1) c.stats.wins++
@@ -636,7 +649,7 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
       out.rep = earned ? Math.round(tier.repFor[earned] / 2) : 0
       c.stats.contracts++
     }
-    out.money = out.prize + out.fee + out.bonus - out.repairs - out.spares
+    out.money = out.prize + out.fee + out.bonus - out.repairs - out.spares - out.bivouac
     c.money += out.money
     c.rep += out.rep
     addNews(c, { kind: 'result', year: c.year, raid: e.raid, cls, job: job.kind, pos: out.pos, of: out.of, money: out.money, rep: out.rep })
