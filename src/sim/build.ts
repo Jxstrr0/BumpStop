@@ -298,6 +298,27 @@ export interface BuildRules {
   year: number
   /** Antlers to spend. */
   budget: number
+  /**
+   * The career's own truck (plan PR 9): the parts already on it cost
+   * nothing, a change costs the new part (less any works discount) minus
+   * what the old one sells for, and `budget` is the money in the bank.
+   */
+  owned?: { build: TruckBuild; resale: number; discount: number }
+}
+
+/**
+ * What changing a truck's parts from `from` to `to` costs: each new part's
+ * price (less the discount) minus what the old one sells for. Below 0 is
+ * money back. Settings are free. Both builds must be the same class.
+ */
+export function changeCost(from: TruckBuild, to: TruckBuild, resale: number, discount = 0): number {
+  if (from.cls !== to.cls) throw new RangeError(`Can't change a ${from.cls} into a ${to.cls}`)
+  let sum = 0
+  for (const slot of SLOTS) {
+    if (from.parts[slot] === to.parts[slot]) continue
+    sum += (partIn(to, slot).cost[to.cls] as number) * (1 - discount) - (partIn(from, slot).cost[from.cls] as number) * resale
+  }
+  return sum
 }
 
 /** The shop's rules for a class until the career sets them: its test budget, any year. */
@@ -313,7 +334,8 @@ export function checkBuild(b: TruckBuild, rules: BuildRules): BuildProblem[] {
   const { mass, cost } = massAndCost(b)
   if (mass > cls.maxMass) out.push({ kind: 'tooHeavy', by: mass - cls.maxMass, limit: cls.maxMass })
   if (mass < cls.minMass) out.push({ kind: 'tooLight', by: cls.minMass - mass, limit: cls.minMass })
-  if (cost > rules.budget) out.push({ kind: 'overBudget', by: cost - rules.budget, budget: rules.budget })
+  const spend = rules.owned ? changeCost(rules.owned.build, b, rules.owned.resale, rules.owned.discount) : cost
+  if (spend > 0 && spend > rules.budget) out.push({ kind: 'overBudget', by: spend - rules.budget, budget: rules.budget })
   for (const slot of SLOTS) {
     const p = partIn(b, slot)
     if (p.year > rules.year) out.push({ kind: 'notYet', slot, part: p.id, year: p.year })

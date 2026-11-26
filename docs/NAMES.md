@@ -56,9 +56,13 @@ bivouac, hp for engine power, M for millions).
 
 **Turned down.** The game uses working names until new ones are picked:
 **Summer Sprint** (3 stages) and **Summer Raid** (5 stages), in
-`raid.*.name` in `src/data/strings.ts` (plan PR 7). Stages are described,
+`raid.*.name` in `src/data/strings.ts` (plan PR 7). The career (plan PR 9)
+adds four more working names in the same plain style: **Midsummer Sprint**,
+**National Raid**, **Autumn Raid** and **The Long One** (the plan's own name
+for the finale). Stages are described,
 not named ("Logging roads", "Rock country", "The old burn", "Eskers and
-washboard", "Hot haul roads"). The first proposals, for the record:
+washboard", "Hot haul roads", and from PR 9 "The mine roads" and "Long
+fast gravel"). The first proposals, for the record:
 
 | Plan's working name | Proposed name (turned down) | Shape |
 | --- | --- | --- |
@@ -88,6 +92,12 @@ privateer entries known only by their race number (`team.*` in
 The hired drivers (plan PR 7) go by their trade until Kelbo picks names:
 the veteran, the charger, the gravel ace and the mechanic
 (`driver.*` in `src/data/strings.ts`).
+
+## Sponsors (plan PR 9)
+
+Unnamed for now: **a local sponsor**, **a regional sponsor** and **a works
+deal** (`sponsor.*` in `src/data/strings.ts`). Privateers who bring prep
+contracts are known by their race number.
 
 ## Still to name (later PRs)
 

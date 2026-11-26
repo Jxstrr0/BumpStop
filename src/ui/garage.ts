@@ -57,6 +57,8 @@ export async function openGarage(): Promise<Garage> {
   const store = makeBuildStore({ builds: start.builds, cls: start.cls, year: start.year })
   let ghosts = start.ghosts
   let raid: RaidState | null = start.raid
+  // The career (plan PR 9) is carried through untouched until its screens arrive (9b).
+  const career = start.career
   let status: SaveStatus = writable ? (view.empty ? { kind: 'idle' } : { kind: 'saved', at: view.savedAt }) : { kind: 'readOnly' }
   const listeners: ((s: SaveStatus) => void)[] = []
   let timer = 0
@@ -64,7 +66,7 @@ export async function openGarage(): Promise<Garage> {
   let asked = false
 
   function current(): GarageSave {
-    return { v: SAVE.version, cls: store.cls(), year: store.year(), builds: store.builds(), raid, ghosts }
+    return { v: SAVE.version, cls: store.cls(), year: store.year(), builds: store.builds(), raid, ghosts, career }
   }
 
   function setStatus(s: SaveStatus): void {

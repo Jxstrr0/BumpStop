@@ -205,3 +205,14 @@ kit, the most the bivouac could fix each night):
 | Light 4x4 | 5.1 h, 2nd | 4.4 h, 2nd | 5.6 h, 4th (two cut tires on day 2) |
 | Heavy truck | 5.4 h, 3rd | 4.8 h, 2nd | 4.2 h, 1st |
 | Side-by-side | 5.8 h, 5th | 5.1 h, 3rd | 5.9 h, 5th (two cut tires on day 2) |
+
+## Career raids (plan PR 9)
+
+The career (`docs/CAREER.md`) adds four raids to the data: Midsummer
+Sprint (3 stages), the National Raid (7), the Autumn Raid (5) and the Long
+One (14). The free-play panel still offers the first two raids only
+(`FREE_RAID_IDS`). A career raid's entry also carries three things a
+free-play raid leaves out: `seed` (this year's roads, so the same raid is a
+new road each year), `field` (the rival teams with the trucks they have
+that year, from `src/sim/teams.ts`) and `hours` (the garage's mechanic
+hours at each bivouac, more with a bigger crew).

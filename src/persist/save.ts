@@ -3,8 +3,8 @@
  * checked before the game trusts it.
  *
  * A save is plain JSON: the build for each class, the class on the bench,
- * the year, the raid in progress (if any) and the last run on each rig (the
- * ghosts). Save codes leave the ghosts out (`leanSave`) because they're big
+ * the year, the raid in progress (if any), the last run on each rig (the
+ * ghosts) and the career (format 2, plan PR 9). Save codes leave the ghosts out (`leanSave`) because they're big
  * and only there for comparing runs.
  *
  * `readSave` takes anything (a slot from storage, an unpacked save code)
@@ -12,13 +12,16 @@
  * It moves old formats up to the newest one first, so a save made by an
  * older version of Bump Stop still loads. Pure: no DOM, no storage.
  */
+import { CALENDAR, TEAM_IDS, UPGRADES, type UpgradeId } from '../data/career'
 import { CLASSES, type ClassId } from '../data/classes'
 import { KITS, type AxleSettings, type TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR, SLOTS } from '../data/parts'
-import { DRIVER_IDS, RAIDS, type RaidId } from '../data/raids'
+import { DRIVER_IDS, RAIDS, type DriverId, type RaidId, type Rival } from '../data/raids'
 import { SAVE } from '../data/save'
 import { findPart, fitsClass, stockBuild, tidyBuild } from '../sim/build'
+import type { CareerJob, CareerState, Contract, NewsItem } from '../sim/career'
 import type { RaidState } from '../sim/raid'
+import { teamsForYear, type TeamGarage } from '../sim/teams'
 
 export interface GarageSave {
   /** The save format (`SAVE.version`). */
@@ -33,6 +36,8 @@ export interface GarageSave {
   raid: RaidState | null
   /** The last run on each rig (`<class>:<rig>`), for the ghost line. Only the shop reads these. */
   ghosts: Record<string, unknown>
+  /** The career (plan PR 9, save format 2), or null if this garage hasn't started one. */
+  career: CareerState | null
 }
 
 /** Why a save couldn't be read: damaged or not a save at all ('bad'), or made by a newer Bump Stop ('future'). */
@@ -57,6 +62,7 @@ export function newSave(): GarageSave {
     builds: Object.fromEntries(CLASS_IDS.map((c) => [c, stockBuild(c)])) as Record<ClassId, TruckBuild>,
     raid: null,
     ghosts: {},
+    career: null,
   }
 }
 
@@ -70,7 +76,7 @@ export function leanSave(save: GarageSave): GarageSave {
  * storage, and the backup reminder, both wait for this.
  */
 export function hasProgress(save: GarageSave): boolean {
-  if (save.raid || Object.keys(save.ghosts).length > 0 || save.year !== FIRST_YEAR) return true
+  if (save.raid || save.career || Object.keys(save.ghosts).length > 0 || save.year !== FIRST_YEAR) return true
   return CLASS_IDS.some((c) => JSON.stringify(save.builds[c]) !== JSON.stringify(stockBuild(c)))
 }
 
@@ -168,15 +174,126 @@ function readRaid(raw: unknown): RaidState {
     const n = finite(spares[k], `${k} spares`)
     if (n < 0 || !Number.isInteger(n)) fail(`${k} spares are not a count`)
   }
-  return { ...(raw as unknown as RaidState), entry: { raid: raidId, build, driver: raw.entry.driver as RaidState['entry']['driver'] } }
+  const entry: RaidState['entry'] = { raid: raidId, build, driver: raw.entry.driver as RaidState['entry']['driver'] }
+  // Career raids (format 2) carry the year's seed, the field and the crew's hours.
+  if (raw.entry.seed !== undefined) entry.seed = finite(raw.entry.seed, 'raid seed')
+  if (raw.entry.hours !== undefined) {
+    entry.hours = finite(raw.entry.hours, 'raid hours')
+    if (entry.hours <= 0) fail('raid hours are not positive')
+  }
+  if (raw.entry.field !== undefined) entry.field = arrayOf(raw.entry.field, 'raid field').map((r, i) => readRival(r, i, build.cls))
+  return { ...(raw as unknown as RaidState), entry }
 }
 
-/** Move a save made by an older format up one step at a time. Version 1 is the first, so there's nothing yet. */
-function migrate(raw: Record<string, unknown>): Record<string, unknown> {
+const TROUBLES = ['fade', 'bottoming', 'mount', 'axle', 'tire', 'stuck', 'lost']
+
+/** A rival entry in a career raid's field. */
+function readRival(raw: unknown, i: number, cls: ClassId): Rival {
+  const what = `rival ${i + 1}`
+  if (!isObj(raw)) fail(`${what} is missing`)
+  if (typeof raw.id !== 'string' || typeof raw.team !== 'string' || typeof raw.habit !== 'string') fail(`${what} has no name`)
+  if (!raw.team.startsWith('team.') || !raw.habit.startsWith('habit.')) fail(`${what} has an unknown team`)
+  if (raw.cls !== cls) fail(`${what} is in the wrong class`)
+  for (const k of ['number', 'pace', 'spread', 'risk'] as const) finite(raw[k], `${what} ${k}`)
+  const delay = arrayOf(raw.delay, `${what} delay`, 2).map((x) => finite(x, `${what} delay`))
+  const trouble = arrayOf(raw.trouble, `${what} trouble`)
+  if (!trouble.length || trouble.some((x) => !TROUBLES.includes(x as string))) fail(`${what} has unknown trouble`)
+  return { ...(raw as unknown as Rival), delay: delay as [number, number] }
+}
+
+// ── The career (format 2) ──
+
+function readContract(raw: unknown): Contract {
+  if (!isObj(raw)) fail('contract is missing')
+  if (typeof raw.id !== 'string') fail('contract has no id')
+  if (!CLASS_IDS.includes(raw.cls as ClassId)) fail('contract has an unknown class')
+  if (!DRIVER_IDS.includes(raw.driver as never)) fail('contract driver is unknown')
+  for (const k of ['number', 'budget', 'fee', 'rep'] as const) finite(raw[k], `contract ${k}`)
+  const bonus = isObj(raw.bonus) ? raw.bonus : fail('contract has no bonus')
+  for (const k of ['finish', 'podium', 'win'] as const) finite(bonus[k], `contract ${k} bonus`)
+  return raw as unknown as Contract
+}
+
+function readJob(raw: unknown): CareerJob | null {
+  if (raw === null || raw === undefined) return null
+  if (!isObj(raw)) fail('career job is not a job')
+  if (raw.kind === 'own') {
+    if (!DRIVER_IDS.includes(raw.driver as never)) fail('career job driver is unknown')
+    return { kind: 'own', driver: raw.driver as DriverId }
+  }
+  if (raw.kind === 'contract') {
+    const contract = readContract(raw.contract)
+    return { kind: 'contract', contract, build: readBuild(raw.build, contract.cls) }
+  }
+  fail('career job is unknown')
+}
+
+/** The rival teams' trucks. A truck that can't be read is bought again for the year, so the career always carries on. */
+function readTeams(raw: unknown, year: number): TeamGarage {
+  const fresh = teamsForYear(year)
+  if (!isObj(raw)) return fresh
+  for (const id of TEAM_IDS) {
+    const team = raw[id]
+    if (!isObj(team)) continue
+    for (const cls of Object.keys(fresh[id]) as ClassId[]) {
+      try {
+        if (team[cls] !== undefined) fresh[id][cls] = readBuild(team[cls], cls)
+      } catch {
+        // Keep the fresh truck for this one.
+      }
+    }
+  }
+  return fresh
+}
+
+const NEWS_KINDS: readonly NewsItem['kind'][] = ['result', 'winner', 'copied', 'newParts', 'sponsor', 'broke', 'longOne', 'skipped']
+
+function readCareer(raw: unknown): CareerState {
+  if (!isObj(raw)) fail('career is missing')
+  const year = finite(raw.year, 'career year')
+  if (!Number.isInteger(year) || year < FIRST_YEAR || year > LAST_YEAR) fail('career year is out of range')
+  const season = finite(raw.season, 'career season')
+  if (!Number.isInteger(season) || season < 0) fail('career season is out of range')
+  const next = finite(raw.next, 'career next raid')
+  if (!Number.isInteger(next) || next < 0 || next >= CALENDAR.length) fail('career next raid is out of range')
+  const day = finite(raw.day, 'career day')
+  if (day < 1 || day > 366) fail('career day is out of range')
+  const upgrades = arrayOf(raw.upgrades, 'career upgrades')
+  if (upgrades.some((u) => !UPGRADES.some((x) => x.id === u))) fail('career has an unknown upgrade')
+  const stats = isObj(raw.stats) ? raw.stats : fail('career stats are missing')
+  for (const k of ['raids', 'wins', 'podiums', 'contracts'] as const) finite(stats[k], `career ${k}`)
+  const longOne = arrayOf(raw.longOne, 'career Long One wins').map((y) => finite(y, 'career Long One year'))
+  // News is only for reading: anything that doesn't look like news is dropped rather than failing the save.
+  const news = Array.isArray(raw.news) ? raw.news.filter((n): n is NewsItem => isObj(n) && NEWS_KINDS.includes(n.kind as NewsItem['kind'])) : []
+  return {
+    seed: finite(raw.seed, 'career seed') >>> 0,
+    season,
+    year,
+    day,
+    next,
+    money: finite(raw.money, 'career money'),
+    rep: Math.max(0, finite(raw.rep, 'career reputation')),
+    own: raw.own === null || raw.own === undefined ? null : readBuild(raw.own),
+    upgrades: [...new Set(upgrades as UpgradeId[])],
+    job: readJob(raw.job),
+    teams: readTeams(raw.teams, year),
+    news,
+    longOne,
+    stats: { raids: stats.raids as number, wins: stats.wins as number, podiums: stats.podiums as number, contracts: stats.contracts as number },
+  }
+}
+
+/**
+ * Move a save made by an older format up one step at a time.
+ * - 1 → 2 (plan PR 9): the career arrives; an old garage has none.
+ */
+function migrate(input: Record<string, unknown>): Record<string, unknown> {
+  let raw = input
   const v = raw.v
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 1) fail('save has no format number')
   if (v > SAVE.version) throw new SaveFormatError('future', 'save is from a newer Bump Stop')
-  // When the format changes: `if (raw.v === 1) raw = { ...raw, v: 2, newThing: ... }`, and so on.
+  if (raw.v === 1) raw = { ...raw, v: 2, career: null }
+  // The next change: `if (raw.v === 2) raw = { ...raw, v: 3, newThing: ... }`, and so on.
   return raw
 }
 
@@ -195,6 +312,9 @@ export function readSave(input: unknown): GarageSave {
   for (const c of CLASS_IDS) if (builds[c] !== undefined) out.builds[c] = readBuild(builds[c], c)
   out.raid = raw.raid === null || raw.raid === undefined ? null : readRaid(raw.raid)
   out.ghosts = isObj(raw.ghosts) ? raw.ghosts : {}
+  out.career = raw.career === null || raw.career === undefined ? null : readCareer(raw.career)
+  // A career's own raid lives in `raid`: without it, there's no raid to come back to.
+  if (out.career?.job?.kind === 'own' && !out.raid) out.career.job = null
   return out
 }
 

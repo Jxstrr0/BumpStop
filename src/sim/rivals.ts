@@ -9,8 +9,8 @@
  * Harsh stages bring more trouble. The same raid always gives the same
  * rival results, so a second go is a fair comparison.
  *
- * The career (plan PR 9) gives rivals their own trucks and habits that
- * change: they copy what wins.
+ * In the career (plan PR 9) the field comes from `teams.ts` instead: rival
+ * teams with their own trucks, whose parts set their pace and trouble.
  */
 import type { ClassId } from '../data/classes'
 import { CLASS_WORK, RAID, RIVAL_HARSH_AVERAGE, RIVALS, type Rival, type RivalTrouble } from '../data/raids'
@@ -37,11 +37,14 @@ export function rivalsIn(cls: ClassId): Rival[] {
  * @param legPar each leg's par time (s): Steady, average driver, no stops.
  * @param km the stage's length.
  * @param harsh the share of the stage on harsh ground (0 to 1).
+ * @param field who's entered: the free-play rivals by default, or the career's teams (`teams.ts`).
  */
-export function rivalStages(cls: ClassId, legPar: readonly number[], km: number, harsh: number, seed: number): RivalStage[] {
+export function rivalStages(
+  cls: ClassId, legPar: readonly number[], km: number, harsh: number, seed: number, field: readonly Rival[] = rivalsIn(cls),
+): RivalStage[] {
   const par = legPar.reduce((a, b) => a + b, 0)
   const close = par * RAID.closeAfter
-  return rivalsIn(cls).map((rival) => {
+  return field.map((rival) => {
     const rng = new Rng(hashString(`${seed}:${rival.id}`))
     const clean = rival.pace * (1 + rival.spread * rng.range(-1, 1))
     const legs = legPar.map((p) => p * clean * (1 + (rival.spread / 2) * rng.range(-1, 1)))
