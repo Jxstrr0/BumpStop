@@ -32,12 +32,21 @@ export function stanceOf(truck: BuiltTruck): { front: number; rear: number } {
   return { front: stock.front.sag - truck.front.sag, rear: stock.rear.sag - truck.rear.sag }
 }
 
-function signed(mm: number): string {
+/** Millimetres with their sign: +12, −5 or ±0. */
+export function signedMm(mm: number): string {
   const r = Math.round(mm)
   return r > 0 ? `+${num(r)}` : r < 0 ? `−${num(-r)}` : '±0'
 }
 
-export function truckView(store: BuildStore): HTMLElement {
+export interface TruckViewHandle {
+  element: HTMLElement
+  /** The 3D view, loading it now if it hasn't come on screen yet (null if the phone can't). */
+  garage(): Promise<Garage | null>
+  /** The 3D view if it's ready, else null. */
+  garageNow(): Garage | null
+}
+
+export function truckView(store: BuildStore): TruckViewHandle {
   const box = el('figure', 'truck-view')
   const canvas = el('canvas', 'truck-canvas')
   canvas.setAttribute('role', 'img')
@@ -47,6 +56,8 @@ export function truckView(store: BuildStore): HTMLElement {
 
   let garage: Garage | null = null
   let failed = false
+  /** The latest truck going into the view. */
+  let shown: Promise<void> | null = null
 
   function describe(): void {
     const truck = store.truck()
@@ -55,7 +66,7 @@ export function truckView(store: BuildStore): HTMLElement {
     const rear = s.rear * 1000
     const stance = Math.round(front) === 0 && Math.round(rear) === 0
       ? t('view.stanceStock')
-      : tf('view.stanceBoth', { front: signed(front), rear: signed(rear) })
+      : tf('view.stanceBoth', { front: signedMm(front), rear: signedMm(rear) })
     const cls = CLASSES.find((c) => c.id === truck.build.cls)!
     canvas.setAttribute('aria-label', tf('view.alt', { cls: t(cls.name).toLowerCase(), stance }))
   }
@@ -64,7 +75,7 @@ export function truckView(store: BuildStore): HTMLElement {
     describe()
     if (!garage || failed) return
     const truck = store.truck()
-    garage.show(truck.build.cls, stanceOf(truck), truck.build.parts).then(
+    shown = garage.show(truck.build.cls, stanceOf(truck), truck.build.parts).then(
       () => { status.hidden = true },
       (err) => fail(err),
     )
@@ -83,26 +94,42 @@ export function truckView(store: BuildStore): HTMLElement {
     try {
       const { createGarage } = await import('../render/garage')
       garage = createGarage(canvas)
-      update()
+      const truck = store.truck()
+      describe()
+      shown = garage.show(truck.build.cls, stanceOf(truck), truck.build.parts).then(
+        () => { status.hidden = true },
+        (err) => fail(err),
+      )
+      await shown
     } catch (err) {
       fail(err)
     }
   }
+  let starting: Promise<void> | null = null
+  const begin = () => (starting ??= start())
 
   // Load three.js only when the view is about to be seen.
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) {
         io.disconnect()
-        void start()
+        void begin()
       }
     }, { rootMargin: '200px' })
     io.observe(box)
   } else {
-    void start()
+    void begin()
   }
 
   store.onChange(update)
   describe()
-  return box
+  return {
+    element: box,
+    async garage() {
+      await begin()
+      await shown
+      return failed ? null : garage
+    },
+    garageNow: () => (failed ? null : garage),
+  }
 }

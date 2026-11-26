@@ -16,6 +16,7 @@ import type { Clip } from '../sim/highlight'
 import type { Pose } from '../sim/poses'
 import type { TrackView } from '../render/trackView'
 import { el } from './dom'
+import { photoMode } from './photoMode'
 import { stanceOf } from './truckView'
 
 /** Slow motion for a clip that ends on a break (share of true speed). */
@@ -43,6 +44,9 @@ export function raidView(): RaidView {
   box.append(canvas, caption)
 
   let view: TrackView | null = null
+  // Photo mode (plan PR 12): freeze the highlight and frame a shot.
+  const photo = photoMode(box, canvas, () => view)
+  caption.after(photo.button)
   let loading: Promise<TrackView | null> | null = null
   let failed = false
   let poses: Pose[][] = []
@@ -98,8 +102,11 @@ export function raidView(): RaidView {
         caption.textContent = t('raidUi.viewLive')
         view.play(p, { rate: 1, loop: false })
       }
+      photo.ready(true)
     },
     stop() {
+      photo.close()
+      photo.ready(false)
       view?.stop()
     },
     works: () => !failed,

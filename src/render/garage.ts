@@ -18,6 +18,12 @@ import { REST_POSE, TruckModel, type FittedParts, type Stance } from './truckMod
 export interface Garage {
   /** Show this class's truck at this stance, with these parts bolted on. Resolves once the model is in. */
   show(cls: ClassId, stance: Stance, parts: FittedParts): Promise<void>
+  /**
+   * The truck from the front three-quarter, drawn at `width` × `height`
+   * pixels and copied onto a plain canvas (for the truck card, plan PR 12).
+   * Null before a truck is in.
+   */
+  snapshot(width: number, height: number): HTMLCanvasElement | null
   dispose(): void
 }
 
@@ -25,6 +31,8 @@ export interface Garage {
 const AUTO_TURN = 0.04
 /** After a drag, wait this long before turning on its own again (ms). */
 const HAND_PAUSE = 4000
+/** The truck card's angle: the front three-quarter, nose to the left (radians around the truck). */
+const SNAPSHOT_TURN = 0.75
 
 export function createGarage(canvas: HTMLCanvasElement): Garage {
   const renderer = makeRenderer(canvas)
@@ -167,6 +175,28 @@ export function createGarage(canvas: HTMLCanvasElement): Garage {
       truck.pose(REST_POSE)
       draw()
       loop()
+    },
+    snapshot(width, height) {
+      if (!truck) return null
+      // Draw once at the card's size, copy it off straight away (the
+      // canvas keeps its picture only until the browser shows it), then put
+      // the view back. All in one go, so the page never shows the big frame.
+      const ratio = renderer.getPixelRatio()
+      const wasTurn = turn
+      turn = SNAPSHOT_TURN
+      renderer.setPixelRatio(1)
+      renderer.setSize(width, height, false)
+      camera.aspect = width / height
+      camera.updateProjectionMatrix()
+      draw()
+      const out = document.createElement('canvas')
+      out.width = width
+      out.height = height
+      out.getContext('2d')?.drawImage(canvas, 0, 0, width, height)
+      turn = wasTurn
+      renderer.setPixelRatio(ratio)
+      resize()
+      return out
     },
     dispose() {
       cancelAnimationFrame(raf)

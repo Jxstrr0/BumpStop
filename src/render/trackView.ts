@@ -17,6 +17,7 @@
  */
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
+import { PHOTO_LIFT } from '../data/graphics'
 import type { FailureKind } from '../data/wear'
 import type { Profile } from '../sim/ground'
 import type { Pose } from '../sim/poses'
@@ -53,13 +54,36 @@ export interface RunSetup {
   wheelbase: number
 }
 
+/** Photo mode's camera and moment (plan PR 12). */
+export interface PhotoControls {
+  /** Where in the clip, 0 (its start) to 1 (its end). */
+  moment: number
+  /** The camera's way round the truck (radians; 0 is side-on from the left). */
+  turn: number
+  /** The camera's height, as an angle above the ground (radians). */
+  lift: number
+  /** Distance from the truck, as a share of where photo mode started (smaller is closer). */
+  zoom: number
+}
+
 export interface TrackView {
   setRun(run: RunSetup): Promise<void>
   play(clip: readonly Pose[], o: ClipOptions): void
   /** Stop drawing until the next clip (the run was reset). */
   stop(): void
+  /**
+   * Photo mode (plan PR 12): freeze the clip where it is and hand the camera
+   * to the player. Returns where it starts, or null when there's nothing on
+   * screen. Clips asked for meanwhile wait until `photoEnd`.
+   */
+  photoStart(): PhotoControls | null
+  photoSet(c: PhotoControls): void
+  photoEnd(): void
+  /** The view as it stands, drawn with its longer side `longSide` pixels and copied onto a plain canvas. */
+  snapshot(longSide: number): HTMLCanvasElement | null
   dispose(): void
 }
+
 
 type Shot = 'side' | 'front' | 'chase' | 'wheel' | 'high'
 const SHOTS: readonly Shot[] = ['side', 'front', 'chase', 'wheel', 'high']
@@ -145,6 +169,10 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   let lastTime = 0
   let visible = true
   let ticket = 0
+  // Photo mode: the player's camera, the distance it started at, and what to do once it ends.
+  let photo: PhotoControls | null = null
+  let photoDistance = 1
+  let waiting: { clip: readonly Pose[]; o: ClipOptions } | 'stop' | null = null
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
 
   function look(): void {
@@ -313,7 +341,62 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     })
   }
 
+  /** Put the truck (and the shaker's posts) where pose `p` says. Returns the truck's x in the scene. */
+  function applyPose(p: Pose): number {
+    const t = truck!
+    const tx = p.distance - origin
+    t.root.position.set(run?.road ? tx : 0, 0, 0)
+    const pose: TruckPose = { z: p.z, pitch: p.pitch, roll: p.roll, wheelZ: p.wheelZ, distance: p.distance }
+    t.pose(pose)
+    if (!run?.road) {
+      for (let i = 0; i < 4; i++) {
+        const c = t.cornerPosition(i, focusPos)
+        posts[i]!.position.set(c.x, p.ground - 0.15, c.z)
+      }
+    }
+    return run?.road ? tx : 0
+  }
+
+  /** Where photo mode's camera looks: the middle of the truck. */
+  function photoTarget(tx: number, out: THREE.Vector3): THREE.Vector3 {
+    const t = truck!
+    return out.set(tx + (t.frontX + t.rearX) / 2, 1.6 * t.radius, 0)
+  }
+
+  /** Draw the frozen moment from the player's camera. */
+  function drawPhoto(): void {
+    if (!truck || !photo || clip.length === 0) return
+    const length = clipLength()
+    clipTime = Math.min(1, Math.max(0, photo.moment)) * length
+    // The break shows only at the very end of a break replay.
+    const atBreak = !!opts.focus && photo.moment >= 0.999
+    if (atBreak && !broke) showBreak(opts.focus!)
+    if (!atBreak && broke) {
+      broke = false
+      truck.breakCorner(null)
+    }
+    shake = 0
+    const tx = applyPose(poseAt(clipTime))
+    photoTarget(tx, camTarget)
+    const d = photoDistance * photo.zoom
+    const lift = Math.min(PHOTO_LIFT.max, Math.max(PHOTO_LIFT.min, photo.lift))
+    camPos.set(
+      camTarget.x + Math.sin(photo.turn) * Math.cos(lift) * d,
+      Math.max(0.15, camTarget.y + Math.sin(lift) * d),
+      camTarget.z - Math.cos(photo.turn) * Math.cos(lift) * d,
+    )
+    camera.position.copy(camPos)
+    camera.lookAt(camTarget)
+    lights.sun.position.set(tx + 8, 14, -10)
+    lights.sun.target.position.set(tx, 0, 0)
+    renderer.render(scene, camera)
+  }
+
   function draw(dtReal: number): void {
+    if (photo) {
+      drawPhoto()
+      return
+    }
     if (!truck || clip.length === 0) {
       renderer.render(scene, camera)
       return
@@ -335,16 +418,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     }
     const p = poseAt(clipTime)
     const progress = length > 0 ? clipTime / length : 1
-    const tx = p.distance - origin
-    truck.root.position.set(run?.road ? tx : 0, 0, 0)
-    const pose: TruckPose = { z: p.z, pitch: p.pitch, roll: p.roll, wheelZ: p.wheelZ, distance: p.distance }
-    truck.pose(pose)
-    if (!run?.road) {
-      for (let i = 0; i < 4; i++) {
-        const c = truck.cornerPosition(i, focusPos)
-        posts[i]!.position.set(c.x, p.ground - 0.15, c.z)
-      }
-    }
+    const tx = applyPose(p)
     if (!ended) {
       emitDust(p, dt)
       if (opts.focus) emitSmoke(opts.focus, dt, progress)
@@ -378,7 +452,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   }
 
   function loop(): void {
-    if (raf || !visible || clip.length === 0) return
+    if (raf || !visible || clip.length === 0 || photo) return
     raf = requestAnimationFrame((now) => {
       if (!lastTime) lastTime = now
       tick(now)
@@ -426,6 +500,10 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     },
     play(next, o) {
       if (next.length === 0) return
+      if (photo) {
+        waiting = { clip: next, o }
+        return
+      }
       const sameRoad = clip.length > 0 && clip[0] === next[0]
       clip = next
       opts = o
@@ -441,10 +519,76 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       loop()
     },
     stop() {
+      if (photo) {
+        waiting = 'stop'
+        return
+      }
       cancelAnimationFrame(raf)
       raf = 0
       clip = []
       truck?.breakCorner(null)
+    },
+    photoStart() {
+      if (!truck || clip.length < 2) return null
+      cancelAnimationFrame(raf)
+      raf = 0
+      // Start from the camera as it is, seen from the middle of the truck.
+      const tx = applyPose(poseAt(clipTime))
+      const target = photoTarget(tx, new THREE.Vector3())
+      const off = camera.position.clone().sub(target)
+      photoDistance = Math.max(truck.radius * 3, off.length())
+      const length = clipLength()
+      photo = {
+        moment: length > 0 ? clipTime / length : 1,
+        turn: Math.atan2(off.x, -off.z),
+        lift: Math.min(PHOTO_LIFT.max, Math.max(PHOTO_LIFT.min, Math.asin(Math.min(1, Math.max(-1, off.y / photoDistance))))),
+        zoom: 1,
+      }
+      waiting = null
+      drawPhoto()
+      return { ...photo }
+    },
+    photoSet(c) {
+      if (!photo) return
+      photo = { ...c }
+      drawPhoto()
+    },
+    photoEnd() {
+      if (!photo) return
+      photo = null
+      const next = waiting
+      waiting = null
+      if (next === 'stop') this.stop()
+      else if (next) this.play(next.clip, next.o)
+      else {
+        lastTime = 0
+        loop()
+      }
+    },
+    snapshot(longSide) {
+      const w0 = canvas.clientWidth
+      const h0 = canvas.clientHeight
+      if (!truck || w0 === 0 || h0 === 0) return null
+      const k = longSide / Math.max(w0, h0)
+      const width = Math.round(w0 * k)
+      const height = Math.round(h0 * k)
+      // Draw once at the photo's size and copy it off straight away (the
+      // canvas keeps its picture only until the browser shows it), then put
+      // the view back, all in one go.
+      const ratio = renderer.getPixelRatio()
+      renderer.setPixelRatio(1)
+      renderer.setSize(width, height, false)
+      camera.aspect = width / height
+      camera.updateProjectionMatrix()
+      draw(0)
+      const out = document.createElement('canvas')
+      out.width = width
+      out.height = height
+      out.getContext('2d')?.drawImage(canvas, 0, 0, width, height)
+      renderer.setPixelRatio(ratio)
+      resize()
+      draw(0)
+      return out
     },
     dispose() {
       cancelAnimationFrame(raf)

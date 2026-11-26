@@ -19,6 +19,7 @@ import { lastPoses, posesHeld, POSES_PER_SECOND, type PoseLog } from '../sim/pos
 import type { BreakEvent } from '../sim/wear'
 import type { TrackView } from '../render/trackView'
 import { el } from './dom'
+import { photoMode } from './photoMode'
 import { stanceOf } from './truckView'
 
 export interface RigRun {
@@ -48,6 +49,9 @@ export function rigView(): RigView {
   box.append(canvas, caption)
 
   let view: TrackView | null = null
+  // Photo mode (plan PR 12): freeze the run and frame a shot.
+  const photo = photoMode(box, canvas, () => view)
+  caption.after(photo.button)
   let loading: Promise<TrackView | null> | null = null
   let failed = false
   let current: RigRun | null = null
@@ -84,6 +88,7 @@ export function rigView(): RigView {
     lastShown = end.t
     const rate = r.beat ? Math.min(1, VIEW_3D.shakerShownHz / Math.max(0.1, r.beat())) : 1
     view.play(clip, { rate, loop: false, onEnd: next })
+    photo.ready(true)
   }
 
   return {
@@ -124,14 +129,18 @@ export function rigView(): RigView {
             ? tf('view3d.replay', { what, where: t(`cornerName.${broken.corner}` as StringKey).toLowerCase() })
             : tf('view3d.replayFrame', { what, zone: t(`zone.${broken.zone ?? 'centre'}` as StringKey) })
           v.play(lastPoses(r.log, VIEW_3D.replaySeconds), { rate: VIEW_3D.slowMotion, loop: true, focus: { corner: broken.corner, kind: broken.kind } })
+          photo.ready(true)
         } else {
           if (r.road) caption.textContent = t('view3d.lasted')
           const rate = r.beat ? Math.min(1, VIEW_3D.shakerShownHz / Math.max(0.1, r.beat())) : 1
           v.play(lastPoses(r.log, VIEW_3D.clipSeconds), { rate, loop: false })
+          photo.ready(true)
         }
       })
     },
     reset() {
+      photo.close()
+      photo.ready(false)
       live = false
       current = null
       window.clearTimeout(retry)
