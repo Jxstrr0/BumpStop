@@ -20,9 +20,9 @@
  */
 import { CLASSES } from '../data/classes'
 import { SPARE_IDS, type SpareId } from '../data/parts'
-import { DRIVER_IDS, DRIVERS, FREE_RAID_IDS, JOBS, PACES, RAID, RAIDS, RIVALS, type DriverId, type PaceId, type RaidId } from '../data/raids'
+import { DRIVER_IDS, DRIVERS, FREE_RAID_IDS, JOBS, PACES, RAID, RAIDS, RIVALS, type DriverId, type PaceId, type RaidId, type Rival } from '../data/raids'
 import { t, tf, type StringKey } from '../data/strings'
-import { checkBuild, partIn, shopRules } from '../sim/build'
+import { checkBuild, partIn } from '../sim/build'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
   advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, leaveCheckpoint,
@@ -65,10 +65,27 @@ export function ordinal(n: number): string {
   return `${n}${suffix}`
 }
 
-function entrantName(who: string): string {
+/** A name for an entry in the standings: you, or a rival from the raid's field (the career's teams) or the usual list. */
+export function entrantName(who: string, field?: readonly Rival[]): string {
   if (who === 'you') return t('raidUi.you')
-  const r = RIVALS.find((x) => x.id === who)
+  const r = (field ?? RIVALS).find((x) => x.id === who) ?? RIVALS.find((x) => x.id === who)
   return r ? tf('raidUi.rivalName', { team: t(r.team), n: String(r.number) }) : who
+}
+
+/** A results table: place, who (with any trouble noted) and the gap to the leader. `you` names the player's line. */
+export function raidTable(rows: { who: string; time: number }[], rec: StageRecord | null, field?: readonly Rival[], you?: string): HTMLElement {
+  const table = el('table', 'raid-table')
+  const lead = rows[0]?.time ?? 0
+  rows.forEach((row, k) => {
+    const tr = el('tr', row.who === 'you' ? 'you' : '')
+    const rival = rec?.rivals.find((x) => x.id === row.who)
+    const name = el('td', 'who', row.who === 'you' && you ? you : entrantName(row.who, field))
+    if (rival?.trouble) name.append(el('span', 'small rival-note', tf('raidUi.rivalTrouble', { what: t(`raidUi.trouble.${rival.trouble.kind}` as StringKey), lost: gap(rival.trouble.lost).slice(1) })))
+    if (rival?.late) name.append(el('span', 'small rival-note', t('raidUi.rivalLate')))
+    tr.append(el('td', 'pos', String(k + 1)), name, el('td', 'time', k === 0 ? clock(row.time) : gap(row.time - lead)))
+    table.append(tr)
+  })
+  return table
 }
 
 function partName(part: Job['part'], index: number): string {
@@ -128,7 +145,20 @@ export interface RaidSaves {
   onRaid(raid: RaidState | null): void
 }
 
-export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
+/**
+ * The career's side of the raid panel (plan PR 9b). While a career is on,
+ * raids start from the career panel (`start`), and when one ends (or you
+ * retire) the career is told so it can pay out.
+ */
+export interface RaidCareer {
+  on(): boolean
+  /** The raid is over: `retired` if you pulled out. */
+  finish(state: RaidState, retired: boolean): void
+  /** The raid panel hands over its way to start a career raid. */
+  register(start: (state: RaidState) => void): void
+}
+
+export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCareer): HTMLElement {
   const box = el('section', 'panel raid')
   box.id = 'raid'
   box.append(el('h2', '', t('raidUi.title')), el('p', 'lead', t('raidUi.lead')))
@@ -174,6 +204,11 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
     state = null
     if (hadRaid) saveRaid()
     run = null
+    if (career?.on()) {
+      // In the career, raids start from the garage above (contracts and your own entries).
+      show(el('p', 'small', t('raidUi.careerNote')))
+      return
+    }
     const raidText = el('p', 'small')
     const driverText = el('p', 'small')
     const syncText = () => {
@@ -200,7 +235,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
       el('p', 'small', tf('raidUi.sparesLine', { list: sparesList({ ...carries }) })),
     )
     if (SPARE_IDS.every((s) => carries[s] === 0)) truckLines.append(el('p', 'small warm-text', t('raidUi.noSparesWarn')))
-    const problems = checkBuild(truck.build, shopRules(store.cls(), store.year()))
+    const problems = checkBuild(truck.build, store.rules())
     const enter = button(t('raidUi.enter'), 'btn start-btn')
     if (problems.length) {
       enter.disabled = true
@@ -227,6 +262,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
     b.addEventListener('click', () => {
       if (armed) {
         window.clearTimeout(disarm)
+        if (career?.on() && state) career.finish(state, true)
         entryScreen()
         return
       }
@@ -523,18 +559,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
   // ── 4. Results ──
 
   function standingsTable(rows: { who: string; time: number }[], rec: StageRecord | null): HTMLElement {
-    const table = el('table', 'raid-table')
-    const lead = rows[0]?.time ?? 0
-    rows.forEach((row, k) => {
-      const tr = el('tr', row.who === 'you' ? 'you' : '')
-      const rival = rec?.rivals.find((x) => x.id === row.who)
-      const name = el('td', 'who', entrantName(row.who))
-      if (rival?.trouble) name.append(el('span', 'small rival-note', tf('raidUi.rivalTrouble', { what: t(`raidUi.trouble.${rival.trouble.kind}` as StringKey), lost: gap(rival.trouble.lost).slice(1) })))
-      if (rival?.late) name.append(el('span', 'small rival-note', t('raidUi.rivalLate')))
-      tr.append(el('td', 'pos', String(k + 1)), name, el('td', 'time', k === 0 ? clock(row.time) : gap(row.time - lead)))
-      table.append(tr)
-    })
-    return table
+    return raidTable(rows, rec, state?.entry.field, state ? t('raidUi.you') : undefined)
   }
 
   function resultsScreen(rec: StageRecord, late: boolean): void {
@@ -644,8 +669,12 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
     const pos = table.findIndex((x) => x.who === 'you') + 1
     const mine = table[pos - 1]!.time
     const head = el('h3', 'raid-day', tf('raidUi.final', { raid: t(raidOf(s).name) }))
-    const again = button(t('raidUi.again'), 'btn start-btn')
-    again.addEventListener('click', () => entryScreen())
+    const inCareer = career?.on() ?? false
+    const again = button(t(inCareer ? 'raidUi.toGarage' : 'raidUi.again'), 'btn start-btn')
+    again.addEventListener('click', () => {
+      if (inCareer) career!.finish(s, false)
+      entryScreen()
+    })
     show(head, el('p', 'readout-line', tf('raidUi.finalPlace', { pos: ordinal(pos), n: String(table.length), time: clock(mine) })), standingsTable(table, null), again)
     focusHead(head)
   }
@@ -653,6 +682,15 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
   // A new class or part on the build screen changes what the entry screen shows.
   store.onChange(() => {
     if (!state) entryScreen()
+  })
+
+  career?.register((next) => {
+    stopTimers()
+    run = null
+    state = next
+    raidId = next.entry.raid
+    driver = next.entry.driver
+    morningScreen()
   })
 
   // Back to where the saved raid was: the morning, the bivouac, or the final results.

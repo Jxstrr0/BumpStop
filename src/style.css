@@ -537,3 +537,47 @@ input[type='range'] {
   text-transform: uppercase;
   cursor: pointer;
 }
+
+/* ── The career (plan PR 9b) ── */
+.career-status .readout-line { margin-bottom: 4px; }
+.career-broke {
+  margin: 8px 0;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 2px solid var(--hot);
+  border-left-width: 8px;
+  border-radius: 4px;
+}
+.career-broke p { margin: 0 0 4px; }
+.career-job { margin-top: 12px; }
+.career-skip { margin-top: 12px; }
+.career-win {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--head);
+  font-size: 20px;
+  font-weight: 800;
+  border-radius: 4px;
+}
+.career-calendar { margin-top: 16px; border-top: 1px solid var(--line); }
+.career-calendar > summary {
+  min-height: 44px;
+  padding: 10px 0;
+  font-family: var(--head);
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.career-calendar li.done { color: var(--muted); text-decoration: line-through; }
+.bench-label {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-left: 6px solid var(--accent);
+  background: var(--panel-2);
+  font-weight: 600;
+}
+.bench-note:not(:empty) { margin-top: 8px; }
+.bench-note p { margin: 0 0 6px; }

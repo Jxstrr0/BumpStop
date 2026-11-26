@@ -29,6 +29,9 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
   bivouac jobs, the raids' stages and the rival entries):
   `src/data/raids.ts`. Raid, driver and team names: `src/data/strings.ts`.
   In plain words: `docs/RAIDS.md`.
+- The career (calendar, money, prize money, contracts, reputation,
+  sponsors, the shop's upgrades, the rival teams and their habits):
+  `src/data/career.ts`. In plain words: `docs/CAREER.md`.
 - Colours: the top of `src/style.css`.
 - The plan: `docs/BUMP-STOP-PLAN.md`. Where it's up to: `docs/STATUS.md`.
 - Names: `docs/NAMES.md`.
