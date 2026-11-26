@@ -285,7 +285,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
   })
   rerunGo.addEventListener('click', () => {
     rerun.hidden = true
-    box.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
+    // begin() scrolls the run into view.
     begin()
   })
   // Once the shop is back on screen the bar isn't needed.
@@ -390,6 +390,10 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     lastChartSamples = -1
     sync()
     drawLive(true)
+    // Bring the run into view: on a phone the start button sits low, so the 3D view
+    // would start below the fold. The Fast, Skip and Stop buttons are pinned to the
+    // bottom of the screen while the run is on (.controls in style.css).
+    live.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
     last = performance.now()
     raf = requestAnimationFrame(tick)
   }

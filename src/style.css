@@ -799,3 +799,70 @@ body.photo-open { overflow: hidden; }
 .link-label input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
 .link-axles .small { margin: 0 0 4px; }
 .link-chip { font-family: var(--mono); font-size: 12px; text-transform: none; vertical-align: middle; color: var(--accent-text); }
+
+/* ── Phone layout fixes from the first playtest (v1.8.1.0) ── */
+
+/* A rig run: Fast, Skip and Stop stay pinned to the bottom of the screen while
+   the run is on, so they're one thumb away however far the page has scrolled. */
+.live .controls {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin: 0 -16px -16px;
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel);
+  border-top: 2px solid var(--ink);
+}
+
+/* The bivouac: hours, spares and money stay in sight while picking jobs,
+   pinned like the build screen's weight and money. */
+.bivouac-counters {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 8px -16px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+}
+.bivouac-counters p { margin: 0; }
+.bivouac-counters .live-progress { margin: 4px 0 6px; }
+
+/* Short screens (a phone on its side): pinned bars get slim so the page still
+   has room. Weight and money sit side by side; the class range lives on the bar
+   already, and "Legal to race" only shows when something's wrong. The 3D views
+   are capped so they leave room for the numbers under them. */
+@media (max-height: 500px) {
+  .build-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+    padding: 4px 16px;
+  }
+  .build-summary .sum-range,
+  .build-summary .problems .ok { display: none; }
+  .build-summary .problems,
+  .build-summary .bench-note { grid-column: 1 / -1; }
+  .build-summary .sum-line { font-size: 14px; }
+  .build-summary .chip { font-size: 11px; padding: 0 6px; }
+  .sum-bar { height: 8px; margin: 2px 0 4px; }
+  .bench-note:not(:empty) { margin-top: 2px; }
+  .bench-note p { margin: 0 0 4px; }
+  .bench-note .start-btn { min-height: 44px; padding: 6px 12px; }
+
+  .bivouac-counters {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 0 16px;
+    padding: 4px 16px;
+  }
+  .bivouac-counters .readout-line { font-size: 14px; }
+  .bivouac-counters .small { margin: 0; font-size: 13px; line-height: 1.35; }
+
+  .rig-canvas { width: min(100%, calc(62vh * 16 / 10)); margin: 0 auto; }
+  .truck-canvas { width: min(100%, calc(62vh * 16 / 11)); margin: 0 auto; }
+  /* Photo mode still fills the whole screen. */
+  .photo-on .rig-canvas { width: 100%; }
+  .live .controls { padding-top: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)); }
+}

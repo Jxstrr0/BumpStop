@@ -743,6 +743,14 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     const sparesLine = el('p', 'small')
     const moneyLine = el('p', 'small')
     const inCareer = s.entry.budget !== undefined
+    // Hours, spares and money stay pinned at the top while scrolling the jobs (style.css .bivouac-counters).
+    const counters = el('div', 'bivouac-counters')
+    counters.setAttribute('aria-live', 'polite')
+    const hoursBox = el('div', 'counter-hours')
+    hoursBox.append(hoursLine, hoursBar)
+    const stockBox = el('div', 'counter-stock')
+    stockBox.append(sparesLine, moneyLine)
+    counters.append(hoursBox, stockBox)
     const list = el('ul', 'job-list')
     const rows = jobs.map((job) => {
       const li = el('li')
@@ -801,7 +809,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     show(
       head,
       el('p', 'small', tf(rest ? 'raidUi.restDayLead' : 'raidUi.bivouacLead', { hours: num(bivouacHours(s)) })),
-      hoursLine, hoursBar, sparesLine, moneyLine,
+      counters,
       el('p', 'small', t('raidUi.slowWearNote')),
       jobs.length ? list : el('p', 'small', t('raidUi.noJobs')),
       done, retireButton(),
