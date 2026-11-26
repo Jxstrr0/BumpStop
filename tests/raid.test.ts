@@ -15,6 +15,7 @@ import { rivalStages, rivalsIn } from '../src/sim/rivals'
 import { runStage, type StageSpec } from '../src/sim/stage'
 import { fromCelsius } from '../src/sim/units'
 import { newWearState, worstDamage } from '../src/sim/wear'
+import { weatherShare, weatherSpeed } from '../src/sim/weather'
 
 const AIR = fromCelsius(20)
 
@@ -159,17 +160,23 @@ describe('driving a stage', { timeout: 60_000 }, () => {
     expect(go()).toEqual(go())
   })
 
-  it('a clean stage takes the time the speeds say', () => {
+  it('a clean stage takes the time the speeds say, the weather included', () => {
     const state = shortRaid('lightKit')
     const truck = raidTruck(state)
     const run = startStage(state, truck, 'conserve')
+    // The Summer Sprint's first day has a thaw that comes in: this checks the slow-down past the turn too.
+    expect(run.weather?.comes).toBe(true)
     driveStage(state, run, ['conserve', 'conserve', 'conserve'])
     expect(run.stops).toEqual([])
     let expected = 0
     for (const leg of run.legs) {
+      let at = leg.from
       for (const s of leg.segments) {
         const line = DRIVERS.veteran.skill.includes(s.ground) ? DRIVERS.veteran.skillTime : 1
-        expected += (s.length / groundSpeed(truck, 'veteran', s.ground, 'conserve')) * line
+        const clear = (s.length / groundSpeed(truck, 'veteran', s.ground, 'conserve')) * line
+        const slow = 1 / weatherSpeed(run.weather!.kind, truck.build.cls, s.ground)
+        expected += clear * (1 + weatherShare(run.weather, at, s.length) * (slow - 1))
+        at += s.length
       }
     }
     expect(run.time).toBeCloseTo(expected, 3)

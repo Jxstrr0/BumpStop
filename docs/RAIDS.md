@@ -188,6 +188,55 @@ off and lake ice that can crack under a heavy truck: `docs/WINTER.md`.
 Every entry drives the same roads (each raid has a fixed seed), so a second
 go shows what a change did.
 
+## Weather that changes mid-stage
+
+Kelbo picked this on 26 November 2026. Numbers: `src/data/weather.ts`; the
+roll: `src/sim/weather.ts`; driving it: `advanceStage` in `src/sim/raid.ts`.
+
+- **The forecast.** About 45% of mornings carry one: a **thaw** (summer
+  stages at 20 °C or cooler), a **dust storm** (summer stages at 19 °C or
+  warmer) or a **whiteout** (winter). It says how likely it is (possible
+  30%, likely 60%, expected 85%) and a window 20% of the stage long
+  where it may come in; the real place is inside it, somewhere from a
+  quarter to four fifths of the way. The roadbook shows the window as a
+  pencil note, and the morning screen says what that weather does.
+- **The roll** is seeded on the raid's seed and the stage, so the same raid
+  always has the same weather (in free play every go; in the career each
+  year's running has its own).
+- **Once it turns**, to the finish, the ground it changes is built
+  differently by the ride sim (`GroundMod` in `buildProfile`: bigger or
+  longer base roughness, taller features, less grip; the same bumps, so
+  nothing else moves), the driver slows down on it, and the air changes:
+
+| | Thaw | Whiteout | Dust storm |
+| --- | --- | --- | --- |
+| Ground | gravel and dirt (not rock) | everything | all summer ground |
+| Roughness / ripple length | ×2.2 / ×2.5 (long soft ruts) | ×1.3 / ×1 | ×1.2 / ×1 |
+| Features (washboard, whoops, rocks, jumps, heaves) | ×1 | ×1.2 (drifts) | ×1.3 (hit square) |
+| Grip | ×0.7 | ×1 | ×1 |
+| Speed | light 0.85, heavy 0.8, side-by-side 0.88 | 0.75 | 0.8 |
+| Air | −4 °C | −6 °C | +5 °C |
+| Tightest corner on winter ground | | ×0.72: Push slides, studs or not | |
+
+- **What it does**, from the forced-weather runs while tuning: a thaw costs
+  time but runs the oil cool (the long ruts work the springs, not the
+  dampers), so Push can be the right call; a dust storm runs the oil much
+  hotter (a stock light 4x4 at Steady can fade on rock country), so it's a
+  day for Conserve or bigger shocks; a whiteout costs a quarter of the
+  speed and Push slides into the snowbank once a piece of winter ground.
+- **The piece of ground it turns on** is driven up to the turn, then the rest
+  on its own seed (`:w`), so the trace has a point right at the turn.
+- **Everyone slows.** The legs' par (and so the closing time and the rivals'
+  pace) takes the slow-down past the turn; the rivals' trouble chance goes
+  up by `rivalRisk` times the share of the stage it covers.
+- **On screen:** the forecast in the morning and in the roadbook, a line in
+  the stage log as the highlight passes the turn, the weather at each
+  checkpoint (on since km n, still forecast, or held off), a line in the
+  day's results, and in the 3D highlight the fog closes in and changes
+  colour (`WEATHER_LOOK`), with the weather named under it.
+- **Saves:** each stage result keeps the day's weather (`StageRecord.weather`);
+  saves from before have none and load as they are.
+
 ## Highlights for the 3D
 
 A long stage drives a full-detail sample of each 5 km chunk and works out
