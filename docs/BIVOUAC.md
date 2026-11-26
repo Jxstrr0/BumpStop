@@ -1,6 +1,6 @@
 # Bivouac breakdowns
 
-Added in 1.3.0.0 (Kelbo picked it from the post-1.0 ideas, 26 November
+Added in 1.4.0.0 (Kelbo picked it from the post-1.0 ideas, 26 November
 2026). Code: `src/sim/condition.ts` and the bivouac in `src/sim/raid.ts`.
 Numbers: `src/data/condition.ts` and `JOBS` in `src/data/raids.ts`.
 

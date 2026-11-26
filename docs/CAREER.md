@@ -35,7 +35,9 @@ use another slot to keep playing free.
   - **Sit this one out** (tap twice).
 - **The calendar** for the year (folded away).
 - **Your truck:** buy one (stock, at its price), sell it (tap twice), and
-  when broke, sell its parts down to the cheapest for money back.
+  when broke, sell its parts down to the cheapest for money back. Its
+  **logbook** sits under it, and the trucks you sold under **Old trucks**
+  (`docs/LOGBOOK.md`).
 - **The shop:** crew and tools, with what each needs.
 - **News:** your results, who copied whom, new parts, sponsors; and your
   record.

@@ -568,6 +568,18 @@ input[type='range'] {
 .career-road p { margin: 0 0 4px; }
 .career-finale { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .career-finale p:not(.career-win) { margin: 0 0 6px; }
+
+/* The garage logbook: each truck's record and moments, and the old trucks. */
+.logbook { margin: 8px 0 12px; border-top: 1px solid var(--line); }
+.logbook > summary { min-height: 44px; padding: 10px 0; box-sizing: border-box; cursor: pointer; font-family: var(--head); font-size: 18px; font-weight: 700; text-transform: uppercase; }
+.logbook-entry { padding: 4px 0 10px; }
+.logbook-entry + .logbook-entry { border-top: 1px dashed var(--line); padding-top: 10px; }
+.logbook-head { margin: 0 0 4px; font-weight: 700; }
+.logbook-entry p.small { margin: 0 0 4px; }
+.logbook-num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.logbook-moments { margin-top: 6px; font-style: italic; }
+.logbook-moments li { margin: 2px 0; }
+.logbook-farewell { margin: 0 0 8px; padding: 8px 10px; border-left: 6px solid var(--accent); background: var(--panel-2); }
 .career-calendar { margin-top: 16px; border-top: 1px solid var(--line); }
 .career-calendar > summary {
   min-height: 44px;
