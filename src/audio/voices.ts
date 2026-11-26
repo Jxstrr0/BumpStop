@@ -1,8 +1,9 @@
 /**
  * The short sounds (plan PR 6): rattles, tire strikes, bottom-outs and the
  * sound of each failure letting go. Each is worked out sample by sample from
- * a few building blocks (noise, filters, ringing tones, a thump), so there
- * are no sound files to download or credit.
+ * a few building blocks (noise, filters, ringing tones, a thump). A real
+ * recording listed in `src/data/recordings.ts` can stand in for any of them;
+ * these are always there underneath.
  *
  * Pure: the same name, sample rate and seed always give the same samples, so
  * the tests can check them. `sound.ts` turns them into Web Audio buffers once.

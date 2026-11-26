@@ -1,7 +1,8 @@
 /**
  * The sound and the buzz (plan PR 6), played with the Web Audio API.
  *
- * Everything is made live, nothing is downloaded:
+ * Everything is made live; real recordings, where there are any
+ * (`src/data/recordings.ts`), stand in for the short sounds and the hiss:
  * - **Engine:** the waveform of the engine's firing pattern (`profile.ts`),
  *   played at its speed in the gear the truck would be in, through a bit of
  *   grit and a tone filter that opens up with revs and load. Diesels add a
@@ -23,6 +24,7 @@ import type { FailureKind } from '../data/wear'
 import { ENGINE_TONE, HISS, MIX, SHAKER_HUM } from '../data/sound'
 import { breakCues, lapCues, newCueState, shakerClatter, type CueState, type Cues, type LapFrame } from './cues'
 import { engineHarmonics, engineSound, engineSpeedFor } from './profile'
+import { loadRecordings, type LoadedRecording } from './recordings'
 import { renderVoice, VOICE_NAMES, type VoiceName } from './voices'
 
 const SOUND_KEY = 'bumpstop.sound'
@@ -94,6 +96,9 @@ export function makeSound(): Sound {
   let master: GainNode | null = null
   let noise: AudioBuffer | null = null
   const buffers = new Map<VoiceName, AudioBuffer[]>()
+  /** Real recordings, as they finish loading. A sound with any plays them instead of its made takes. */
+  const recorded = new Map<VoiceName, LoadedRecording[]>()
+  let hissRecording: LoadedRecording | null = null
   let run: RunVoices | null = null
   let take = 0
 
@@ -128,6 +133,15 @@ export function makeSound(): Sound {
         takes.push(buf)
       }
       buffers.set(name, takes)
+    }
+
+    // Load any real recordings in the background; until one arrives (or if it never does) the made sound plays.
+    // `?sound=made` in the address skips them, to hear the two side by side.
+    if (new URLSearchParams(location.search).get('sound') !== 'made') {
+      loadRecordings(ctx, (sound, loaded) => {
+        if (sound === 'hissLoop') hissRecording ??= loaded
+        else recorded.set(sound, [...(recorded.get(sound) ?? []), loaded])
+      })
     }
 
     // Pause the sound with the tab, so it never plays in the background.
@@ -231,7 +245,19 @@ export function makeSound(): Sound {
     hissBand.frequency.value = 3500
     const hissGain = keep(c.createGain())
     hissGain.gain.value = 0
-    loopNoise(c, r).connect(hissBand).connect(hissGain).connect(master)
+    if (hissRecording) {
+      // A recorded hiss, looped from a different place each run.
+      const src = c.createBufferSource()
+      src.buffer = hissRecording.buffer
+      src.loop = true
+      src.start(0, Math.random() * hissRecording.buffer.duration)
+      r.sources.push(src)
+      const trim = keep(c.createGain())
+      trim.gain.value = hissRecording.gain
+      src.connect(trim).connect(hissGain).connect(master)
+    } else {
+      loopNoise(c, r).connect(hissBand).connect(hissGain).connect(master)
+    }
     const lfo = keep(c.createOscillator())
     lfo.type = 'square'
     lfo.frequency.value = HISS.sputterHz
@@ -300,13 +326,24 @@ export function makeSound(): Sound {
   function play(cues: Cues): void {
     if (!ctx || !master) return
     for (const shot of cues.shots) {
+      const real = recorded.get(shot.voice)
       const takes = buffers.get(shot.voice)
-      if (!takes) continue
+      let buffer: AudioBuffer
+      let trim = 1
+      if (real && real.length > 0) {
+        const pick = real[take++ % real.length] as LoadedRecording
+        buffer = pick.buffer
+        trim = pick.gain
+      } else if (takes) {
+        buffer = takes[take++ % takes.length] as AudioBuffer
+      } else {
+        continue
+      }
       const src = ctx.createBufferSource()
-      src.buffer = takes[take++ % takes.length] as AudioBuffer
+      src.buffer = buffer
       src.playbackRate.value = shot.rate
       const g = ctx.createGain()
-      g.gain.value = shot.gain
+      g.gain.value = shot.gain * trim
       src.connect(g).connect(master)
       src.start(now() + shot.delay)
     }

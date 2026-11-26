@@ -2,8 +2,9 @@
  * Every number behind the sound and the buzz (plan PR 6).
  *
  * Nothing here is a recording: every sound is made live in the browser from
- * these numbers and from what the sim is doing (`src/audio/`). How it all
- * works: `docs/SOUND.md`.
+ * these numbers and from what the sim is doing (`src/audio/`). Real
+ * recordings that can stand in for the short sounds are listed in
+ * `recordings.ts`. How it all works: `docs/SOUND.md`.
  *
  * `FEEL` is the only part the sim reads (`src/sim/laps.ts` counts the hits
  * with it). The rest is for `src/audio/`.

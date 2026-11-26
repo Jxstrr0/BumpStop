@@ -37,5 +37,7 @@ Each copied file says where it came from in its first line
 | `public/icon.svg`, `icon-180.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | Made for Bump Stop (the PNGs are drawn from `icon.svg`) |
 
 Every sound (plan PR 6) is made live in the browser by the game's own code
-(`src/audio/`), so there are no third-party sound files. Any recordings
-added later get a line here.
+(`src/audio/`). Real recordings can stand in for the short sounds and the
+hiss (`src/data/recordings.ts`, files in `public/sounds/`); there are none
+yet. Each one added gets a line in this table: the file name, its title,
+author, licence and the page it came from.
