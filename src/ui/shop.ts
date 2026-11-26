@@ -20,6 +20,11 @@
  * (`src/audio/sound.ts`), which plays the engine, the clatter, the hits and
  * the hiss, and the break when something lets go. Sound and Buzz switches
  * sit under the start button.
+ *
+ * Ghost trucks (Kelbo asked, 26 November 2026): on the two loops the run can
+ * race a ghost, your best run there or a friend's (`ghostRace.ts`). The
+ * ghost's own run is driven again step for step beside yours, shown as a
+ * see-through truck in 3D, and the report says who lasted longer.
  */
 import { heatShare } from '../audio/cues'
 import { makeSound } from '../audio/sound'
@@ -27,7 +32,8 @@ import { CLASSES, type ClassId } from '../data/classes'
 import { WARM_SHARE } from '../data/failures'
 import { RIGS, RIG_VIEW, SHAKER, SHOP_RIGS, VIEW_3D, type RigId, type RigPiece, type ShopRigId } from '../data/rigs'
 import { t, tf, type StringKey } from '../data/strings'
-import type { BuiltTruck } from '../sim/build'
+import { buildTruck, type BuiltTruck } from '../sim/build'
+import { ghostFromRun } from '../sim/ghost'
 import { advanceLaps, lapLength, lapResult, startLaps, takeFeel, type LapRunner, type RunHistory } from '../sim/laps'
 import { advanceShaker, shakerSteps, startShaker, type ShakerPoint, type ShakerRunner } from '../sim/shaker'
 import { fromCelsius, msToKmh } from '../sim/units'
@@ -36,6 +42,7 @@ import { BAND_WORD, bandOf, ghostLegend, lineChart, shakerChart, type Band, type
 import { el, num } from './dom'
 import { SHOP_EVENT, type ShopEvent } from './events'
 import { jumpTo, type Jump } from './fixes'
+import { distanceText, ghostRace, raceText, type GhostPick } from './ghostRace'
 import { lapReport, shakerReport, type LapGhost } from './report'
 import { rigView } from './rigView'
 
@@ -81,8 +88,17 @@ function readGhost(raw: unknown): Ghost | null {
   return raw as Ghost
 }
 
+/** A ghost truck racing this run: the ghost, its truck, and its own run driven step for step with yours. */
+interface Race {
+  pick: GhostPick
+  truck: BuiltTruck
+  runner: LapRunner
+  /** What the race line says now, so it only changes when something happens. */
+  said: string
+}
+
 type Active =
-  | { kind: 'laps'; rig: RigId; cls: ClassId; truck: BuiltTruck; runner: LapRunner; ghost: LapGhostRun | null }
+  | { kind: 'laps'; rig: RigId; cls: ClassId; truck: BuiltTruck; runner: LapRunner; ghost: LapGhostRun | null; race: Race | null }
   | { kind: 'shaker'; cls: ClassId; truck: BuiltTruck; runner: ShakerRunner; ghost: ShakerPoint[] | null; total: number; taken: number }
 
 /** Each class and rig drives its own road, the same every run, so a re-run shows exactly what a fix changed. */
@@ -119,7 +135,21 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
       if (g) ghosts.set(ghostKey(c.id, r), g)
     }
   }
-  const ghostsChanged = () => saves?.onGhosts(Object.fromEntries(ghosts))
+  // The ghost trucks (best runs and friends' ghosts) are kept beside the last-run lines, under their own keys.
+  const ghostsChanged = () => saves?.onGhosts({ ...Object.fromEntries(ghosts), ...race.stored() })
+  const race = ghostRace({
+    saved: saves?.ghosts ?? {},
+    onChange: () => ghostsChanged(),
+    onFriend(g) {
+      // Put the friend's class and loop on the bench, if nothing's running and the career allows the class.
+      if (active) return
+      store.setClass(g.cls)
+      if (store.cls() !== g.cls) return
+      rig = g.rig
+      channel = g.rig === 'tortureLoop' ? 'wear' : 'oil'
+      reset()
+    },
+  })
   let rig: ShopRigId = 'washboardLadder'
   let active: Active | null = null
   let raf = 0
@@ -213,6 +243,8 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
   const chartHolder = el('div', 'sim-chart')
   const legendHolder = el('div')
   const ghostNote = el('p', 'small')
+  const raceLine = el('p', 'small race-line')
+  raceLine.setAttribute('aria-live', 'polite')
 
   const controls = el('div', 'btn-row controls')
   const fastBtn = el('button', 'btn', t('shop.fast'))
@@ -236,7 +268,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
 
   // The 3D view of the run (plan PR 5). It moves into the report when the run ends, so the slow-motion replay is in sight.
   const view3d = rigView()
-  live.append(view3d.element, liveHead, progress, corners, frameLine, channelRow, chartTitle, chartHolder, legendHolder, ghostNote, controls)
+  live.append(view3d.element, liveHead, progress, corners, frameLine, channelRow, chartTitle, chartHolder, legendHolder, ghostNote, raceLine, controls)
   const reportHolder = el('div', 'report-holder')
 
   // --- The bar that brings the player back after a fix jump ---
@@ -304,6 +336,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     lastLine.textContent = lastRunText()
     start.textContent = t(rig === 'shaker' ? 'shop.startShaker' : 'shop.start')
     start.disabled = active !== null
+    race.sync(store.cls(), rig, active !== null)
     for (const { ch, b } of channelButtons) b.setAttribute('aria-pressed', String(ch === channel))
   }
 
@@ -320,7 +353,15 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
       sound.startShaker(truck.build.parts.engine, cls)
     } else {
       const runner = startLaps(truck.ride, truck.wear, RIGS[rig], seedFor(cls, rig), { airTemp: AIR, poses: VIEW_3D.poseSeconds })
-      active = { kind: 'laps', rig, cls, truck, runner, ghost: ghost?.kind === 'laps' ? ghost : null }
+      // The ghost drives the very same road from the same start, so step for step it's exactly where its run was.
+      const pick = race.pick(cls, rig)
+      let rival: Race | null = null
+      if (pick) {
+        const ghostTruck = buildTruck(pick.ghost.build)
+        const ghostRunner = startLaps(ghostTruck.ride, ghostTruck.wear, RIGS[rig], seedFor(cls, rig), { airTemp: AIR, poses: VIEW_3D.poseSeconds, trace: false })
+        rival = { pick, truck: ghostTruck, runner: ghostRunner, said: '' }
+      }
+      active = { kind: 'laps', rig, cls, truck, runner, ghost: ghost?.kind === 'laps' ? ghost : null, race: rival }
       sound.startLaps(truck.build.parts.engine, cls)
     }
     fast = false
@@ -335,9 +376,12 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     const laps = active.kind === 'laps'
     for (const n of [corners, frameLine, channelRow]) n.hidden = !laps
     ghostNote.textContent = active.ghost ? t('shop.ghostNote') : ''
+    raceLine.textContent = ''
     live.prepend(view3d.element)
     if (active.kind === 'laps') {
-      view3d.begin({ truck, road: active.runner.road, log: active.runner.poses! })
+      const r = active.race
+      const ghostRun = r ? { truck: r.truck, log: r.runner.poses!, broken: () => r.runner.run.w.broken } : null
+      view3d.begin({ truck, road: active.runner.road, log: active.runner.poses!, ghost: ghostRun })
     } else {
       const sr = active.runner
       view3d.begin({ truck, road: null, log: sr.poses!, beat: () => sr.freqs[Math.min(sr.index, sr.freqs.length - 1)] as number })
@@ -402,8 +446,28 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
   }
 
   function step(a: Active, n: number): void {
-    if (a.kind === 'laps') advanceLaps(a.runner, n)
-    else a.taken += advanceShaker(a.runner, n)
+    if (a.kind === 'laps') {
+      const taken = advanceLaps(a.runner, n)
+      // The ghost takes exactly as many steps, so the two stay side by side in time.
+      if (a.race && !a.race.runner.done) advanceLaps(a.race.runner, taken)
+    } else a.taken += advanceShaker(a.runner, n)
+  }
+
+  /** The line under the chart while racing a ghost: who it is, and what happened to it. */
+  function drawRace(a: Extract<Active, { kind: 'laps' }>): void {
+    const r = a.race
+    if (!r) return
+    const g = r.runner
+    const broke = g.run.w.broken
+    const who = t(r.pick.source === 'best' ? 'ghost.whoBest' : 'ghost.whoFriend')
+    let text: string
+    if (broke) text = tf('ghost.liveBroke', { who, what: t(`fail.${broke.kind}` as StringKey).toLowerCase(), lap: String(g.laps.length) })
+    else if (g.done) text = tf('ghost.liveLasted', { who })
+    else text = tf('ghost.liveRacing', { who })
+    if (text !== r.said) {
+      r.said = text
+      raceLine.textContent = text
+    }
   }
 
   function drawLive(force: boolean): void {
@@ -445,6 +509,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
       c.cell.dataset.band = band
     }
     frameLine.textContent = tf('live.frame', { pct: num(Math.max(...r.run.w.frame.map((f) => f.damage)) * 100) })
+    drawRace(a)
 
     // The chart only needs redrawing when there's a new sample, and not more than a few times a second.
     const now = performance.now()
@@ -539,6 +604,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     } else {
       const run = lapResult(a.runner)
       report = lapReport(run, stopped, a.ghost, ctx)
+      if (!stopped) raceVerdict(report, a, ghostFromRun(a.cls, a.rig, a.truck.build, run))
       const lastLap = run.laps[run.laps.length - 1]
       ghosts.set(ghostKey(a.cls, a.rig), {
         kind: 'laps',
@@ -563,12 +629,35 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     report.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
   }
 
+  /**
+   * The report's ghost lines: how the run went against the ghost (if it
+   * raced one), and whether it's a new best (which becomes the ghost).
+   */
+  function raceVerdict(report: HTMLElement, a: Extract<Active, { kind: 'laps' }>, mine: ReturnType<typeof ghostFromRun>): void {
+    const lines: string[] = []
+    const r = a.race
+    if (r) {
+      // The ghost's own run as driven here; if yours ended first, the rest of its run is what it did before.
+      const g = r.runner
+      const lastLap = g.laps[g.laps.length - 1]
+      const theirs = g.done ? { distance: lastLap?.endDistance ?? 0 } : r.pick.ghost
+      lines.push(tf(r.pick.source === 'best' ? 'ghost.againstBest' : 'ghost.againstFriend', { how: raceText(mine, theirs) }))
+    }
+    if (race.record(mine)) lines.push(tf('ghost.newBest', { dist: distanceText(mine.distance) }))
+    if (lines.length === 0) return
+    const box = el('div', 'ghost-verdict')
+    for (const l of lines) box.append(el('p', '', l))
+    const head = report.querySelector('.report-head')
+    if (head) head.after(box)
+    else report.prepend(box)
+  }
+
   store.onChange((change) => {
     // A new class is a new truck: drop the run in progress. Part and setting changes wait for the next run.
     if (change === 'class' || change === 'bench') reset()
   })
 
-  box.append(testing, rigRow, rigText, lastLine, start, soundRow, live, reportHolder, rerun)
+  box.append(testing, rigRow, rigText, lastLine, start, race.element, soundRow, live, reportHolder, rerun)
   sync()
   return box
 }

@@ -12,6 +12,10 @@
  *
  * On the shaker rig the truck stands on four posts on the shop floor.
  *
+ * A ghost truck (your best run, or a friend's) can drive the loop with you:
+ * a pale, see-through copy posed from its own clip of the same moments.
+ * When it has broken it stays where it stopped, so you drive away from it.
+ *
  * With reduced motion the camera holds one side-on view and never shakes or
  * swoops; the truck still moves as the sim says.
  */
@@ -22,6 +26,7 @@ import type { FailureKind } from '../data/wear'
 import { WEATHER_LOOK, type WeatherId } from '../data/weather'
 import type { Profile } from '../sim/ground'
 import type { Pose } from '../sim/poses'
+import { GHOST_LOOK } from '../data/rigs'
 import { addLights, applyLook, applyTier, cssColour, isDark, makeRenderer, onLookChange } from './look'
 import { Puffs } from './particles'
 import { Forest, placePieces, stripGeometry } from './terrain'
@@ -42,6 +47,10 @@ export interface ClipOptions {
   focus?: BreakFocus | null
   /** Called when a clip that doesn't loop reaches its end. */
   onEnd?: () => void
+  /** The ghost truck's poses over the same moments (it may have stopped earlier), or null for no ghost. */
+  ghost?: readonly Pose[] | null
+  /** What broke on the ghost, shown once it has stopped. */
+  ghostBroken?: BreakFocus | null
 }
 
 export interface RunSetup {
@@ -53,6 +62,8 @@ export interface RunSetup {
   road: readonly Profile[] | null
   /** Front axle to rear axle (m). */
   wheelbase: number
+  /** A ghost truck of the same class to race, or null. */
+  ghost?: { stance: Stance; parts: FittedParts } | null
 }
 
 /** Photo mode's camera and moment (plan PR 12). */
@@ -100,6 +111,17 @@ const AHEAD = 60
 const smooth = (u: number) => {
   const v = Math.min(1, Math.max(0, u))
   return v * v * (3 - 2 * v)
+}
+
+/** The pose at time `t` (s into the run) in a clip, starting the search at `cursor`. Returns the pose and where it was found. */
+function poseIn(list: readonly Pose[], cursor: number, t: number): { pose: Pose; cursor: number } {
+  let k = cursor
+  while (k < list.length - 2 && list[k + 1]!.t <= t) k++
+  while (k > 0 && list[k]!.t > t) k--
+  const a = list[k]!
+  const b = list[Math.min(k + 1, list.length - 1)]!
+  const span = b.t - a.t
+  return { pose: lerpPose(a, b, span > 0 ? Math.min(1, Math.max(0, (t - a.t) / span)) : 0), cursor: k }
 }
 
 function lerpPose(a: Pose, b: Pose, u: number): Pose {
@@ -156,6 +178,10 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   scene.add(dust.points, smoke.points)
 
   let truck: TruckModel | null = null
+  // The ghost truck, and its clip of the same moments.
+  let ghost: TruckModel | null = null
+  let ghostClip: readonly Pose[] = []
+  let ghostCursor = 0
   let run: RunSetup | null = null
   let clip: readonly Pose[] = []
   let opts: ClipOptions = { rate: 1, loop: false }
@@ -234,13 +260,43 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   }
 
   function poseAt(time: number): Pose {
+    const found = poseIn(clip, cursor, clip[0]!.t + time)
+    cursor = found.cursor
+    return found.pose
+  }
+
+  /**
+   * Put the ghost truck where its own clip says at this moment of the run
+   * (`time` s into the clip). Once its clip runs out it has stopped: it
+   * stays put, showing what broke, and drops out of the picture behind.
+   */
+  function placeGhost(time: number): void {
+    const g = ghost
+    if (!g) return
+    if (!run?.road || ghostClip.length === 0 || clip.length === 0) {
+      g.root.visible = false
+      return
+    }
     const t = clip[0]!.t + time
-    while (cursor < clip.length - 2 && clip[cursor + 1]!.t <= t) cursor++
-    while (cursor > 0 && clip[cursor]!.t > t) cursor--
-    const a = clip[cursor]!
-    const b = clip[Math.min(cursor + 1, clip.length - 1)]!
-    const span = b.t - a.t
-    return lerpPose(a, b, span > 0 ? Math.min(1, Math.max(0, (t - a.t) / span)) : 0)
+    const last = ghostClip[ghostClip.length - 1]!
+    let p = last
+    if (t < last.t) {
+      const found = poseIn(ghostClip, ghostCursor, t)
+      ghostCursor = found.cursor
+      p = found.pose
+    }
+    const gx = p.distance - origin
+    g.root.visible = gx > -BEHIND * 0.8
+    if (!g.root.visible) return
+    const broken = t >= last.t ? opts.ghostBroken : null
+    g.breakCorner(null)
+    if (broken && broken.corner >= 0) {
+      if (broken.kind === 'tire') g.breakCorner(broken.corner, 'flat')
+      if (broken.kind === 'axle') g.breakCorner(broken.corner, 'flop')
+      if (broken.kind === 'mount') g.breakCorner(broken.corner, 'mount')
+    }
+    g.root.position.set(gx, 0, 0)
+    g.pose({ z: p.z, pitch: p.pitch, roll: p.roll, wheelZ: p.wheelZ, distance: p.distance })
   }
 
   function clipLength(): number {
@@ -387,6 +443,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     }
     shake = 0
     const tx = applyPose(poseAt(clipTime))
+    placeGhost(clipTime)
     photoTarget(tx, camTarget)
     const d = photoDistance * photo.zoom
     const lift = Math.min(PHOTO_LIFT.max, Math.max(PHOTO_LIFT.min, photo.lift))
@@ -429,6 +486,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const p = poseAt(clipTime)
     const progress = length > 0 ? clipTime / length : 1
     const tx = applyPose(p)
+    placeGhost(clipTime)
     if (!ended) {
       emitDust(p, dt)
       if (opts.focus) emitSmoke(opts.focus, dt, progress)
@@ -505,11 +563,31 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
         truck = model
         scene.add(truck.root)
       }
+      if (next.ghost && ghost?.cls !== next.cls) {
+        const model = await TruckModel.load(next.cls)
+        if (mine !== ticket) {
+          model.dispose()
+          return
+        }
+        ghost?.dispose()
+        ghost = model
+        ghost.ghostly(new THREE.Color(GHOST_LOOK.tint), GHOST_LOOK.opacity, GHOST_LOOK.mix)
+        scene.add(ghost.root)
+      }
+      if (ghost) {
+        ghost.root.visible = false
+        if (next.ghost) {
+          ghost.stance = next.ghost.stance
+          ghost.fit(next.ghost.parts)
+          ghost.breakCorner(null)
+        }
+      }
       run = next
       truck.stance = next.stance
       truck.fit(next.parts)
       truck.breakCorner(null)
       clip = []
+      ghostClip = []
       dust.clear()
       smoke.clear()
     },
@@ -523,6 +601,9 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       clip = next
       opts = o
       cursor = 0
+      ghostClip = (run?.ghost && o.ghost) || []
+      ghostCursor = 0
+      if (ghost && ghostClip.length === 0) ghost.root.visible = false
       restart()
       if (!o.focus) {
         shot = SHOTS[shotIndex++ % SHOTS.length]!
@@ -541,7 +622,9 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       cancelAnimationFrame(raf)
       raf = 0
       clip = []
+      ghostClip = []
       truck?.breakCorner(null)
+      if (ghost) ghost.root.visible = false
     },
     photoStart() {
       if (!truck || clip.length < 2) return null
@@ -612,6 +695,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       stopLook()
       stopTier()
       truck?.dispose()
+      ghost?.dispose()
       strip.geometry.dispose()
       dust.dispose()
       smoke.dispose()

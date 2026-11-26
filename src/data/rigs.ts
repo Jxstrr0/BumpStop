@@ -137,3 +137,12 @@ export const VIEW_3D = {
   /** The shaker is slowed so no beat looks faster than this many a second (Hz). */
   shakerShownHz: 2.5,
 } as const
+
+/** How the ghost truck looks on the 3D test track: a blue copy you can see through, drawn over everything like an X-ray. */
+export const GHOST_LOOK = {
+  /** Every colour on the ghost is pulled this far (0 to 1) towards this one. */
+  tint: 0x4f9be8,
+  mix: 0.85,
+  /** How solid each surface is (0 invisible, 1 solid); where surfaces overlap it adds up. */
+  opacity: 0.18,
+} as const
