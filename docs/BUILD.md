@@ -83,6 +83,16 @@ up hits, so the balance bot's weak-spot builds for it (short bump stops,
 weak mounts, soft frame) had to be weaker to break first
 (`src/data/balance.ts`).
 
+## The build screen
+
+`src/ui/buildScreen.ts`, with the truck on the bench kept in
+`src/ui/buildStore.ts` (one build per class, in memory until saves arrive in
+plan PR 8). Class buttons and a year slider at the top; weight and money
+pinned in a strip that stays in sight while scrolling, with the problems
+listed under it; a row per slot that opens to its choices; then the front
+and rear axle's sliders. Only the adjusters a part has get a slider. The
+ride sim and break test on the preview page drive whatever is on the bench.
+
 ## Tests
 
 `tests/build.test.ts`: every stock build is legal in 1985 and drives on its
