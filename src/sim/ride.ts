@@ -206,6 +206,8 @@ export function emptyStats(): RideStats {
  */
 export function dampingMultiplier(oilTemp: number, damper: DamperSetup): number {
   let m = detExp(-DAMPER_OIL.viscositySlope * (oilTemp - DAMPER_OIL.referenceTemp))
+  // Below freezing the oil thickens faster (winter, plan PR 10).
+  if (oilTemp < DAMPER_OIL.coldFrom) m *= detExp(DAMPER_OIL.coldSlope * (DAMPER_OIL.coldFrom - oilTemp))
   const foam = (oilTemp - damper.aerationTemp) / DAMPER_OIL.aerationSpan
   if (foam > 0) m *= 1 - (1 - DAMPER_OIL.aerationFloor) * (foam > 1 ? 1 : foam)
   if (m > DAMPER_OIL.maxMultiplier) m = DAMPER_OIL.maxMultiplier

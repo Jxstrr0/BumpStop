@@ -13,7 +13,8 @@
  *   after hit, or one load bigger than the mount.
  * - **Snapped axle or CV:** the joint's torque against its strength, which
  *   drops as the joint works at an angle. A wheel that spins up in the air
- *   and lands slams the most torque through it. Past its biggest angle the
+ *   and lands slams the most torque through it, as much as the tire can
+ *   grip the ground (less on ice and snow). Past its biggest angle the
  *   joint binds and snaps.
  * - **Cut tire:** squashed onto the rim over a sharp edge cuts it at once;
  *   smaller folds over sharp edges bruise the casing until it gives.
@@ -21,6 +22,7 @@
  *
  * The whole state is plain numbers, so a run can be saved and carried on.
  */
+import { GROUND } from '../data/ground'
 import { SIM, type DamperSetup } from '../data/ride'
 import { FRAME_ZONES, WEAR, type AxleWear, type FailureKind, type FatigueSpec, type FrameZone, type WearSetup } from '../data/wear'
 import { detAtan } from './det'
@@ -233,6 +235,8 @@ export function stepWear(
   w.t += DT
   w.distance += speed * DT
   let found: BreakEvent | null = null
+  // How hard a tire can grip this ground: on ice a landing on a spinning wheel just spins, so the axle feels less.
+  const ground = GROUND[profile.ground]
   const brk = (kind: FailureKind, corner: number, zone: FrameZone | null, value: number, limit: number, fatigue: boolean) => {
     if (!found) found = { kind, corner, zone, t: w.t, distance: w.distance, speed, value, limit, fatigue, estimated: false }
   }
@@ -276,7 +280,7 @@ export function stepWear(
       spin += ((1 - spin) * DT) / ax.spinUpTime
       torque = ax.driveTorque * (1 - spin)
     } else {
-      const grip = WEAR.grip * tire * ax.wheelRadius
+      const grip = (aw.tire.studded ? ground.studGrip : ground.grip) * tire * ax.wheelRadius
       if (spin > 0) {
         // Landing on a spinning wheel: the tire grabs, and the faster the wheel was spinning, the more of
         // the grip goes through the joint (a slipping tire grips harder the more it slips), until the spin stops.

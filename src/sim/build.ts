@@ -249,6 +249,7 @@ export function buildTruck(input: TruckBuild): BuiltTruck {
         bruiseFrom: muleAw.tire.bruiseFrom * tires.casing,
         pinchAt: muleAw.tire.pinchAt * tires.casing,
         bruise: { ...muleAw.tire.bruise },
+        studded: tires.studded,
       },
     })
 

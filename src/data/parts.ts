@@ -139,6 +139,8 @@ export interface TirePart extends PartCommon {
   /** How far it squashes before the sidewall folds and the rim pinches it: a tougher casing. */
   casing: number
   unsprung: number
+  /** Studs for winter (plan PR 10): more grip on ice and snow, nothing on gravel. */
+  studded: boolean
 }
 
 /** Guards against rock hits; they start to count in the raids (plan PR 7). */
@@ -285,11 +287,16 @@ export const PARTS: readonly Part[] = [
 
   // ── Tires ──
   { slot: 'tires', id: 'allTerrain', name: 'part.allTerrain', text: 'part.allTerrainText', year: 1985,
-    mass: { light4x4: 80, heavy: 400, sxs: 36 }, cost: { light4x4: 1200, heavy: 6000, sxs: 800 }, stiffness: 0.95, casing: 0.85, unsprung: 0.98 },
+    mass: { light4x4: 80, heavy: 400, sxs: 36 }, cost: { light4x4: 1200, heavy: 6000, sxs: 800 }, stiffness: 0.95, casing: 0.85, unsprung: 0.98, studded: false },
   { slot: 'tires', id: 'rallyTires', name: 'part.rallyTires', text: 'part.rallyTiresText', year: 1985,
-    mass: { light4x4: 88, heavy: 440, sxs: 40 }, cost: { light4x4: 2400, heavy: 12000, sxs: 1600 }, stiffness: 1, casing: 1, unsprung: 1 },
+    mass: { light4x4: 88, heavy: 440, sxs: 40 }, cost: { light4x4: 2400, heavy: 12000, sxs: 1600 }, stiffness: 1, casing: 1, unsprung: 1, studded: false },
   { slot: 'tires', id: 'heavyPly', name: 'part.heavyPly', text: 'part.heavyPlyText', year: 1985,
-    mass: { light4x4: 100, heavy: 500, sxs: 46 }, cost: { light4x4: 3600, heavy: 18000, sxs: 2400 }, stiffness: 1.15, casing: 1.25, unsprung: 1.05 },
+    mass: { light4x4: 100, heavy: 500, sxs: 46 }, cost: { light4x4: 3600, heavy: 18000, sxs: 2400 }, stiffness: 1.15, casing: 1.25, unsprung: 1.05, studded: false },
+  // Studded for winter: the same casings with tungsten studs, a little heavier and dearer (plan PR 10).
+  { slot: 'tires', id: 'studdedRally', name: 'part.studdedRally', text: 'part.studdedRallyText', year: 1985,
+    mass: { light4x4: 92, heavy: 460, sxs: 42 }, cost: { light4x4: 3400, heavy: 16000, sxs: 2200 }, stiffness: 1, casing: 1, unsprung: 1.03, studded: true },
+  { slot: 'tires', id: 'studdedPly', name: 'part.studdedPly', text: 'part.studdedPlyText', year: 1985,
+    mass: { light4x4: 104, heavy: 520, sxs: 48 }, cost: { light4x4: 4600, heavy: 22000, sxs: 3000 }, stiffness: 1.15, casing: 1.25, unsprung: 1.08, studded: true },
 
   // ── Protection ──
   { slot: 'protection', id: 'noGuards', name: 'part.noGuards', text: 'part.noGuardsText', year: 1985,

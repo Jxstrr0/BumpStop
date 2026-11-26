@@ -187,9 +187,14 @@ export function buildProfile(ground: GroundId, length: number, rng: Rng): Profil
       const len = pick(r, w.length)
       const h = pick(r, w.height)
       const crack = pick(r, w.crack)
-      // A broad lump with a crack in it: the slab before the crack is lifted a
-      // little more, so the wheel drops off a sharp step part-way over.
-      const shape = (u: number) => h * hump(u) + (u < w.crackAt ? crack * rise(u / w.crackAt) : 0)
+      const up = r.chance(w.stepUp)
+      const at = w.crackAt
+      // A broad lump with a crack in it. Usually the slab before the crack is
+      // lifted a little more, so the wheel drops off a sharp step part-way over;
+      // a step-up crack lifts the slab after it instead, so the tire hits the edge.
+      const shape = up
+        ? (u: number) => h * hump(u) + (u >= at ? crack * (1 - rise((u - at) / (1 - at))) : 0)
+        : (u: number) => h * hump(u) + (u < at ? crack * rise(u / at) : 0)
       if (r.chance(w.oneTrack)) {
         stamp(r.chance(0.5) ? left : right, step, x, len, shape)
       } else {

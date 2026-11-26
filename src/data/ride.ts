@@ -38,14 +38,23 @@ export const SIM = {
  * the reference temperature, more than 1 when cold (stiff) and less than 1
  * when hot (fade). Above a damper's `aerationTemp` the oil starts to foam and
  * damping falls off further, down to `aerationFloor` of what it was.
+ *
+ * Below freezing the oil thickens much faster (plan PR 10, winter): each
+ * kelvin under `coldFrom` adds `coldSlope` more. So a damper on a -30 °C
+ * morning damps about 2.6 times as hard as set, until its own work warms
+ * the oil up. Summer never gets near it.
  */
 export const DAMPER_OIL = {
   /** K: damping is exactly as set at 40 °C. */
   referenceTemp: 313.15,
   /** Per kelvin. */
   viscositySlope: 0.0065,
+  /** K: below 0 °C the oil thickens faster. */
+  coldFrom: 273.15,
+  /** Per kelvin below `coldFrom`, on top of `viscositySlope`. */
+  coldSlope: 0.017,
   /** Never stiffer than this when stone cold. */
-  maxMultiplier: 2.2,
+  maxMultiplier: 3.2,
   /** Never softer than this, however hot. */
   minMultiplier: 0.2,
   /** K above the aeration temperature where the foaming is complete. */
