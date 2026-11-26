@@ -139,8 +139,20 @@ describe('damper heat and fade', () => {
     // Foam takes away more than the thinning oil alone would over those 31 K.
     expect(wellAbove / justBelow).toBeLessThan(0.7)
     // Always inside the limits.
-    expect(dampingMultiplier(fromCelsius(-60), dm)).toBeLessThanOrEqual(2.2)
+    expect(dampingMultiplier(fromCelsius(-60), dm)).toBeLessThanOrEqual(3.2)
     expect(dampingMultiplier(fromCelsius(400), dm)).toBeGreaterThanOrEqual(0.2)
+  })
+
+  it('thickens much faster below freezing: about 2.6 times as stiff at -30 °C, and summer is untouched', () => {
+    const plain = (c: number) => Math.exp(-0.0065 * (c - 40))
+    // Above 0 °C nothing changed from the summer sim.
+    for (const c of [0, 10, 25]) expect(dampingMultiplier(fromCelsius(c), dm)).toBeCloseTo(plain(c), 9)
+    const at = (c: number) => dampingMultiplier(fromCelsius(c), dm)
+    expect(at(-10)).toBeGreaterThan(plain(-10) * 1.15)
+    expect(at(-30)).toBeGreaterThan(2.4)
+    expect(at(-30)).toBeLessThan(2.9)
+    // Colder is always stiffer.
+    for (let c = -40; c < 40; c += 5) expect(at(c)).toBeGreaterThan(at(c + 5))
   })
 
   it('heats the oil on rough ground and cools it on smooth', () => {
@@ -174,7 +186,7 @@ describe('damper heat and fade', () => {
       speed: kmhToMs(40),
       traceEvery: 500,
     })
-    expect(dampingMultiplier(air, p.damper[0]!)).toBeGreaterThan(1.4)
+    expect(dampingMultiplier(air, p.damper[0]!)).toBeGreaterThan(2.4)
     expect(trace.length).toBeGreaterThan(100)
     for (const temp of s.oilTemp) expect(temp).toBeGreaterThan(air + 10)
     // Warming, so the oil is never colder than where it started and the damping eases off.

@@ -130,7 +130,7 @@ export const CLATTER = {
   /** Damper heating (kelvin a second, per damper) that counts as flat out. */
   fullHeating: 0.5,
   /** Each ground's own rattle at `fullSpeed` and above (0 to 1); slower is quieter. */
-  ground: { graded: 0.06, washboard: 0.55, rough: 0.45, whoops: 0.25, rocks: 0.5, jumps: 0.12, iceHeaves: 0.2 } satisfies Record<GroundId, number>,
+  ground: { graded: 0.06, washboard: 0.55, rough: 0.45, whoops: 0.25, rocks: 0.5, jumps: 0.12, iceHeaves: 0.2, ice: 0.03, snow: 0.12 } satisfies Record<GroundId, number>,
   fullSpeed: 20,
   /** Rattles a second at flat out, and never more than this however fast the run plays. */
   ticksPerSecond: 22,

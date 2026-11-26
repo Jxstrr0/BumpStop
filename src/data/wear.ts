@@ -79,6 +79,8 @@ export interface AxleWear {
     sharpEdge: number
     /** Casing bruises: fatigue on the squash past `bruiseFrom`, on sharp ground only (m). */
     bruise: FatigueSpec
+    /** Studded (plan PR 10): grips harder on ice and snow (each ground's `studGrip`). */
+    studded: boolean
   }
 }
 
@@ -97,8 +99,6 @@ export interface WearSetup {
 export const WEAR = {
   /** A damper over its red line for this long has faded: damping has dropped and the wheels skip (s). */
   fadeHold: 2,
-  /** Tire grip on gravel, which sets the torque a landing on a spinning wheel puts through the axle. */
-  grip: 0.8,
   /** Trace samples per second kept for the break's trace. */
   traceRate: 100,
   /** Seconds of trace kept before a break. */
@@ -135,6 +135,7 @@ export const MULE_WEAR: Readonly<Record<ClassId, WearSetup>> = {
         pinchAt: 0.1,
         sharpEdge: 0.6,
         bruise: { ultimate: 0.055, endurance: 0.012, exponent: 6, gate: 0.002 },
+        studded: false,
       },
     },
     {
@@ -164,6 +165,7 @@ export const MULE_WEAR: Readonly<Record<ClassId, WearSetup>> = {
         pinchAt: 0.24,
         sharpEdge: 0.6,
         bruise: { ultimate: 0.08, endurance: 0.016, exponent: 6, gate: 0.002 },
+        studded: false,
       },
     },
     {
@@ -193,6 +195,7 @@ export const MULE_WEAR: Readonly<Record<ClassId, WearSetup>> = {
         pinchAt: 0.125,
         sharpEdge: 0.6,
         bruise: { ultimate: 0.06, endurance: 0.014, exponent: 6, gate: 0.002 },
+        studded: false,
       },
     },
     {

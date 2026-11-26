@@ -34,8 +34,8 @@ export const PACES: readonly PaceId[] = ['conserve', 'steady', 'push']
 /** Each pace call scales every speed on the stage by this. */
 export const PACE_SPEED: Readonly<Record<PaceId, number>> = { conserve: 0.88, steady: 1, push: 1.12 }
 
-/** Ground a stage can be made of in summer (frost heaves come with winter, plan PR 10). */
-export type RaidGround = Exclude<GroundId, 'iceHeaves'>
+/** Ground a stage can be made of in summer (winter raids come in plan PR 10b). */
+export type RaidGround = Exclude<GroundId, 'iceHeaves' | 'ice' | 'snow'>
 
 /**
  * Steady speeds (km/h), for an average driver in the class's stock truck.

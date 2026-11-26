@@ -364,6 +364,8 @@ BUMP_STOPS = ['rubber', 'urethane', 'hydraulic']
 AXLES = ['standardAxles', 'heavyDutyAxles', 'chromolyAxles']
 WHEELS = ['steelWheels', 'alloyWheels', 'beadlocks']
 TIRES = ['allTerrain', 'rallyTires', 'heavyPly']
+# Studded tires (plan PR 10) use the same casing as their plain twin; the studs are too small to see.
+STUDDED = {'rallyTires': ['studdedRally'], 'heavyPly': ['studdedPly']}
 
 
 def corner_pos(t, c):
@@ -720,7 +722,7 @@ def build_truck(cls, t, materials):
         if side < 0:
             wh.rotation_euler = (0, 0, math.pi)
         for k in TIRES:
-            place(link(fit_name('tires', [k], c), tires[k]), wh, (0, 0, 0))
+            place(link(fit_name('tires', [k] + STUDDED.get(k, []), c), tires[k]), wh, (0, 0, 0))
         for k in WHEELS:
             place(link(fit_name('wheels', [k], c), rims[k]), wh, (0, 0, 0))
 

@@ -94,6 +94,21 @@ describe('the stock builds', () => {
   })
 })
 
+describe('studded tires (winter)', () => {
+  it.each(IDS)('%s: come in two casings, a little heavier than plain, and pass the studs to the wear model', (c) => {
+    const studded = partsFor(c, 'tires').filter((p) => p.slot === 'tires' && p.studded)
+    expect(studded.length).toBe(2)
+    const plain = stockBuild(c)
+    const withStuds = { ...plain, parts: { ...plain.parts, tires: 'studdedRally' } }
+    const a = buildTruck(plain)
+    const b = buildTruck(withStuds)
+    expect(b.mass).toBeGreaterThan(a.mass)
+    expect(a.wear.front.tire.studded).toBe(false)
+    expect(b.wear.front.tire.studded).toBe(true)
+    expect(b.wear.rear.tire.studded).toBe(true)
+  })
+})
+
 describe('ride height comes from the spring', () => {
   it('a softer spring sags more: less bump travel, more droop, the same total', () => {
     const stock = buildTruck(stockBuild('light4x4')).front

@@ -22,7 +22,8 @@ scale from it; see `docs/BUILD.md`.
 ## The ground
 
 `src/sim/ground.ts` builds the road from recipes in `src/data/ground.ts`:
-graded road, washboard, whoops, rocks, jumps and frost heaves. Each recipe
+graded road, washboard, rough gravel, whoops, rocks, jumps, and the winter
+grounds: frost heaves, ice road and packed snow (`docs/WINTER.md`). Each recipe
 has gentle random roughness plus its own features, picked from ranges by a
 seeded random stream. The same recipe and seed always build the same road.
 
@@ -31,8 +32,9 @@ seeded random stream. The same recipe and seed always build the same road.
 A damper resists speed: the faster the wheel moves, the harder it pushes
 back, and all of that work becomes heat in its oil. Air flowing past cools
 it, more at speed. Oil temperature sets how hard the damper damps
-(`dampingMultiplier`): exactly as set at 40 °C, up to about twice as stiff on
-a -30 °C morning, and softer as it heats up. Above the damper's aeration
+(`dampingMultiplier`): exactly as set at 40 °C, stiffer when cold (below
+freezing it thickens much faster: about 2.6 times as stiff on a -30 °C
+morning, see `docs/WINTER.md`), and softer as it heats up. Above the damper's aeration
 temperature the oil foams and damping drops off further. That softening is
 **fade**, and it comes from the heat, never a dice roll. The numbers are in
 `DAMPER_OIL` and each damper's settings.

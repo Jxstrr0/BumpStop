@@ -31,6 +31,8 @@ const GROUND_COLOUR: Record<GroundId, number> = {
   rocks: 0x9a9286,
   jumps: 0xb39a76,
   iceHeaves: 0xc9d3da,
+  ice: 0xaec6d6,
+  snow: 0xe6eaee,
 }
 const VERGE = 0x8f8a6c
 const BANK = 0x6f7259

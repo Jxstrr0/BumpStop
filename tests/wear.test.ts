@@ -136,6 +136,29 @@ describe('each failure has its own cause', () => {
     expect(peakLanding(250)).toBeGreaterThan(3 * peakLanding(1))
   })
 
+  it('on ice a spinning wheel just spins when it lands, so the axle feels far less; studs grip harder', () => {
+    const peakLanding = (ground: Profile['ground'], studded: boolean) => {
+      const b = bench()
+      for (const a of [b.wp.axle[0]!, b.wp.axle[1]!]) a.tire = { ...a.tire, studded }
+      const road = { ...flatRoad(), ground }
+      const r = emptyReadings()
+      b.f.tire[0] = 0
+      for (let n = 0; n < 250; n++) stepWear(b.w, b.wp, b.s, b.p, b.f, road, 10, r)
+      b.f.tire[0] = 20000
+      let peak = 0
+      for (let n = 0; n < 50; n++) {
+        stepWear(b.w, b.wp, b.s, b.p, b.f, road, 10, r)
+        peak = Math.max(peak, r.jointTorque[0]!)
+      }
+      return peak
+    }
+    expect(peakLanding('ice', false)).toBeLessThan(peakLanding('graded', false) / 3)
+    expect(peakLanding('ice', true)).toBeGreaterThan(peakLanding('ice', false) * 1.2)
+    expect(peakLanding('snow', false)).toBeLessThan(peakLanding('graded', false))
+    // Studs make no difference on gravel.
+    expect(peakLanding('graded', true)).toBe(peakLanding('graded', false))
+  })
+
   it('cut tire: squashed to the rim over a sharp edge, but not on smooth ground', () => {
     const pinch = MULE_WEAR.light4x4.front.tire.pinchAt
     const smooth = bench()
