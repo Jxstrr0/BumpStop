@@ -1,6 +1,6 @@
 /**
- * The ride sim on the preview screen (plan PR 1): pick a truck, it drives
- * the 12 km test stage at 500 steps a second, and the chart shows the
+ * The ride sim on the preview screen (plan PR 1): the truck on the build
+ * screen (plan PR 3) drives the 12 km test stage at 500 steps a second, and the chart shows the
  * hottest damper's oil temperature along the way. A second button runs a
  * 300 km stage the long-stage way (samples plus scaling) and says how long
  * it took. The chart follows the trace rule: cool blue for normal, amber for
@@ -11,13 +11,14 @@
  */
 import { CLASSES, type ClassId } from '../data/classes'
 import { PREVIEW_LONG_REPEATS, PREVIEW_STAGE, PREVIEW_TRACE_SECONDS } from '../data/previewStage'
-import { SIM, TEST_MULES, type DamperSetup } from '../data/ride'
+import { SIM, type DamperSetup, type RideSetup } from '../data/ride'
 import { t, tf, type StringKey } from '../data/strings'
 import { buildProfile } from '../sim/ground'
 import { driveSection, restingState, rideParams } from '../sim/ride'
 import { Rng } from '../sim/rng'
 import { runStage } from '../sim/stage'
 import { fromCelsius, msToKmh, toCelsius } from '../sim/units'
+import type { BuildStore } from './buildStore'
 import { el, num, svg } from './dom'
 
 const AIR = fromCelsius(20)
@@ -49,9 +50,8 @@ function seedFor(id: ClassId, road: number): number {
 }
 
 /** Drive the test stage in full detail and keep the hottest damper's temperature every half second. */
-function runPreview(id: ClassId, road: number): PreviewRun {
+function runPreview(setup: RideSetup, id: ClassId, road: number): PreviewRun {
   const started = performance.now()
-  const setup = TEST_MULES[id]
   const p = rideParams(setup)
   const s = restingState(AIR)
   const root = new Rng(seedFor(id, road))
@@ -143,24 +143,17 @@ function later(work: () => void): void {
   requestAnimationFrame(() => setTimeout(work, 0))
 }
 
-export function rideCheckPanel(): HTMLElement {
+export function rideCheckPanel(store: BuildStore): HTMLElement {
   const box = el('section', 'panel trace')
   box.append(el('h2', '', t('sim.title')), el('p', 'lead', t('sim.lead')))
 
-  let picked: ClassId = 'light4x4'
   let road = 1
 
-  const picker = el('div', 'btn-row')
-  const classButtons = CLASSES.map((c) => {
-    const b = el('button', 'btn', t(c.name))
-    b.type = 'button'
-    b.addEventListener('click', () => {
-      picked = c.id
-      draw()
-    })
-    picker.append(b)
-    return { id: c.id, b }
-  })
+  const testing = el('p', 'small testing')
+  // The stage only runs when asked (or the class changes): running it on every slider move would be slow on a phone.
+  const drive = el('button', 'btn', t('sim.drive'))
+  drive.type = 'button'
+  drive.addEventListener('click', () => draw())
   const another = el('button', 'btn', t('sim.anotherRoad'))
   another.type = 'button'
   another.addEventListener('click', () => {
@@ -185,7 +178,8 @@ export function rideCheckPanel(): HTMLElement {
     longButton.disabled = true
     longResult.textContent = t('sim.running')
     later(() => {
-      const setup = TEST_MULES[picked]
+      const setup = store.truck().ride
+      const picked = store.cls()
       const segments = Array.from({ length: PREVIEW_LONG_REPEATS }, () => PREVIEW_STAGE).flat()
       const started = performance.now()
       const r = runStage(setup, { airTemp: AIR, segments }, seedFor(picked, road))
@@ -201,13 +195,16 @@ export function rideCheckPanel(): HTMLElement {
   })
 
   function draw(): void {
-    for (const { id, b } of classButtons) b.setAttribute('aria-pressed', String(id === picked))
+    const picked = store.cls()
+    const cls = CLASSES.find((c) => c.id === picked)!
+    testing.textContent = tf('build.testing', { cls: t(cls.name) })
     roadLabel.textContent = tf('sim.road', { n: String(road) })
     verdict.textContent = t('sim.running')
     longResult.textContent = ''
     later(() => {
-      const run = runPreview(picked, road)
-      const d = TEST_MULES[picked].rear.damper
+      const setup = store.truck().ride
+      const run = runPreview(setup, picked, road)
+      const d = setup.rear.damper
       const peak = run.points.reduce((m, pt) => (pt.temp > m.temp ? pt : m), run.points[0] as Point)
       const band = bandOf(peak.temp, d)
       holder.replaceChildren(chart(run, d))
@@ -221,7 +218,10 @@ export function rideCheckPanel(): HTMLElement {
 
   const head = el('div', 'sim-head')
   head.append(title, roadLabel)
-  box.append(picker, head, holder, el('p', 'axis', t('sim.axis')), legend, verdict, details, stageList(), another, longButton, longResult)
+  box.append(testing, head, holder, el('p', 'axis', t('sim.axis')), legend, verdict, details, stageList(), drive, another, longButton, longResult)
+  store.onChange((change) => {
+    if (change === 'class') draw()
+  })
   draw()
   return box
 }

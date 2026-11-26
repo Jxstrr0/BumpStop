@@ -1,21 +1,21 @@
 /**
- * The break test on the preview screen (plan PR 2): pick a truck and a test
- * loop, and the sim drives it 5 km/h faster every lap until something lets
- * go. It says what broke, where and why, draws that failure's trace from the
+ * The break test on the preview screen (plan PR 2): pick a test loop, and
+ * the sim drives the truck on the build screen (plan PR 3) 5 km/h faster
+ * every lap until something lets go. It says what broke, where and why, draws that failure's trace from the
  * last few seconds, and lists where to fix it.
  *
  * This is a test bench, not the game screen: the rigs with live traces and
  * the report with fix jumps arrive in plan PR 4.
  */
-import { CLASSES, type ClassId } from '../data/classes'
+import { CLASSES } from '../data/classes'
 import { FAILURES, type CornerChannel, type FrameChannel } from '../data/failures'
+import type { RideSetup } from '../data/ride'
 import { RIGS, type RigId } from '../data/rigs'
-import { TEST_MULES } from '../data/ride'
 import { t, tf, type StringKey } from '../data/strings'
-import { MULE_WEAR } from '../data/wear'
 import { runLaps, type LapRun } from '../sim/laps'
 import { fromCelsius, msToKmh } from '../sim/units'
 import type { BreakEvent } from '../sim/wear'
+import type { BuildStore } from './buildStore'
 import { el, num, svg } from './dom'
 
 const AIR = fromCelsius(20)
@@ -30,9 +30,9 @@ interface ChartPlan {
   limit: number
 }
 
-function chartPlan(ev: BreakEvent, cls: ClassId): ChartPlan {
+function chartPlan(ev: BreakEvent, ride: RideSetup): ChartPlan {
   const pct = (v: number) => v * 100
-  const axle = ev.corner < 2 ? TEST_MULES[cls].front : TEST_MULES[cls].rear
+  const axle = ev.corner < 2 ? ride.front : ride.rear
   switch (ev.kind) {
     case 'fade':
       return { channel: 'oilTemp', label: 'break.chOil', scale: (k) => k - 273.15, limit: ev.limit - 273.15 }
@@ -57,11 +57,11 @@ function chartPlan(ev: BreakEvent, cls: ClassId): ChartPlan {
 }
 
 /** The last seconds before the break, with the limit as a red dashed line. */
-function traceChart(run: LapRun, cls: ClassId): SVGSVGElement | null {
+function traceChart(run: LapRun, ride: RideSetup): SVGSVGElement | null {
   const ev = run.broken
   const trace = run.trace
   if (!ev || !trace) return null
-  const plan = chartPlan(ev, cls)
+  const plan = chartPlan(ev, ride)
   const raw = trace.channels[plan.channel]
   if (!raw || raw.length < 2) return null
   const values = raw.map(plan.scale)
@@ -117,25 +117,14 @@ function later(work: () => void): void {
   requestAnimationFrame(() => setTimeout(work, 0))
 }
 
-export function breakTestPanel(): HTMLElement {
+export function breakTestPanel(store: BuildStore): HTMLElement {
   const box = el('section', 'panel trace')
   box.append(el('h2', '', t('break.title')), el('p', 'lead', t('break.lead')))
 
-  let cls: ClassId = 'light4x4'
   let rig: RigId = 'tortureLoop'
   let road = 1
 
-  const classRow = el('div', 'btn-row')
-  const classButtons = CLASSES.map((c) => {
-    const b = el('button', 'btn', t(c.name))
-    b.type = 'button'
-    b.addEventListener('click', () => {
-      cls = c.id
-      sync()
-    })
-    classRow.append(b)
-    return { id: c.id, b }
-  })
+  const testing = el('p', 'small testing')
   const rigRow = el('div', 'btn-row')
   const rigButtons = RIG_IDS.map((id) => {
     const b = el('button', 'btn', t(RIG_NAME[id]))
@@ -160,9 +149,13 @@ export function breakTestPanel(): HTMLElement {
   const laps = el('p', 'small')
 
   function sync(): void {
-    for (const { id, b } of classButtons) b.setAttribute('aria-pressed', String(id === cls))
+    const cls = CLASSES.find((c) => c.id === store.cls())!
+    testing.textContent = tf('build.testing', { cls: t(cls.name) })
     for (const { id, b } of rigButtons) b.setAttribute('aria-pressed', String(id === rig))
   }
+  store.onChange((change) => {
+    if (change === 'class') sync()
+  })
 
   runButton.addEventListener('click', () => {
     runButton.disabled = true
@@ -171,8 +164,10 @@ export function breakTestPanel(): HTMLElement {
     fixes.replaceChildren()
     holder.replaceChildren()
     later(() => {
+      const truck = store.truck()
+      const cls = store.cls()
       const started = performance.now()
-      const run = runLaps(TEST_MULES[cls], MULE_WEAR[cls], RIGS[rig], (CLASSES.findIndex((c) => c.id === cls) + 1) * 100 + road, {
+      const run = runLaps(truck.ride, truck.wear, RIGS[rig], (CLASSES.findIndex((c) => c.id === cls) + 1) * 100 + road, {
         airTemp: AIR,
       })
       const ms = performance.now() - started
@@ -188,7 +183,7 @@ export function breakTestPanel(): HTMLElement {
           ` ${tf('break.result', { lap: String(run.brokenLap), speed: num(msToKmh(last.speed)), what: t(info.name), where: where(ev) })}`,
         )
         cause.textContent = t(info.cause)
-        const chart = traceChart(run, cls)
+        const chart = traceChart(run, truck.ride)
         if (chart) holder.append(chart)
         traceNote.textContent = t(info.traceText)
         fixTitle.textContent = t('break.fixes')
@@ -199,7 +194,7 @@ export function breakTestPanel(): HTMLElement {
     })
   })
 
-  box.append(classRow, rigRow, runButton, verdict, cause, holder, traceNote, fixTitle, fixes, laps)
+  box.append(testing, rigRow, runButton, verdict, cause, holder, traceNote, fixTitle, fixes, laps)
   sync()
   return box
 }

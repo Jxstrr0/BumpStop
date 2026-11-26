@@ -1,8 +1,9 @@
 /**
  * Bump Stop's entry point. For now it shows one screen: a preview of the
- * "roadbook" look (plan PR 0) with test benches for the ride sim (plan
- * PR 1) and wear and breaks (plan PR 2), then hides the loading screen. The build screen (plan PR 3) and the
- * rigs (plan PR 4) replace it step by step.
+ * "roadbook" look (plan PR 0) with the build screen (plan PR 3) and test
+ * benches for the ride sim (plan PR 1) and wear and breaks (plan PR 2) that
+ * drive the truck on it, then hides the loading screen. The rigs (plan PR 4)
+ * replace the test benches.
  */
 import '@fontsource/space-grotesk/latin-500.css'
 import '@fontsource/big-shoulders/latin-700.css'
@@ -10,9 +11,10 @@ import '@fontsource/big-shoulders/latin-800.css'
 import '@fontsource/overpass-mono/latin-400.css'
 import '@fontsource/overpass-mono/latin-600.css'
 import './style.css'
-import { CLASSES } from './data/classes'
 import { t } from './data/strings'
-import { el, num } from './ui/dom'
+import { buildPanel } from './ui/buildScreen'
+import { makeBuildStore } from './ui/buildStore'
+import { el } from './ui/dom'
 import { bindLoadingScreen } from './ui/loading'
 import { roadbookStrip } from './ui/preview'
 import { breakTestPanel } from './ui/breakTest'
@@ -48,33 +50,19 @@ function loopPanel(): HTMLElement {
   return box
 }
 
-function classesPanel(): HTMLElement {
-  const box = el('section', 'panel')
-  box.append(el('h2', '', t('classes.title')))
-  const grid = el('div', 'classes')
-  for (const c of CLASSES) {
-    const card = el('article', 'class-card')
-    const weight = el('p', 'weight')
-    weight.append(el('span', 'label', t('class.weight')), ` ${num(c.minMass)}–${num(c.maxMass)} kg`)
-    card.append(el('h3', '', t(c.name)), el('p', '', t(c.blurb)), weight)
-    grid.append(card)
-  }
-  box.append(grid)
-  return box
-}
-
 function previewScreen(app: HTMLElement): void {
   const head = el('header', 'title')
   const h1 = el('h1')
   h1.append(el('span', 'hi', t('game.name')))
   head.append(el('p', 'kicker', t('preview.kicker')), h1, el('p', 'tagline', t('game.tagline')))
+  const store = makeBuildStore()
   app.append(
     head,
     loopPanel(),
+    buildPanel(store),
+    rideCheckPanel(store),
+    breakTestPanel(store),
     roadbookStrip(),
-    rideCheckPanel(),
-    breakTestPanel(),
-    classesPanel(),
     el('p', 'note', t('preview.note')),
     footer(),
   )
