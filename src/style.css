@@ -581,3 +581,31 @@ input[type='range'] {
 }
 .bench-note:not(:empty) { margin-top: 8px; }
 .bench-note p { margin: 0 0 6px; }
+
+/* Settings (plan PR 12): graphics tiers and offline play. */
+.settings h3 { margin: 16px 0 4px; font-size: 20px; }
+.tier-list { margin: 8px 0 0; padding-left: 20px; }
+.tier-list li { margin: 4px 0; }
+
+/* "A new version is ready" bar (plan PR 12): pinned to the bottom, above the safe area. */
+.update-bar {
+  position: fixed;
+  z-index: 900;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 12px;
+  background: var(--panel);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  color: var(--ink);
+}
+.update-bar p { flex: 1 1 100%; margin: 0; font-size: 15px; line-height: 1.35; }
+.update-later { margin-left: auto; }
+.update-go { background: var(--accent); color: var(--on-accent); }

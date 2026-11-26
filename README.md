@@ -32,6 +32,10 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
 - The career (calendar, money, prize money, contracts, reputation,
   sponsors, the shop's upgrades, the rival teams and their habits):
   `src/data/career.ts`. In plain words: `docs/CAREER.md`.
+- Graphics tiers (Lite, Full, Ultra: pixels, shadows, trees, dust, road
+  detail, and when Auto steps down): `src/data/graphics.ts`. Offline play
+  and graphics in plain words: `docs/OFFLINE.md`. If the game ever acts
+  stale, open it with `?nosw` on the end of the address.
 - Colours: the top of `src/style.css`.
 - The plan: `docs/BUMP-STOP-PLAN.md`. Where it's up to: `docs/STATUS.md`.
 - Names: `docs/NAMES.md`.

@@ -13,6 +13,7 @@
  * `origin`, so numbers stay small and exact on the phone's graphics chip.
  */
 import * as THREE from 'three'
+import { MAX_TREE_ROWS } from '../data/graphics'
 import type { GroundId } from '../data/ground'
 import { heightAt, type Profile } from '../sim/ground'
 
@@ -186,7 +187,8 @@ export class Forest {
   private birch: THREE.InstancedMesh
   private crowns: THREE.InstancedMesh
 
-  constructor(max = 260) {
+  /** Room for every tree at the most rows any graphics tier plants. */
+  constructor(max = 90 * MAX_TREE_ROWS) {
     const spruceMat = new THREE.MeshStandardMaterial({ color: 0x3d4a40, roughness: 0.9, flatShading: true })
     this.spruce = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), spruceMat, max)
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0xe9e4d6, roughness: 0.8 })
@@ -201,8 +203,8 @@ export class Forest {
     }
   }
 
-  /** Plant trees along [from, to] (run-distance), drawn relative to `origin`. */
-  plant(from: number, to: number, origin: number, halfTrack: number, night: boolean): void {
+  /** Plant trees along [from, to] (run-distance), drawn relative to `origin`, `rows` deep each side. */
+  plant(from: number, to: number, origin: number, halfTrack: number, night: boolean, rows = 3): void {
     const m = new THREE.Matrix4()
     const q = new THREE.Quaternion()
     const sc = new THREE.Vector3()
@@ -210,10 +212,10 @@ export class Forest {
     let ns = 0
     let nb = 0
     const max = this.spruce.instanceMatrix.count
-    // One chance of a tree per 3 metres per side, between the bank and the far slope.
+    // One chance of a tree per 3 metres per row, between the bank and the far slope.
     for (let s = Math.ceil(from / 3) * 3; s < to; s += 3) {
       for (const side of [-1, 1]) {
-        for (let row = 0; row < 3; row++) {
+        for (let row = 0; row < Math.min(rows, MAX_TREE_ROWS); row++) {
           const h = hash2(s, side * 7 + row)
           if (h < 0.35) continue
           const dist = halfTrack + 9 + row * 6 + hash2(s + 1, row) * 5

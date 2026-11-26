@@ -11,7 +11,8 @@
  */
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
-import { addLights, applyLook, cssColour, makeRenderer, onLookChange } from './look'
+import { addLights, applyLook, applyTier, cssColour, makeRenderer, onLookChange } from './look'
+import { frameTime, onTierChange } from './tiers'
 import { REST_POSE, TruckModel, type FittedParts, type Stance } from './truckModel'
 
 export interface Garage {
@@ -93,6 +94,7 @@ export function createGarage(canvas: HTMLCanvasElement): Garage {
     raf = 0
     const dt = Math.min(0.1, (now - lastTime) / 1000)
     lastTime = now
+    frameTime(dt)
     turn += dt * AUTO_TURN * Math.PI * 2
     draw()
     loop()
@@ -135,6 +137,11 @@ export function createGarage(canvas: HTMLCanvasElement): Garage {
   watcher.observe(canvas)
   const onReduced = () => loop()
   reduced.addEventListener('change', onReduced)
+  // A new graphics tier (picked, or Auto stepping down): new pixels and shadows.
+  const stopTier = onTierChange(() => {
+    if (applyTier(renderer, lights.sun)) resize()
+    else draw()
+  })
 
   look()
   resize()
@@ -167,6 +174,7 @@ export function createGarage(canvas: HTMLCanvasElement): Garage {
       watcher.disconnect()
       reduced.removeEventListener('change', onReduced)
       stopLook()
+      stopTier()
       truck?.dispose()
       renderer.dispose()
     },
