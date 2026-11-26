@@ -96,6 +96,15 @@ listed under it; a row per slot that opens to its choices; then the front
 and rear axle's sliders. Only the adjusters a part has get a slider. The
 rigs in the shop (plan PR 4, `docs/RIGS.md`) test whatever is on the bench.
 
+**Link front and rear** (Kelbo asked, 26 November 2026) is a tick box above
+the axles. Ticked, every slider sets both axles to the same value
+(`withSetting` in `buildStore.ts`), the other axle's slider follows along, and
+each axle's heading carries a Linked tag. Ticking it changes nothing by
+itself: the ends keep their own values until a slider moves. Unticking keeps
+every value as it is, so the ends can be tuned apart again. The choice is
+kept on the phone under `bumpstop.linkAxles` (not in a save slot); without
+localStorage it starts unticked.
+
 ## Tests
 
 `tests/build.test.ts`: every stock build is legal in 1985 and drives on its
