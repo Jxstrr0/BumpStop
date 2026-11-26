@@ -577,6 +577,39 @@ input[type='range'] {
   cursor: pointer;
 }
 .career-calendar li.done { color: var(--muted); text-decoration: line-through; }
+/* The hall of fame (after 1.2): folded at the foot of the career panel, like the calendar. */
+.career-hall { margin-top: 16px; border-top: 1px solid var(--line); }
+.career-hall > summary {
+  min-height: 44px;
+  padding: 10px 0;
+  font-family: var(--head);
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.hall-body > p { margin: 0 0 8px; }
+.hall-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+.hall-photo { margin: 0; padding: 6px; background: var(--panel); border: 1px solid var(--line); }
+/* Tapped: the photo takes the whole row. */
+.hall-photo.big { grid-column: 1 / -1; }
+.hall-photo-zoom {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.hall-photo.big .hall-photo-zoom { cursor: zoom-out; }
+.hall-photo-zoom img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; }
+.hall-photo.big .hall-photo-zoom img { aspect-ratio: auto; object-fit: contain; }
+.hall-photo figcaption { margin: 6px 0; }
 .bench-label {
   margin: 0 0 8px;
   padding: 8px 10px;

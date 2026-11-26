@@ -216,10 +216,52 @@ week. It needs a reputation of 60 to enter your own truck.
   year to `longOne`. Saves from before have none and load as they were; a
   story that doesn't add up is dropped, never the save.
 
-## After 2025
+## After 2025: the hall of fame
 
-The year stops at 2025 and the seasons keep counting, so the raids'
-roads and the contracts keep changing.
+The last raid of 2025 ends the career. Its results card says so ("That's
+2025 done: the end of the road") with a button to **open the hall of
+fame**. The year stops at 2025 and the seasons keep counting, so anyone who
+wants more can carry on: the raids' roads and the contracts keep changing.
+
+The hall of fame folds away at the foot of the career panel. Until the end
+it's **The career so far**, so it's there to look at any time.
+
+- **The record:** seasons, your own raids, wins, podiums, contracts, and the
+  years the garage won the Whole Damn Country.
+- **Best seasons:** the top three (`HALL.bestSeasons`): a Whole Damn Country
+  win first, then wins, podiums and reputation. Each says the season's
+  money, reputation and best result.
+- **Biggest rival:** the rival team that finished ahead of your trucks most
+  often (own entries and contract trucks both count; a retired truck counts
+  as beaten). Most meetings breaks a tie.
+- **Favourite truck:** from the truck logbooks.
+- **Drivers you hired** for your own entries: how many raids, wins and
+  podiums each, and the year they first drove for you.
+- **The album:** in a career, photo mode has a **Keep for the album**
+  button. The shot (1,280 pixels, as a JPEG, with the BUMP STOP mark) goes
+  in this career's album, up to 24 photos (`HALL.albumMax`), captioned with
+  the raid or the test track and the year. Tap a photo to see it bigger;
+  **Remove** (tap twice) makes room.
+
+How it's kept:
+
+- The career's news only keeps 40 lines, so the hall keeps its own small
+  record as the career goes (`src/sim/hall.ts`, in `CareerState.hall`): a
+  line per season, a tally per rival team and per driver, and the season the
+  career ended. `settle` adds to it after every raid.
+- A career saved before the hall of fame has no record: it starts counting
+  from the season it's in, and the hall of fame says which year. The
+  totals (from the career's own record) are still the whole career. No new
+  save format: the record is optional and a record that doesn't add up is
+  dropped, never the save.
+- The album isn't in the save: photos are too big. They live in the game's
+  IndexedDB database (`bumpstop`, a second store `album`, database version
+  2), by slot and by career (its seed), so a new career in the same slot
+  gets a new album and deleting a slot deletes its photos
+  (`src/persist/album.ts`). Save codes and backups leave them out; they stay
+  on this phone. A browser without IndexedDB has no album, and says so.
+- Screens: `src/ui/hall.ts`; photo mode reaches the album through
+  `src/ui/album.ts`.
 
 ## What's not here yet
 
@@ -236,3 +278,7 @@ rolling to 2025 and past, the same career for the same seed, the teams
 the shop, the save (format 1 moving up, careers and career raids round
 trip, damaged team trucks, bad careers turned away), and the stock trucks
 getting home on the Polar Night Raid and the Whole Damn Country.
+
+`tests/hall.test.ts`: the hall of fame's record (seasons, rivals, drivers,
+best seasons), the end coming once after 2025, the record through a save
+(and older careers without one), and the album's bookkeeping.

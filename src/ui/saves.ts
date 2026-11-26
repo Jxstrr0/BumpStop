@@ -19,6 +19,7 @@ import {
   backupAgeDays, backupReminderDue, lastBackupAt, markBackedUp, readBackupFile, saveBackupFile, storageProtected,
 } from '../persist/safety'
 import { hasProgress } from '../persist/save'
+import { clearSlotPhotos } from '../persist/album'
 import { deleteSlot, slotSummary, type SlotView } from '../persist/slots'
 import type { BuildStore } from './buildStore'
 import { el } from './dom'
@@ -154,6 +155,8 @@ function slotCard(view: SlotView, garage: Garage, onDeleted: () => void): HTMLEl
         void (async () => {
           if (here) garage.stop()
           await deleteSlot(view.slot)
+          // The slot's career photos go with it.
+          await clearSlotPhotos(view.slot)
           // Deleting the open slot starts a fresh garage in it.
           if (here) location.reload()
           else onDeleted()

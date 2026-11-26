@@ -9,10 +9,15 @@
  * draws it at about 2,000 pixels with the BUMP STOP mark in the corner and
  * opens the share sheet (or downloads it). Done, or Escape, goes back, and
  * the run carries on from where it got to.
+ *
+ * In a career, **Keep for the album** puts a smaller copy of the shot in
+ * the career's photo album, which the hall of fame shows (`album.ts`).
  */
+import { HALL } from '../data/career'
 import { t } from '../data/strings'
 import { PHOTO_LIFT, PHOTO_ZOOM } from '../data/graphics'
 import type { PhotoControls, TrackView } from '../render/trackView'
+import { albumHook, albumPicture, type PhotoPlace } from './album'
 import { el } from './dom'
 import { pictureName, pngFile, shareFile, stampMark } from './shareImage'
 
@@ -54,7 +59,7 @@ export interface PhotoMode {
  * Add photo mode to a 3D view's figure. `view` gives the view once three.js
  * has loaded (null before). Returns the button, hidden until `ready(true)`.
  */
-export function photoMode(box: HTMLElement, canvas: HTMLCanvasElement, view: () => TrackView | null): PhotoMode {
+export function photoMode(box: HTMLElement, canvas: HTMLCanvasElement, view: () => TrackView | null, where: PhotoPlace = 'track'): PhotoMode {
   const n = ++ids
   const button = el('button', 'btn small-btn photo-btn', t('photo.open'))
   button.type = 'button'
@@ -70,8 +75,12 @@ export function photoMode(box: HTMLElement, canvas: HTMLCanvasElement, view: () 
   take.type = 'button'
   const done = el('button', 'btn', t('photo.done'))
   done.type = 'button'
+  // Only in a career: shown when photo mode opens, if there's an album to keep it in.
+  const keep = el('button', 'btn', t('photo.keep'))
+  keep.type = 'button'
+  keep.hidden = true
   const row = el('div', 'btn-row photo-row')
-  row.append(take, done)
+  row.append(take, keep, done)
   const note = el('p', 'small photo-note')
   note.setAttribute('aria-live', 'polite')
   bar.append(hint, moment.wrap, turn.wrap, zoom.wrap, row, note)
@@ -147,6 +156,8 @@ export function photoMode(box: HTMLElement, canvas: HTMLCanvasElement, view: () 
     c = start
     toSliders(start)
     note.textContent = ''
+    keep.hidden = albumHook()?.caption(where) == null
+    keep.disabled = false
     box.classList.add('photo-on')
     document.body.classList.add('photo-open')
     bar.hidden = false
@@ -185,6 +196,20 @@ export function photoMode(box: HTMLElement, canvas: HTMLCanvasElement, view: () 
     void shareFile(file).then((r) => {
       note.textContent = r === 'shared' ? t('photo.shared') : r === 'downloaded' ? t('photo.downloaded') : r === 'failed' ? t('photo.failed') : ''
     })
+  })
+  keep.addEventListener('click', () => {
+    const hook = albumHook()
+    const caption = hook?.caption(where)
+    const shot = view()?.snapshot(HALL.albumSize)
+    if (!hook || !caption || !shot) return
+    stampMark(shot)
+    keep.disabled = true
+    void albumPicture(shot)
+      .then((picture) => (picture ? hook.keep(picture, caption) : 'failed' as const))
+      .then((r) => {
+        note.textContent = r === 'kept' ? t('photo.kept') : r === 'full' ? t('photo.albumFull') : t('photo.keepFailed')
+        keep.disabled = false
+      })
   })
   done.addEventListener('click', close)
   button.addEventListener('click', open)
