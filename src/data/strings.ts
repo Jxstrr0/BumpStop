@@ -813,7 +813,6 @@ const STRINGS = {
   'career.record': 'Your own raids: {raids}, wins {wins}, podiums {podiums}. Contracts: {contracts}.',
   'career.calendar': 'The {year} calendar',
   'career.calendarLine': '{date}: {raid}, {stages} stages ({tier}; your own truck from reputation {rep})',
-  'career.winterLater': 'Winter raids join the calendar in a later update.',
   'career.news.result': '{raid}: {who} {cls} {place}. {money}, reputation +{rep}.',
   'career.news.yours': 'your',
   'career.news.contract': 'a privateer’s',
