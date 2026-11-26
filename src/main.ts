@@ -3,7 +3,8 @@
  * PR 8), then shows one screen: the "roadbook" look (plan PR 0) with the
  * career (plan PR 9), the build screen (plan PR 3), the shop's three rigs
  * and the report (plan PR 4), which test the truck, the raids (plan PR 7),
- * which race it, and the saves and backups. Then it hides the loading screen.
+ * which race it, the saves and backups, and the help (plan PR 11). Then it
+ * hides the loading screen.
  */
 import '@fontsource/space-grotesk/latin-500.css'
 import '@fontsource/big-shoulders/latin-700.css'
@@ -16,6 +17,7 @@ import { buildPanel } from './ui/buildScreen'
 import { careerPanel } from './ui/career'
 import { el } from './ui/dom'
 import { openGarage, type Garage } from './ui/garage'
+import { helpPanel } from './ui/help'
 import { bindLoadingScreen } from './ui/loading'
 import { roadbookStrip } from './ui/preview'
 import { raidPanel } from './ui/raid'
@@ -33,7 +35,7 @@ function footer(): HTMLElement {
   return foot
 }
 
-function loopPanel(): HTMLElement {
+function loopPanel(help: HTMLElement): HTMLElement {
   const box = el('section', 'panel')
   box.append(el('h2', '', t('loop.title')))
   const list = el('ol', 'loop')
@@ -48,7 +50,12 @@ function loopPanel(): HTMLElement {
     li.append(el('strong', '', t(name)), el('span', '', t(text)))
     list.append(li)
   }
-  box.append(list)
+  // A way to the help for anyone new to suspension words.
+  const pointer = el('p', 'small help-pointer', t('help.pointer'))
+  const go = el('button', 'btn small-btn', t('help.toHelp'))
+  go.type = 'button'
+  go.addEventListener('click', () => help.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  box.append(list, pointer, go)
   return box
 }
 
@@ -61,15 +68,17 @@ function gameScreen(app: HTMLElement, garage: Garage): void {
   const reminder = backupReminder(garage)
   // The career goes first: it sets the bench (the build screen's truck and year) before the build screen draws.
   const career = careerPanel(store, garage.career)
+  const help = helpPanel(store)
   app.append(
     head,
     ...(reminder ? [reminder] : []),
-    loopPanel(),
+    loopPanel(help.element),
     career.element,
     buildPanel(store),
     shopPanel(store, garage.shop),
     raidPanel(store, garage.raid, career.raid),
     savesPanel(garage),
+    help.element,
     roadbookStrip(),
     el('p', 'note', t('preview.note')),
     footer(),
