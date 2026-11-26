@@ -151,6 +151,11 @@ export function eventDays(e: CalendarEvent): number {
   return RAIDS[e.raid].stages.length + TRAVEL_DAYS
 }
 
+/** The career's first raid, before anything has happened: the first-job guide's time (plan PR 11b). */
+export function isFirstRaid(c: CareerState): boolean {
+  return c.season === 0 && c.next === 0 && c.stats.raids === 0 && c.stats.contracts === 0
+}
+
 export function isBroke(c: CareerState): boolean {
   return c.money < 0
 }
@@ -188,12 +193,16 @@ export function offers(c: CareerState): Contract[] {
   const taken = new Set<number>()
   const out: Contract[] = []
   for (let k = 0; k < CONTRACTS.perEvent; k++) {
+    // The career's very first offer is the guided first job (plan PR 11b). The dice are still rolled, so every other offer stays as it was.
+    const firstJob = k === 0 && isFirstRaid(c)
     // The first offer is always open to anyone, in a cheap class: the way back from broke.
-    const cls: ClassId = k === 0
+    const rolled: ClassId = k === 0
       ? rng.pick(['light4x4', 'sxs'] as const)
       : rng.weighted(CLASSES.map((x) => ({ item: x.id, weight: x.id === 'light4x4' ? 2 : 1 })))
+    const cls = firstJob ? CONTRACTS.firstJob.cls : rolled
     const rep = k === 0 ? 0 : CONTRACTS.classRep[cls] + rng.int(0, 3) * 5
-    const budget = round(KITS[cls].budget * rng.range(CONTRACTS.budget[0], CONTRACTS.budget[1]) * scale)
+    const share = rng.range(CONTRACTS.budget[0], CONTRACTS.budget[1])
+    const budget = round(KITS[cls].budget * (firstJob ? CONTRACTS.firstJob.budget : share) * scale)
     const fee = round(budget * CONTRACTS.fee)
     const base = cls === 'heavy' ? 520 : cls === 'sxs' ? 330 : 20
     let number = base + rng.int(0, 69)
