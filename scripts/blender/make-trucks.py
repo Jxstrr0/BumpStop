@@ -21,12 +21,19 @@ moving part is its own named node:
 
     Body                 everything the springs hold up (cab, frame, cage)
       MountTop_FL ...    where each shock bolts to the body (an empty)
-      Arm_FL ...         side-by-side only: arms that swing from the body
+      Arm_FL_Lower ...   arms that swing from the body: wishbones, trailing
+                         arms, radius rods, tie rods, half-shafts
+        MountLow_FL_...  a layout's shock bottom, when it sits on an arm
     Hub_FL ...           each wheel's upright: moves up and down
       Wheel_FL ...       the wheel and tire: spins
-      MountLow_FL ...    where the shock bolts to the axle or arm (an empty)
-      ArmEnd_FL ...      side-by-side only: where the arm meets the upright
+      MountLow_FL ...    where the shock bolts to the axle or hub (an empty)
+      ArmEnd_FL_Lower .. where each arm meets the upright (it points here)
     Axle_F, Axle_R       light 4x4 and heavy truck: the solid axle beams
+
+SUSPENSION LAYOUTS. Where a truck offers more than one layout at an end
+(the light 4x4's beam axle or double wishbones), each layout's parts sit in
+a group the game shows like a bolt-on, and the extra layouts have their own
+shock mounts at the stock shock length. See LAYOUTS below.
     ShockBody_FL ...     the shock's body, from the top mount downwards
     ShockShaft_FL ...    the shock's shaft, from the bottom mount upwards
     Spring_FL ...        the coil spring, from the top mount, squashed to fit
@@ -340,18 +347,39 @@ def fit_name(slot, parts, where=''):
 
 TRUCKS = {
     'light4x4': dict(cg_front=1.3, cg_rear=1.5, track=1.65, radius=0.40, tire=0.30,
-                     front='axle', rear='axle', paint='#ECE8DC', trim='#25272B'),
+                     paint='#ECE8DC', trim='#25272B'),
     'heavy': dict(cg_front=2.1, cg_rear=1.9, track=2.1, radius=0.62, tire=0.42,
-                  front='axle', rear='axle', paint='#5A6E80', trim='#ECE8DC'),
+                  paint='#5A6E80', trim='#ECE8DC'),
     'sxs': dict(cg_front=1.15, cg_rear=1.2, track=1.6, radius=0.37, tire=0.27,
-                front='arms', rear='trailing', paint='#F4F1E8', trim='#25272B'),
+                paint='#F4F1E8', trim='#25272B'),
 }
 
-# Which suspension parts show coil springs (the rest are on leaf springs).
-# Plan PR 3's light 4x4 wishbones and trailing arms are drawn as coil-sprung
-# beam axles for now.
+# Each end's suspension layouts, as (kind, the suspension parts drawn that
+# way). The first is the stock layout: its shock mounts are the plain
+# MountTop_FL / MountLow_FL. The others get their own mounts, named after
+# their parts (MountTop_FL_wishbone), placed so the shock is exactly as long
+# at rest as the stock one: every shock body and spring then fits every
+# layout, and the game hangs the shocks on the build's own mounts. When an
+# end has more than one layout, each one's parts on the body sit in a
+# `Fit_<slot>_<parts>_Rig<F|R>` group (and a solid axle in
+# `Fit_<slot>_<parts>_Axle<F|R>`), so the game shows only the build's own.
+LAYOUTS = {
+    'light4x4': {'F': [('axle', ['solidAxleCoil', 'solidAxleLeaf']), ('wishbone', ['wishbone'])],
+                 'R': [('axle', ['coilLink', 'leafAxle']), ('trailingArm', ['trailingArm'])]},
+    'heavy': {'F': [('axle', ['beamLeaf', 'beamCoil'])],
+              'R': [('axle', ['rearBeamLeaf', 'rearBeamCoil'])]},
+    'sxs': {'F': [('arms', ['sxsWishbone']), ('longArms', ['longArms'])],
+            'R': [('trailing', ['sxsTrailing']), ('longTrailing', ['longTrailing'])]},
+}
+
+# Which suspension parts show coil springs round the shocks (the rest are on
+# leaf springs), and which solid axles are held by coil-sprung links.
 COIL = {
     'light4x4': {'F': ['solidAxleCoil', 'wishbone'], 'R': ['coilLink', 'trailingArm']},
+    'heavy': {'F': ['beamCoil'], 'R': ['rearBeamCoil']},
+}
+LINKS = {
+    'light4x4': {'F': ['solidAxleCoil'], 'R': ['coilLink']},
     'heavy': {'F': ['beamCoil'], 'R': ['rearBeamCoil']},
 }
 LEAF = {
@@ -683,7 +711,32 @@ class Build:
         self.body = empty('Body', None, (0, 0, 0))
         self.shell = Part('BodyShell')
         self.axles = {}
-        self.arms = {}
+        self.groups = {}
+        self.tops = {}
+        self.rig_parts = {}
+
+    def layouts(self, key):
+        """The layouts at one end ('F' or 'R'), stock first."""
+        return LAYOUTS[self.cls][key]
+
+    def rig(self, key, kind):
+        """Where one layout's parts on the body go: a group of its own the game
+        can hide, or the body itself when that end has only one layout."""
+        layouts = self.layouts(key)
+        if len(layouts) == 1:
+            return self.body
+        if (key, kind) not in self.groups:
+            parts = dict(layouts)[kind]
+            slot = 'frontSusp' if key == 'F' else 'rearSusp'
+            self.groups[(key, kind)] = empty(fit_name(slot, parts, 'Rig' + key), self.body, (0, 0, 0))
+        return self.groups[(key, kind)]
+
+    def rig_part(self, key, kind):
+        """One shared Part for a layout's brackets on the body, from all its
+        corners (one node, so one draw call)."""
+        if (key, kind) not in self.rig_parts:
+            self.rig_parts[(key, kind)] = Part(f'Brackets{key}_{kind}')
+        return self.rig_parts[(key, kind)]
 
     def fit(self, slot, parts, where=''):
         """A new Part for one or more fitted parts, on the body unless placed elsewhere."""
@@ -694,6 +747,374 @@ class Build:
             part.bm.free()
             return None
         return place(part.finish(self.materials), parent if parent is not None else self.body, loc)
+
+
+# --- Suspension layouts --------------------------------------------------------------
+# What each wheel hangs on. A layout draws its arms and says where its shock
+# bolts on: the bottom (on the hub or on an arm) and the top (on the body).
+# Arms are drawn in their pivot's space and named Arm_<corner>_<what>; the
+# game turns each one to point at its ArmEnd_<corner>_<what>, an empty on the
+# hub, so the arms follow the wheel.
+
+def plate_y(p, x0, x1, y, z0, z1, th=0.012):
+    """A flat bracket standing along the truck at `y`."""
+    p.box(((x0 + x1) / 2, y, (z0 + z1) / 2), (x1 - x0, th, z1 - z0), 'Graphite', bevel=0.003)
+
+
+def solve_top(low, x, y, length):
+    """A top mount at (x, y) over the bottom mount, just high enough for the
+    shock to be `length` long."""
+    flat = (x - low[0]) ** 2 + (y - low[1]) ** 2
+    return V((x, y, low[2] + math.sqrt(max(length * length - flat, 0.0))))
+
+
+def wishbone(p, rel, spread, rad, mat, s, plate=True):
+    """An A-shaped arm: rubber bushings on the body at (±spread, 0, 0), a ball
+    joint on the upright at `rel`, and a plate across the middle."""
+    for px in (spread, -spread):
+        p.tube((px, 0, 0), tuple(rel), rad, mat, segments=8)
+        p.tube((px - 0.035 * s, 0, 0), (px + 0.035 * s, 0, 0), rad * 1.35, 'Rubber', segments=8)
+    p.tube(tuple(rel - V((0, 0, 0.025 * s))), tuple(rel + V((0, 0, 0.025 * s))), rad * 1.5, 'Steel', segments=8)
+    if plate:
+        a, b = V((spread, 0, 0)).lerp(rel, 0.5), V((-spread, 0, 0)).lerp(rel, 0.5)
+        tip = rel * 0.92
+        lift = V((0, 0, rad * 0.5))
+        p.convex([a + lift, b + lift, tip + lift, a - lift, b - lift, tip - lift], mat)
+
+
+def boxed_wishbone(p, rel, spread, s, mat):
+    """A long-travel lower arm: one deep boxed plate from wide bushings to a
+    chrome heim joint, with a tube along each edge."""
+    th = 0.022 * s
+    p.convex([(spread, 0, th), (-spread, 0, th), (spread, 0, -th), (-spread, 0, -th),
+              tuple(rel + V((0.035 * s, 0, th))), tuple(rel + V((-0.035 * s, 0, th))),
+              tuple(rel + V((0.035 * s, 0, -th))), tuple(rel + V((-0.035 * s, 0, -th)))], mat, bevel=0.004 * s)
+    for px in (spread, -spread):
+        p.tube((px, 0, 0), tuple(rel), 0.02 * s, mat, segments=8)
+        p.tube((px - 0.04 * s, 0, 0), (px + 0.04 * s, 0, 0), 0.03 * s, 'Rubber', segments=8)
+    p.tube(tuple(rel - V((0, 0, 0.03 * s))), tuple(rel + V((0, 0, 0.03 * s))), 0.034 * s, 'Chrome', segments=10)
+
+
+def boxed_trailing(p, rel, s, mat, width, deep, brace):
+    """A trailing arm: a boxed beam from the bushing on the body back to the
+    upright, deeper at the wheel end, and a brace to a second bushing
+    inboard (`brace` is that bushing's offset across the truck)."""
+    w, d = width * s, deep * s
+    p.convex([(0, -w * 0.8, d * 0.45), (0, w * 0.8, d * 0.45), (0, -w * 0.8, -d * 0.45), (0, w * 0.8, -d * 0.45),
+              tuple(rel + V((0.05 * s, -w, d))), tuple(rel + V((0.05 * s, w, d))),
+              tuple(rel + V((0.05 * s, -w, -d * 0.85))), tuple(rel + V((0.05 * s, w, -d * 0.85)))],
+             mat, bevel=0.006 * s)
+    p.tube((0, -w * 1.4, 0), (0, w * 1.4, 0), 0.035 * s, 'Rubber', segments=8)
+    if brace:
+        p.tube((0, brace, 0), tuple(rel * 0.6), 0.022 * s, mat, segments=8)
+        p.tube((-0.03 * s, brace, 0), (0.03 * s, brace, 0), 0.03 * s, 'Rubber', segments=8)
+
+
+def rod(p, rel, s, mat='Graphite'):
+    """A plain link with a chrome rod end at each end."""
+    p.tube((0, 0, 0), tuple(rel), 0.016 * s, mat, segments=8)
+    d = rel.normalized()
+    for pnt in (V((0, 0, 0)), rel):
+        p.tube(tuple(pnt - d * 0.03 * s), tuple(pnt + d * 0.03 * s), 0.022 * s, 'Chrome', segments=8)
+
+
+def drive_shaft(p, a, e, k, s):
+    """A half-shaft with a rubber boot at each joint: thicker for heavy-duty
+    axles, chrome with blue boots for chromoly."""
+    a, e = V(a), V(e)
+    rad = {'standardAxles': 0.016, 'heavyDutyAxles': 0.022, 'chromolyAxles': 0.015}[k] * s
+    boot = {'standardAxles': 'Rubber', 'heavyDutyAxles': 'Rubber', 'chromolyAxles': 'Anodised'}[k]
+    p.tube(tuple(a), tuple(e), rad, 'Chrome' if k == 'chromolyAxles' else 'Steel', segments=8)
+    d = (e - a).normalized()
+    for pnt in (a + d * 0.05 * s, e - d * 0.05 * s):
+        p.tube(tuple(pnt - d * 0.045 * s), tuple(pnt + d * 0.045 * s), rad * 2.4, boot, segments=10, r2=rad * 1.4)
+
+
+def diff_cover(p, k, centre, s):
+    """The cover on the back of a diff (round Y, facing +Y): plain, finned
+    steel for heavy-duty, blue for chromoly."""
+    cx, cy, cz = centre
+    if k == 'heavyDutyAxles':
+        p.lathe([(0.13 * s, 0.0), (0.13 * s, 0.03 * s), (0.1 * s, 0.06 * s), (0.0, 0.065 * s)], 'Steel',
+                segments=16, centre=centre, closed=False, smooth=False)
+        for fin in range(-2, 3):
+            p.box((cx, cy + 0.06 * s, cz + fin * 0.035 * s), (0.2 * s, 0.012 * s, 0.01 * s), 'Steel')
+    else:
+        p.lathe([(0.11 * s, 0.0), (0.11 * s, 0.03 * s), (0.08 * s, 0.05 * s), (0.0, 0.055 * s)],
+                'Anodised' if k == 'chromolyAxles' else 'Graphite', segments=16, centre=centre, closed=False,
+                smooth=False)
+
+
+class Corner:
+    """One corner while it's built: where its wheel is, and a way to add arms."""
+
+    def __init__(self, b, c, hub):
+        t = b.t
+        self.b, self.c, self.hub = b, c, hub
+        self.x, self.y = corner_pos(t, c)
+        self.r, self.s = b.r, b.s
+        self.side = 1 if c[1] == 'L' else -1
+        self.key = c[0]
+        self.half = t['track'] / 2
+        self.hub_world = V((self.x, self.y, self.r))
+
+    def at(self, dx, out, z):
+        """A point by this corner: `dx` along the truck from the axle line,
+        `out` from the centre line towards this wheel, `z` up from the ground."""
+        return V((self.x + dx, self.side * out, z))
+
+    def arm(self, group, what, pivot, end, draw=None):
+        """An arm from the body at `pivot` to the upright at `end` (world
+        positions, at rest). `draw(part, rel)` draws it in the pivot's space,
+        `rel` being the end. Returns the arm and `rel`."""
+        name = f'Arm_{self.c}_{what}'
+        pivot = V(pivot)
+        rel = V(end) - pivot
+        part = Part(name)
+        if draw is not None:
+            draw(part, rel)
+        if part.empty_part():
+            part.bm.free()
+            obj = place(empty(name, None, (0, 0, 0)), group, tuple(pivot))
+        else:
+            obj = place(part.finish(self.b.materials), group, tuple(pivot))
+        empty(f'ArmEnd_{self.c}_{what}', self.hub, tuple(V(end) - self.hub_world))
+        return obj, rel
+
+    def on_arm(self, pivot, rel, f, lift=(0, 0, 0)):
+        """A point a fraction `f` of the way down an arm, nudged by `lift`."""
+        return V(pivot) + rel * f + V(lift)
+
+
+def layout_corner(b, k, kind, group):
+    """Draw one layout at one corner. Returns where its shock bolts on, in
+    world space at rest: `low` on `parent` (whose own origin is `origin`), and
+    either `top`, or `top_xy` for the top to sit over it at the stock shock's
+    length."""
+    t, s, r = b.t, k.s, k.r
+    side, tire = k.side, t['tire']
+    inboard = tire * 0.75 + 0.05 * s
+
+    if kind == 'axle':
+        # Stock beam axle: the shock from the hub, just inboard of the wheel, up to the frame.
+        low = k.hub_world + V((0.0, -side * inboard, -0.02 * s))
+        top = k.at(0.08 * s if k.key == 'F' else -0.08 * s, k.half - inboard, r + 0.58 * s)
+        return dict(parent=k.hub, origin=k.hub_world, low=low, top=top)
+
+    if kind == 'arms':
+        # Stock side-by-side double wishbones; the shock stands on the hub and leans in.
+        ball = k.half - tire * 0.55
+        k.arm(group, 'Lower', k.at(0, 0.32 * s, r - 0.06 * s), k.at(0, ball, r - 0.06 * s),
+              lambda p, rel: wishbone(p, rel, 0.18 * s, 0.022 * s, 'Graphite', s))
+        k.arm(group, 'Upper', k.at(0, 0.32 * s, r + 0.2 * s), k.at(0, ball, r + 0.2 * s),
+              lambda p, rel: wishbone(p, rel, 0.2 * s, 0.018 * s, 'Graphite', s, plate=False))
+        plate_y(b.rig_part(k.key, kind), k.x - 0.23 * s, k.x + 0.23 * s, side * 0.29 * s, r - 0.1 * s, r + 0.24 * s)
+        low = k.hub_world + V((0.0, -side * inboard, -0.02 * s))
+        top = k.at(-0.05 * s, k.half - inboard - 0.32 * s, r + 0.95 * s)
+        return dict(parent=k.hub, origin=k.hub_world, low=low, top=top)
+
+    if kind == 'longArms':
+        # Long-travel arms: pivots near the middle of the truck, so the arms are
+        # half as long again and swing through a flatter arc. Boxed alloy lower
+        # arms with chrome heim joints; the shock sits on the lower arm.
+        ball = k.half - tire * 0.55
+        lp = k.at(0, 0.12 * s, r - 0.09 * s)
+        lower, rel = k.arm(group, 'LongLower', lp, k.at(0, ball, r - 0.06 * s),
+                           lambda p, rel: boxed_wishbone(p, rel, 0.24 * s, s, 'Alloy'))
+        k.arm(group, 'LongUpper', k.at(0, 0.16 * s, r + 0.24 * s), k.at(0, ball, r + 0.2 * s),
+              lambda p, rel: wishbone(p, rel, 0.24 * s, 0.019 * s, 'Alloy', s, plate=False))
+        plate_y(b.rig_part(k.key, kind), k.x - 0.28 * s, k.x + 0.28 * s, side * 0.09 * s, r - 0.13 * s, r + 0.28 * s)
+        low = k.on_arm(lp, rel, 0.8, (0, 0, 0.04 * s))
+        return dict(parent=lower, origin=lp, low=low, top_xy=(k.x - 0.05 * s, side * (abs(low.y) - 0.3 * s)))
+
+    if kind == 'trailing':
+        # Stock side-by-side rear: a trailing arm from ahead of the wheel and two radius rods.
+        end = k.at(0, k.half - tire * 0.6, r - 0.04 * s)
+        k.arm(group, 'Trailing', k.at(0.7 * s, 0.38 * s, r - 0.02 * s), end,
+              lambda p, rel: boxed_trailing(p, rel, s, 'Graphite', 0.02, 0.07, None))
+        for what, dx, z in (('RodUpper', -0.05, 0.12), ('RodLower', 0.05, -0.1)):
+            k.arm(group, what, k.at(dx * s, 0.22 * s, r + z * s), k.at(dx * s, k.half - tire * 0.62, r + z * s),
+                  lambda p, rel: rod(p, rel, s))
+        br = b.rig_part(k.key, kind)
+        br.box(tuple(k.at(0.7 * s, 0.38 * s, (r + 0.42) / 2)), (0.07 * s, 0.09 * s, 0.42 - r + 0.04 * s), 'Graphite')
+        plate_y(br, k.x - 0.1 * s, k.x + 0.1 * s, side * 0.2 * s, r - 0.13 * s, r + 0.15 * s)
+        low = k.hub_world + V((-0.06 * s, -side * inboard, -0.02 * s))
+        top = k.at(0.1 * s, k.half - inboard - 0.27 * s, r + 0.95 * s)
+        return dict(parent=k.hub, origin=k.hub_world, low=low, top=top)
+
+    if kind == 'longTrailing':
+        # Long-travel rear: a longer, deeper alloy trailing arm reaching under
+        # the seats, longer radius rods, and the shock on the arm.
+        end = k.at(0, k.half - tire * 0.6, r - 0.04 * s)
+        ap = k.at(1.0 * s, 0.4 * s, r - 0.03 * s)
+        arm, rel = k.arm(group, 'LongTrailing', ap, end,
+                         lambda p, rel: boxed_trailing(p, rel, s, 'Alloy', 0.028, 0.1, -side * 0.16 * s))
+        for what, dx, z in (('LongRodUpper', -0.05, 0.12), ('LongRodLower', 0.05, -0.1)):
+            k.arm(group, what, k.at(dx * s, 0.12 * s, r + z * s), k.at(dx * s, k.half - tire * 0.62, r + z * s),
+                  lambda p, rel: rod(p, rel, s, 'Alloy'))
+        br = b.rig_part(k.key, kind)
+        for out in (0.4, 0.4 - 0.16):
+            br.box(tuple(k.at(1.0 * s, out * s, (r + 0.42) / 2)), (0.07 * s, 0.05 * s, 0.42 - r + 0.04 * s), 'Graphite')
+        plate_y(br, k.x - 0.1 * s, k.x + 0.1 * s, side * 0.1 * s, r - 0.13 * s, r + 0.15 * s)
+        low = k.on_arm(ap, rel, 0.9, (0, 0, 0.06 * s))
+        return dict(parent=arm, origin=ap, low=low, top_xy=(low.x + 0.08 * s, side * (abs(low.y) - 0.26 * s)))
+
+    if kind == 'wishbone':
+        # The light 4x4's double wishbones: a long lower arm from a crossmember
+        # under the frame, a shorter upper arm from the frame rail, the
+        # coilover on a bracket at the back of the lower arm (behind the upper
+        # arm, outboard of the rail), a tie rod from the steering rack, and a
+        # half-shaft from the diff, which is bolted to the frame.
+        ball = k.half - tire * 0.55
+        lp = k.at(0, 0.2 * s, r - 0.1 * s)
+        lbj = k.at(0, ball - 0.02 * s, r - 0.13 * s)
+
+        def lower_arm(p, rel):
+            wishbone(p, rel, 0.22 * s, 0.026 * s, 'Graphite', s)
+            # The shock bracket, reaching back from the arm near the ball joint.
+            a = rel * 0.86
+            p.convex([a + V((0.0, 0, 0.012 * s)), a + V((-0.17 * s, 0, 0.012 * s)), a + V((0.0, -side * 0.05 * s, 0.012 * s)),
+                      a + V((0.0, 0, -0.012 * s)), a + V((-0.17 * s, 0, -0.012 * s)),
+                      a + V((0.0, -side * 0.05 * s, -0.012 * s))], 'Graphite')
+            p.tube(tuple(a + V((-0.15 * s, -0.03 * s, 0.03 * s))), tuple(a + V((-0.15 * s, 0.03 * s, 0.03 * s))),
+                   0.018 * s, 'Steel', segments=8)
+
+        lower, rel = k.arm(group, 'Lower', lp, lbj, lower_arm)
+        # The upper arm pivots on brackets on top of the frame rail and reaches
+        # down to a tall knuckle on the upright.
+        k.arm(group, 'Upper', k.at(-0.02 * s, 0.4 * s, r + 0.4 * s), k.at(-0.02 * s, ball - 0.07 * s, r + 0.25 * s),
+              lambda p, rel: wishbone(p, rel, 0.16 * s, 0.022 * s, 'Graphite', s, plate=False))
+        knuckle = b.fit('frontSusp', ['wishbone'], 'Knuckle' + k.c)
+        iy = -side * tire * 0.55
+        knuckle.convex([(0.035 * s, iy + 0.025 * s, 0.1 * s), (-0.035 * s, iy + 0.025 * s, 0.1 * s),
+                        (0.035 * s, iy - 0.025 * s, 0.1 * s), (-0.035 * s, iy - 0.025 * s, 0.1 * s),
+                        (0.01 * s, iy - side * 0.045 * s, 0.27 * s), (-0.05 * s, iy - side * 0.045 * s, 0.27 * s),
+                        (0.01 * s, iy - side * 0.085 * s, 0.27 * s), (-0.05 * s, iy - side * 0.085 * s, 0.27 * s)],
+                       'Graphite', bevel=0.006 * s)
+        b.add(knuckle, k.hub)
+        k.arm(group, 'Tie', k.at(0.14 * s, 0.25 * s, r + 0.02 * s), k.at(0.07 * s, ball - 0.02 * s, r + 0.02 * s),
+              lambda p, rel: rod(p, rel, s, 'Steel'))
+        low = k.on_arm(lp, rel, 0.86, (-0.15 * s, 0, 0.03 * s))
+        return dict(parent=lower, origin=lp, low=low, top_xy=(low.x - 0.02 * s, side * (abs(low.y) - 0.01 * s)))
+
+    if kind == 'trailingArm':
+        # The light 4x4's independent rear: a boxed trailing arm on each side,
+        # pivoting on a hanger under the frame rail, braced to a second
+        # bushing inboard; the coilover on a bracket on the arm's inner side,
+        # and a half-shaft from the diff on the frame.
+        end = k.at(0, k.half - tire * 0.6, r - 0.04 * s)
+        ap = k.at(0.8 * s, 0.5 * s, r + 0.04 * s)
+
+        def trailing_arm(p, rel):
+            boxed_trailing(p, rel, s, 'Graphite', 0.03, 0.09, -side * 0.2 * s)
+            a = rel * 0.9
+            p.box(tuple(a + V((0, -side * 0.05 * s, 0))), (0.09 * s, 0.07 * s, 0.05 * s), 'Graphite', bevel=0.006 * s)
+
+        arm, rel = k.arm(group, 'Trailing', ap, end, trailing_arm)
+        low = k.on_arm(ap, rel, 0.9, (0, -side * 0.065 * s, 0.0))
+        return dict(parent=arm, origin=ap, low=low, top_xy=(low.x + 0.04 * s, low.y))
+
+    raise ValueError(kind)
+
+
+def independent_extras(b, key, kind, group):
+    """The body-side parts of an independent layout on a truck that also has
+    a beam axle there: the diff bolted to the frame (with each axle part's
+    cover), the frame brackets the arms hang on, the steering rack, bump
+    stops, an anti-roll bar and full armour's diff guard."""
+    t, s, r = b.t, b.s, b.r
+    x = t['cg_front'] if key == 'F' else -t['cg_rear']
+    slot = 'frontSusp' if key == 'F' else 'rearSusp'
+    zc = r + (0.0 if key == 'F' else 0.03)
+    p = Part(f'Diff{key}_' + kind)
+    p.lathe([(0.0, -0.1 * s), (0.12 * s, -0.08 * s), (0.14 * s, 0.0), (0.12 * s, 0.08 * s), (0.0, 0.1 * s)],
+            'Graphite', segments=16, centre=(x, 0.0, zc), closed=False)
+    for sd in (-1, 1):
+        p.tube((x, sd * 0.08 * s, zc), (x, sd * 0.17 * s, zc), 0.045 * s, 'Graphite', segments=10)
+    towards = -1 if key == 'F' else 1
+    p.tube((x + towards * 0.12 * s, 0.0, zc + 0.02), (x + towards * 0.7 * s, 0.0, zc + 0.12 * s), 0.03 * s, 'Steel')
+    rail_y, rail_low = 0.45, 0.54
+    if kind == 'wishbone':
+        # Crossmembers under the lower arm bushings, dropped from the rails.
+        for dx in (0.22, -0.22):
+            p.box((x + dx * s, 0, r - 0.1 * s), (0.07 * s, 0.5 * s, 0.06 * s), 'Graphite', bevel=0.008)
+            for sd in (-1, 1):
+                p.convex([(x + dx * s - 0.03, sd * 0.2 * s, r - 0.13 * s), (x + dx * s + 0.03, sd * 0.2 * s, r - 0.13 * s),
+                          (x + dx * s - 0.03, sd * rail_y, rail_low), (x + dx * s + 0.03, sd * rail_y, rail_low),
+                          (x + dx * s - 0.03, sd * (rail_y - 0.05), rail_low), (x + dx * s + 0.03, sd * (rail_y - 0.05), rail_low)],
+                         'Graphite')
+        for sd in (-1, 1):
+            # Upper arm brackets standing on the rail, and a shock tower behind
+            # the upper arm with a plate out to the top mount.
+            for dx in (0.14, -0.18):
+                p.box((x + dx * s, sd * 0.42 * s, r + 0.36 * s), (0.05 * s, 0.07 * s, 0.13 * s), 'Graphite')
+            top = b.tops[(key + ('L' if sd > 0 else 'R'), kind)]
+            tz = top.z + 0.03 * s
+            p.convex([(x - 0.36 * s, sd * 0.47, 0.64), (x - 0.22 * s, sd * 0.47, 0.64),
+                      (x - 0.36 * s, sd * 0.47, tz), (x - 0.24 * s, sd * 0.47, tz),
+                      (x - 0.36 * s, sd * 0.5, 0.64), (x - 0.22 * s, sd * 0.5, 0.64),
+                      (x - 0.36 * s, sd * 0.5, tz), (x - 0.24 * s, sd * 0.5, tz)], 'Graphite', bevel=0.006)
+            plate = []
+            for z in (tz, tz + 0.014):
+                plate += [(x - 0.36 * s, sd * 0.47, z), (top.x - 0.06 * s, top.y + sd * 0.05 * s, z),
+                          (top.x + 0.05 * s, top.y + sd * 0.05 * s, z), (top.x + 0.05 * s, sd * 0.47, z)]
+            p.convex(plate, 'Graphite')
+        # The steering rack and its boots.
+        p.tube((x + 0.14 * s, -0.25 * s, r + 0.02 * s), (x + 0.14 * s, 0.25 * s, r + 0.02 * s), 0.03 * s, 'Graphite')
+        for sd in (-1, 1):
+            p.tube((x + 0.14 * s, sd * 0.17 * s, r + 0.02 * s), (x + 0.14 * s, sd * 0.25 * s, r + 0.02 * s), 0.036 * s,
+                   'Rubber', segments=10, r2=0.022 * s)
+    else:
+        # Hangers for the trailing arms' bushings, under the rails.
+        for sd in (-1, 1):
+            for yy in (0.5, 0.3):
+                p.convex([(x + 0.76 * s, sd * yy * s, r + 0.0), (x + 0.84 * s, sd * yy * s, r + 0.0),
+                          (x + 0.72 * s, sd * yy * s, rail_low), (x + 0.88 * s, sd * yy * s, rail_low),
+                          (x + 0.76 * s, sd * (yy - 0.02) * s, r + 0.0), (x + 0.84 * s, sd * (yy - 0.02) * s, r + 0.0),
+                          (x + 0.72 * s, sd * (yy - 0.02) * s, rail_low), (x + 0.88 * s, sd * (yy - 0.02) * s, rail_low)],
+                         'Graphite')
+            # A bracket off the rail for the top of the shock.
+            top = b.tops[(key + ('L' if sd > 0 else 'R'), kind)]
+            tz = top.z + 0.03 * s
+            p.box((top.x, sd * (abs(top.y) + 0.45) / 2 + sd * 0.03, tz), (0.12 * s, abs(top.y) - 0.39, 0.014), 'Graphite')
+            p.box((top.x, sd * 0.47, (tz + 0.7) / 2), (0.1 * s, 0.03, tz - 0.7), 'Graphite')
+        # A crossmember the diff hangs from.
+        p.box((x, 0, 0.62), (0.12 * s, 0.9, 0.1), 'Graphite', bevel=0.01)
+    b.add(p, group)
+
+    for k in AXLES:
+        p = b.fit('axles', [k], 'Diff' + key)
+        diff_cover(p, k, (x, 0.08 * s, zc), s)
+        b.add(p, group)
+
+    # Bump stops: over the upper arm at the front, over the trailing arm at the back.
+    for kb in BUMP_STOPS:
+        p = b.fit('bumpStops', [kb], 'Ifs' + key)
+        for sd in (-1, 1):
+            if kind == 'wishbone':
+                # Over the lower arm's back leg, hanging from the rail.
+                pnt = (x - 0.07 * s, sd * 0.5, 0.5)
+                bump_stop(p, pnt, s, kb)
+                p.box((pnt[0], sd * 0.48, 0.52), (0.07 * s, 0.07, 0.04), 'Steel')
+            else:
+                pnt = (x + 0.2 * s, sd * 0.58, 0.62)
+                bump_stop(p, pnt, s, kb)
+                p.box((pnt[0], sd * 0.51, pnt[2] + 0.006), (0.06 * s, 0.1, 0.012), 'Steel')
+        b.add(p, group)
+
+    for kr, adj in (('fixedBars', False), ('adjustableBars', True)):
+        p = b.fit('antiRoll', [kr], 'Ifs' + key)
+        if kind == 'wishbone':
+            roll_bar(p, x + 0.42, 0.42, 0.56, 0.42, r - 0.07, s, adj, flip=1)
+        else:
+            roll_bar(p, x + 0.45, 0.58, 0.5, 0.3, r + 0.02, s, adj, flip=1)
+        b.add(p, group)
+
+    p = b.fit('protection', ['fullArmour'], 'Diff' + key)
+    p.box((x, 0, zc - 0.19 * s), (0.42 * s, 0.46 * s, 0.02), 'Steel', bevel=0.005)
+    for sd in (-1, 1):
+        p.box((x, sd * 0.22 * s, zc - 0.1 * s), (0.36 * s, 0.02, 0.18 * s), 'Steel')
+    b.add(p, group)
 
 
 def build_truck(cls, t, materials):
@@ -713,8 +1134,6 @@ def build_truck(cls, t, materials):
     for c in CORNERS:
         x, y = corner_pos(t, c)
         side = 1 if c[1] == 'L' else -1
-        end = 'front' if c[0] == 'F' else 'rear'
-        kind = t[end]
 
         hub = empty('Hub_' + c, None, (x, y, r))
         wh = empty('Wheel_' + c, hub, (0, 0, 0))
@@ -729,29 +1148,32 @@ def build_truck(cls, t, materials):
         # The upright behind the wheel, with the brake disc and caliper.
         up = Part('Upright_' + c)
         inner = -side * t['tire'] * 0.55
-        up.box((0, inner, 0), (0.08 * s, 0.06 * s, r * 0.75), 'Graphite', bevel=0.01 * s)
+        # Taller on the side-by-side, whose wishbones' ball joints sit further apart.
+        up.box((0, inner, 0), (0.08 * s, 0.06 * s, 0.42 * s if cls == 'sxs' else r * 0.75), 'Graphite', bevel=0.01 * s)
         up.lathe([(0.0, 0.0), (r * 0.42, 0.0), (r * 0.42, 0.018 * s), (0.0, 0.018 * s)], 'Steel', segments=18,
                  centre=(0, inner + side * 0.06 * s, 0), smooth=False)
         up.box((r * 0.28, inner + side * 0.07 * s, r * 0.22), (0.07 * s, 0.05 * s, 0.12 * s), 'Graphite',
                rot=Matrix.Rotation(-0.6, 3, 'Y'), bevel=0.01 * s)
         place(up.finish(materials), hub, (0, 0, 0))
 
-        # Shock mounts: on the hub just inboard of the wheel, and up on the body.
-        inboard = t['tire'] * 0.75 + 0.05 * s
-        low_local = (0.0 if kind != 'trailing' else -0.06 * s, -side * inboard, -0.02 * s)
-        if kind == 'arms':
-            # Long-travel shocks stand tall and lean in, so they poke up through the bonnet like a real one's.
-            top_world = (x - 0.05 * s, side * (t['track'] / 2 - inboard - 0.32 * s), r + 0.95 * s)
-        elif kind == 'trailing':
-            top_world = (x + 0.1 * s, side * (t['track'] / 2 - inboard - 0.27 * s), r + 0.95 * s)
-        else:
-            top_world = (x + (0.08 if end == 'front' else -0.08) * s, side * (t['track'] / 2 - inboard),
-                         r + 0.58 * s)
-        empty('MountLow_' + c, hub, low_local)
-        empty('MountTop_' + c, b.body, top_world)
-
-        low_world = V((x, y, r)) + V(low_local)
-        length = (V(top_world) - low_world).length
+        # What the wheel hangs on, in each layout at this end. The stock
+        # layout's shock length is every layout's, so one set of shocks fits all.
+        k = Corner(b, c, hub)
+        stock = None
+        for kind, lparts in b.layouts(c[0]):
+            got = layout_corner(b, k, kind, b.rig(c[0], kind))
+            low = V(got['low'])
+            if stock is None:
+                top = V(got['top'])
+                stock = (top, low, (top - low).length)
+                tag = ''
+            else:
+                top = solve_top(low, *got['top_xy'], stock[2])
+                tag = '_' + '-'.join(lparts)
+            b.tops[(c, kind)] = top
+            empty('MountLow_' + c + tag, got['parent'], tuple(low - V(got['origin'])))
+            empty('MountTop_' + c + tag, b.body, tuple(top))
+        top_world, low_world, length = stock
 
         # The shock body: one variant per damper part, all hanging from the top mount.
         # The left and right shocks at each end are the same length, so they share meshes.
@@ -762,60 +1184,40 @@ def build_truck(cls, t, materials):
                 meshes[(what, key)] = make().to_mesh(materials)
             return meshes[(what, key)]
 
-        # The shock body: one variant per damper part, all hanging from the top mount.
-        sb = empty('ShockBody_' + c, None, top_world)
-        for k in DAMPERS:
-            mesh = shared('damper-' + k, lambda: kit_shock_body('Damper_' + k, length, s, k))
-            place(link(fit_name('dampers', [k], c), mesh), sb, (0, 0, 0))
+        sb = empty('ShockBody_' + c, None, tuple(top_world))
+        for kd in DAMPERS:
+            mesh = shared('damper-' + kd, lambda: kit_shock_body('Damper_' + kd, length, s, kd))
+            place(link(fit_name('dampers', [kd], c), mesh), sb, (0, 0, 0))
         place(link('ShockShaft_' + c, shared('shaft', lambda: kit_shaft('Shaft', length, s))), None, tuple(low_world))
-        spring = empty('Spring_' + c, None, top_world)
+        spring = empty('Spring_' + c, None, tuple(top_world))
         coil = COIL.get(cls, {}).get(c[0])
         name = fit_name('frontSusp' if c[0] == 'F' else 'rearSusp', coil, 'Spring' + c) if coil else 'Coil_' + c
         place(link(name, shared('spring', lambda: kit_spring('Spring', length, s))), spring, (0, 0, 0))
 
-        if kind == 'arms':
-            # Upper and lower wishbones from the body out to the upright.
-            pivot = (x, side * 0.32 * s, r - 0.06 * s)
-            end_world = V((x, side * (t['track'] / 2 - t['tire'] * 0.55), r - 0.06 * s))
-            arm = Part('Arm_' + c)
-            rel = end_world - V(pivot)
-            up_rel = rel + V((0, 0, 0.26 * s))
-            arm.tube((0.18 * s, 0, 0), tuple(rel), 0.022 * s, 'Graphite')
-            arm.tube((-0.18 * s, 0, 0), tuple(rel), 0.022 * s, 'Graphite')
-            arm.tube(tuple(up_rel), (0.12 * s, 0, 0.26 * s), 0.018 * s, 'Graphite')
-            arm.tube(tuple(up_rel), (-0.12 * s, 0, 0.26 * s), 0.018 * s, 'Graphite')
-            # Ball joints, bushings and a gusset plate where the arms meet.
-            for pnt in (tuple(rel), tuple(up_rel)):
-                arm.tube(V(pnt) - V((0, 0, 0.02 * s)), V(pnt) + V((0, 0, 0.02 * s)), 0.03 * s, 'Steel', segments=8)
-            for px in (0.18, -0.18):
-                arm.tube((px * s, -0.02 * s, 0), (px * s, 0.02 * s, 0), 0.028 * s, 'Rubber', segments=8)
-            arm.convex([(0.1 * s, 0, 0.01 * s), (-0.1 * s, 0, 0.01 * s), tuple(rel * 0.55 + V((0, 0, 0.01 * s))),
-                        (0.1 * s, 0, -0.01 * s), (-0.1 * s, 0, -0.01 * s), tuple(rel * 0.55 - V((0, 0, 0.01 * s)))],
-                       'Graphite')
-            arm_obj = place(arm.finish(materials), b.body, pivot)
-            b.arms[c] = (arm_obj, rel)
-            empty('ArmEnd_' + c, hub, tuple(end_world - V((x, y, r))))
-        elif kind == 'trailing':
-            # A long trailing arm from the body, ahead of the wheel, back to the upright.
-            pivot = (x + 0.7 * s, side * 0.38 * s, r - 0.02 * s)
-            end_world = V((x, side * (t['track'] / 2 - t['tire'] * 0.6), r - 0.04 * s))
-            arm = Part('Arm_' + c)
-            rel = end_world - V(pivot)
-            # A boxed arm, deeper at the wheel end.
-            arm.convex([(0, -0.02 * s, 0.03 * s), (0, 0.02 * s, 0.03 * s), (0, -0.02 * s, -0.03 * s),
-                        (0, 0.02 * s, -0.03 * s),
-                        tuple(rel + V((0.05 * s, -0.025 * s, 0.07 * s))), tuple(rel + V((0.05 * s, 0.025 * s, 0.07 * s))),
-                        tuple(rel + V((0.05 * s, -0.025 * s, -0.06 * s))), tuple(rel + V((0.05 * s, 0.025 * s, -0.06 * s)))],
-                       'Graphite', bevel=0.006 * s)
-            arm.tube((0, 0, 0.12 * s), tuple(rel + V((0, 0, 0.1 * s))), 0.02 * s, 'Graphite')
-            arm.tube((0, -0.03 * s, 0), (0, 0.03 * s, 0), 0.035 * s, 'Rubber', segments=8)
-            arm_obj = place(arm.finish(materials), b.body, pivot)
-            b.arms[c] = (arm_obj, rel)
-            empty('ArmEnd_' + c, hub, tuple(end_world - V((x, y, r))))
+        # Half-shafts from the diff out to the wheel, for the independent
+        # layouts: thicker for heavy-duty axles, chrome with blue boots for
+        # chromoly. The side-by-side's serve both of its layouts.
+        kinds = [kd for kd, _ in b.layouts(c[0])]
+        shaft = None
+        if cls == 'sxs' and c[0] == 'F':
+            shaft = (b.body, k.at(0, 0.32 * s, r + 0.02 * s), k.at(0, t['track'] / 2 - t['tire'] * 0.55, r + 0.02 * s))
+        elif cls == 'sxs':
+            shaft = (b.body, k.at(0.02 * s, 0.22 * s, r + 0.02 * s), k.at(0, t['track'] / 2 - t['tire'] * 0.6, r))
+        elif 'wishbone' in kinds:
+            shaft = (b.rig('F', 'wishbone'), k.at(0, 0.17 * s, r), k.at(0, t['track'] / 2 - t['tire'] * 0.55, r))
+        elif 'trailingArm' in kinds:
+            shaft = (b.rig('R', 'trailingArm'), k.at(0, 0.17 * s, r + 0.03), k.at(0, t['track'] / 2 - t['tire'] * 0.6, r))
+        if shaft:
+            obj, rel = k.arm(shaft[0], 'Shaft', shaft[1], shaft[2])
+            for ka in AXLES:
+                p = b.fit('axles', [ka], 'Shaft' + c)
+                drive_shaft(p, (0, 0, 0), rel, ka, s)
+                b.add(p, obj)
 
     # Solid axles: a beam between the two hubs with the diff in the middle.
-    for end, key in (('front', 'F'), ('rear', 'R')):
-        if t[end] != 'axle':
+    for key in ('F', 'R'):
+        axle_parts = dict(b.layouts(key)).get('axle')
+        if axle_parts is None:
             continue
         x = t['cg_front'] if key == 'F' else -t['cg_rear']
         half = t['track'] / 2 - t['tire'] * 0.55
@@ -837,7 +1239,11 @@ def build_truck(cls, t, materials):
             axle.tube((0.16 * s, -half + 0.05, -0.03 * s), (0.16 * s, half - 0.05, -0.03 * s), 0.018 * s, 'Steel')
             for sd in (-1, 1):
                 axle.tube((0, sd * (half - 0.05), 0), (0.16 * s, sd * (half - 0.05), -0.03 * s), 0.02 * s, 'Graphite')
-        axle_obj = place(axle.finish(materials), None, (x, 0, r))
+        # With independent arms to choose from, the axle sits in a group the game can hide.
+        group = None
+        if len(b.layouts(key)) > 1:
+            group = empty(fit_name('frontSusp' if key == 'F' else 'rearSusp', axle_parts, 'Axle' + key), None, (0, 0, 0))
+        axle_obj = place(axle.finish(materials), group, (x, 0, r))
         b.axles[key] = (axle_obj, half)
 
         # The axle parts: housings and diff covers get beefier with the price.
@@ -889,8 +1295,7 @@ def build_truck(cls, t, materials):
                        0.022 * s, 'Graphite', segments=8)
         b.add(p, axle_obj)
 
-        coil = COIL[cls][key]
-        p = b.fit('frontSusp' if key == 'F' else 'rearSusp', coil, 'Links' + key)
+        p = b.fit('frontSusp' if key == 'F' else 'rearSusp', LINKS[cls][key], 'Links' + key)
         back = -1 if key == 'F' else 1
         for sd in (-1, 1):
             y = sd * rail * 0.9
@@ -910,20 +1315,15 @@ def build_truck(cls, t, materials):
     # The class's own body, frame and bolt-ons.
     {'light4x4': pickup, 'heavy': cabover, 'sxs': buggy}[cls](b)
 
-    # The side-by-side's drive shafts live on its arms: thicker for heavy-duty, blue boots for chromoly.
-    for c, (arm_obj, rel) in b.arms.items():
-        for k in AXLES:
-            p = b.fit('axles', [k], 'Arm' + c)
-            a = V((0, 0, 0.08 * s))
-            e = rel + V((0, 0, 0.08 * s if c[0] == 'F' else 0.04 * s))
-            rad = {'standardAxles': 0.016, 'heavyDutyAxles': 0.022, 'chromolyAxles': 0.015}[k] * s
-            boot = {'standardAxles': 'Rubber', 'heavyDutyAxles': 'Rubber', 'chromolyAxles': 'Anodised'}[k]
-            p.tube(tuple(a), tuple(e), rad, 'Chrome' if k == 'chromolyAxles' else 'Steel', segments=8)
-            d = (e - a).normalized()
-            for pnt in (a + d * 0.05 * s, e - d * 0.05 * s):
-                p.tube(tuple(pnt - d * 0.045 * s), tuple(pnt + d * 0.045 * s), rad * 2.4, boot, segments=10,
-                       r2=rad * 1.4)
-            b.add(p, arm_obj)
+    for (key, kd), part in b.rig_parts.items():
+        b.add(part, b.rig(key, kd))
+
+    # The body-side parts of the light 4x4's independent layouts.
+    for key in ('F', 'R'):
+        kinds = [kd for kd, _ in b.layouts(key)]
+        for kd in kinds:
+            if kd in ('wishbone', 'trailingArm'):
+                independent_extras(b, key, kd, b.rig(key, kd))
 
     shell = b.shell.finish(materials)
     place(shell, b.body, (0, 0, 0))
@@ -1151,20 +1551,24 @@ def pickup_bolt_ons(b, sill, w, xb, xf, top, xr):
     t, s, r = b.t, b.s, b.r
     fx, rx = t['cg_front'], -t['cg_rear']
 
-    # Bump stops under the frame rails, over each end of the axles.
+    # Bump stops under the frame rails, over each end of the axles. (The
+    # independent layouts have their own: see independent_extras.)
     for k in BUMP_STOPS:
-        p = b.fit('bumpStops', [k])
-        for x in (fx, rx):
+        for key, x in (('F', fx), ('R', rx)):
+            p = b.fit('bumpStops', [k], key)
             for sd in (-1, 1):
                 bump_stop(p, (x, sd * 0.45, 0.54), s, k)
-        b.add(p)
+            b.add(p, b.rig(key, 'axle'))
 
     # Anti-roll bars across the frame, with links down to the axles.
     for k, adj in (('fixedBars', False), ('adjustableBars', True)):
-        p = b.fit('antiRoll', [k])
-        roll_bar(p, fx + 0.42, 0.42, 0.56, 0.42, r + 0.06, s, adj, flip=1)
-        roll_bar(p, rx - 0.42, 0.42, 0.56, 0.42, r + 0.06, s, adj, flip=-1)
-        b.add(p)
+        for key in ('F', 'R'):
+            p = b.fit('antiRoll', [k], key)
+            if key == 'F':
+                roll_bar(p, fx + 0.42, 0.42, 0.56, 0.42, r + 0.06, s, adj, flip=1)
+            else:
+                roll_bar(p, rx - 0.42, 0.42, 0.56, 0.42, r + 0.06, s, adj, flip=-1)
+            b.add(p, b.rig(key, 'axle'))
 
     # Guards: plates under the nose and the gearbox; full armour adds rock
     # sliders down the sills, a guard for the tank and plates on the diffs.
