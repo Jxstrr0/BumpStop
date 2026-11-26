@@ -77,7 +77,13 @@ export function settingsPanel(): HTMLElement {
   } else {
     const sound = el('li', '', t('credits.soundMixed'))
     const list = el('ul')
-    for (const rec of RECORDINGS) list.append(el('li', '', tf('credits.recording', { title: rec.title, author: rec.author, licence: rec.licence, source: rec.source })))
+    // Two takes of the same sound share a title, so each title is listed once.
+    const seen = new Set<string>()
+    for (const rec of RECORDINGS) {
+      if (seen.has(rec.title)) continue
+      seen.add(rec.title)
+      list.append(el('li', '', tf('credits.recording', { title: rec.title, author: rec.author, licence: rec.licence, source: rec.source })))
+    }
     sound.append(list)
     credits.append(sound)
   }

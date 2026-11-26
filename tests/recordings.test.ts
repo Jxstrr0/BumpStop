@@ -7,7 +7,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { maxLength, prepareSamples } from '../src/audio/recordings'
 import { VOICE_NAMES } from '../src/audio/voices'
-import { RECORDED_SOUNDS, RECORDING_PREP, RECORDINGS } from '../src/data/recordings'
+import { LICENCES, RECORDED_SOUNDS, RECORDING_PREP, RECORDINGS } from '../src/data/recordings'
 
 const PUBLIC = new URL('../public/', import.meta.url)
 const credits = readFileSync(new URL('../CREDITS.md', import.meta.url), 'utf8')
@@ -24,7 +24,7 @@ describe('the recordings list', () => {
       expect(existsSync(path), `${rec.file} is missing`).toBe(true)
       expect(statSync(path).size, `${rec.file} is over 300 KB`).toBeLessThanOrEqual(300 * 1024)
       expect(RECORDED_SOUNDS).toContain(rec.sound)
-      expect(['CC0', 'CC BY 3.0', 'CC BY 4.0']).toContain(rec.licence)
+      expect(LICENCES).toContain(rec.licence)
       expect(rec.source, rec.file).toMatch(/^https:\/\//)
       expect(rec.title.length && rec.author.length, rec.file).toBeGreaterThan(0)
       expect(rec.gain > 0 && rec.gain <= 2, rec.file).toBe(true)
@@ -33,6 +33,10 @@ describe('the recordings list', () => {
       expect(line, rec.file).toContain(rec.author)
       expect(line, rec.file).toContain(rec.licence)
     }
+  })
+
+  it('only the approved licences: CC0, CC BY, or made for Bump Stop', () => {
+    expect([...LICENCES]).toEqual(['CC0', 'CC BY 3.0', 'CC BY 4.0', 'Made for Bump Stop'])
   })
 
   it('every file in public/sounds/ is listed, so nothing ships uncredited', () => {
