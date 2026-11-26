@@ -166,6 +166,12 @@ export const CONTRACTS = {
   classRep: { light4x4: 0, sxs: 0, heavy: 12 } as Readonly<Record<ClassId, number>>,
   /** A bigger raid pays more: fee and budget times this. */
   tierScale: { regional: 1, national: 1.3, long: 1.7 } as Readonly<Record<Tier, number>>,
+  /**
+   * The career's very first job, which the first-job guide walks through
+   * (plan PR 11b): always a privateer's old light 4x4, as the plan has it,
+   * with a budget that leaves room for studded tires on the winter raid.
+   */
+  firstJob: { cls: 'light4x4' as ClassId, budget: 0.85 },
 } as const
 
 // ── Rival teams ──
