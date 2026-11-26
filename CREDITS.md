@@ -25,7 +25,10 @@ Each copied file says where it came from in its first line
 
 ## Sound and art
 
-None yet. Every sound (plan PR 6) is made live in the browser by the game's
-own code (`src/audio/`), so there are no third-party sound files. Any
-recordings added later get a line here. The truck models (plan PR 5) are
-made in Blender by script.
+| File | Source |
+| --- | --- |
+| `public/models/truck-*.glb` | Made for Bump Stop by `scripts/blender/make-trucks.py` (no outside assets) |
+
+Every sound (plan PR 6) is made live in the browser by the game's own code
+(`src/audio/`), so there are no third-party sound files. Any recordings
+added later get a line here.

@@ -438,3 +438,19 @@ input[type='range'] {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* The 3D truck on the build screen (plan PR 5). Sideways drags turn it;
+   up-and-down drags still scroll the page (touch-action). */
+.truck-view { margin: 12px 0; }
+.truck-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 11;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  touch-action: pan-y;
+  cursor: grab;
+}
+.truck-view figcaption { margin-top: 6px; }
+.truck-status { margin: 6px 0 0; }

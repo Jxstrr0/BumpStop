@@ -6,7 +6,7 @@ const STRINGS = {
   'game.name': 'Bump Stop',
   'game.tagline': 'Build a rally truck, find the speed where it breaks, then go racing.',
   'preview.kicker': 'A rally-raid truck builder',
-  'preview.note': 'This is a preview. The build screen, the three rigs and the report are in; 3D comes next.',
+  'preview.note': 'This is a preview. The build screen, the 3D trucks, the three rigs and the report are in; the 3D test track comes next.',
 
   'loop.title': 'The loop',
   'loop.build': 'Build it',
@@ -235,6 +235,13 @@ const STRINGS = {
   'build.lead':
     'Pick a part for every slot and tune each axle, inside the class weight and your budget. The rigs in the shop below test this truck.',
   'build.year': 'Year',
+  'view.label': 'Your truck in 3D',
+  'view.alt': 'The {cls} in 3D, sitting on the shop floor. {stance}',
+  'view.stanceStock': 'It sits at the stock ride height.',
+  'view.stanceBoth': 'Ride height against stock: front {front} mm, rear {rear} mm.',
+  'view.hint': 'Drag sideways to turn it. Softer springs and less preload make it sit lower.',
+  'view.loading': 'Loading the 3D truck…',
+  'view.failed': 'The 3D view could not start on this device. Everything else still works.',
   'build.yearNote': 'Parts arrive with their year. The career will set it; for now, pick one.',
   'build.weight': 'Weight',
   'build.window': '(class {min}–{max} kg)',
