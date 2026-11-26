@@ -33,7 +33,7 @@ import { t, tf, type StringKey } from '../data/strings'
 import { changeCost, checkBuild, findPart, partIn, shopRules, stockBuild, tidyBuild, type BuildProblem } from '../sim/build'
 import {
   buyTruck, buyUpgrade, cheapestBuild, contractProblems, contractRaid, contractRules, discountOf, driveAutoStage, driverFee, driverName,
-  dropContract, entryFee, entryProblems, enterOwn, eventDays, fitOwn, isBroke, longOneRoad, newCareer, nextEvent, offers, ownRules,
+  dropContract, entryFee, entryProblems, enterOwn, eventDays, fitOwn, garageSpares, isBroke, longOneRoad, newCareer, nextEvent, offers, ownRules,
   sellTruck, setContractBuild, settle, sponsorName, sponsorOf, sponsorPay, takeContract, truckPrice, truckValue, upgradeProblem,
   type CareerState, type Contract, type EntryProblem, type LongOneStory, type NewsItem, type Settlement,
 } from '../sim/career'
@@ -46,7 +46,7 @@ import { hallBlock, type HallBlock } from './hall'
 import type { GlossaryId } from '../data/glossary'
 import type { BuildStore } from './buildStore'
 import { el, num, reveal } from './dom'
-import { ordinal, raidTable, type RaidCareer } from './raid'
+import { ordinal, raidTable, sparesList, type RaidCareer } from './raid'
 import { farewellText, logbookBlock, oldTrucksBlock } from './logbook'
 import { firstJobGuide } from './tutorial'
 
@@ -540,8 +540,12 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     if (RAIDS[nextEvent(career).raid].season === 'winter' && !partIn(store.build(), 'tires').studded) {
       lines.append(el('p', 'small warm-text', t('raidUi.winterNoStuds')))
     }
+    // The parts truck's spares (late crew and tools) come on top of the truck's own.
+    const more = garageSpares(career)
+    const hasMore = SPARE_IDS.some((id) => more[id] > 0)
+    if (hasMore) lines.append(el('p', 'small', tf('career.partsTruckLine', { list: sparesList(more) })))
     // No spares is allowed too, just costly: free play warns before a raid, so the career does as well (Kelbo's playtest).
-    if (carriesNoSpares(store.build())) lines.append(el('p', 'small warm-text', t('raidUi.noSparesWarn')))
+    if (carriesNoSpares(store.build()) && !hasMore) lines.append(el('p', 'small warm-text', t('raidUi.noSparesWarn')))
     const problems = entryProblems(career, driver, store.build())
     const enter = button(t('career.enter'), 'btn start-btn')
     enter.disabled = problems.length > 0 || !startRaid
@@ -713,27 +717,45 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
   function shopBlock(career: CareerState): HTMLElement {
     const wrap = el('div')
     wrap.append(el('h3', 'raid-sub', t('career.shop')))
-    const list = el('ul', 'job-list')
-    for (const u of UPGRADES) {
+    // What the garage has already, in one line, so the list keeps to what's left to buy (nine upgrades since 1.11).
+    const owned = UPGRADES.filter((u) => career.upgrades.includes(u.id))
+    if (owned.length) wrap.append(el('p', 'small', tf('career.shopOwned', { list: owned.map((u) => t(u.name).toLowerCase()).join(', ') })))
+    const item = (u: (typeof UPGRADES)[number]): HTMLElement => {
       const problem = upgradeProblem(career, u.id)
       const li = el('li')
       const b = button('', 'fix-btn job-btn')
-      const why = problem === 'owned' ? t('career.upgrade.owned')
-        : problem === 'rep' ? tf('career.upgrade.rep', { n: String(u.rep) })
-          : problem === 'needs' ? tf('career.upgrade.needs', { what: t(UPGRADES.find((x) => x.id === u.needs)!.name).toLowerCase() })
-            : problem === 'money' || isBroke(career) ? tf('career.upgrade.cost', { n: money(u.cost) }) : tf('career.upgrade.buy', { n: money(u.cost) })
+      const why = problem === 'rep' ? tf('career.upgrade.rep', { n: String(u.rep) })
+        : problem === 'needs' ? tf('career.upgrade.needs', { what: t(UPGRADES.find((x) => x.id === u.needs)!.name).toLowerCase() })
+          : problem === 'money' || isBroke(career) ? tf('career.upgrade.cost', { n: money(u.cost) }) : tf('career.upgrade.buy', { n: money(u.cost) })
       b.append(el('span', 'fix-what', t(u.name)), el('span', 'fix-where', `${t(u.text)} ${why}`))
-      b.disabled = problem !== null
-      b.setAttribute('aria-pressed', String(problem === 'owned'))
+      b.disabled = problem !== null || isBroke(career)
       b.addEventListener('click', () => {
         buyUpgrade(career, u.id)
         save()
         render()
       })
       li.append(b)
-      list.append(li)
+      return li
     }
-    wrap.append(list)
+    const left = UPGRADES.filter((u) => !career.upgrades.includes(u.id))
+    // Within reach on reputation: listed. The rest wait, folded, with what they cost and need, so there's something to aim for.
+    const now = left.filter((u) => career.rep >= u.rep)
+    const later = left.filter((u) => career.rep < u.rep)
+    if (now.length) {
+      const list = el('ul', 'job-list')
+      for (const u of now) list.append(item(u))
+      wrap.append(list)
+    } else if (!left.length) {
+      wrap.append(el('p', 'small', t('career.shopAll')))
+    }
+    if (later.length) {
+      const fold = el('details', 'shop-later')
+      fold.append(el('summary', '', tf('career.shopLater', { n: String(later.length) })))
+      const list = el('ul', 'job-list')
+      for (const u of later) list.append(item(u))
+      fold.append(list)
+      wrap.append(fold)
+    }
     return wrap
   }
 

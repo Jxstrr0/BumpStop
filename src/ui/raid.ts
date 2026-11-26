@@ -124,7 +124,7 @@ function effectText(part: CondPart, value: number): string {
   return tf('raidUi.effect.spring', { pct: num(e.travel * 100) })
 }
 
-function sparesList(spares: Record<SpareId, number>): string {
+export function sparesList(spares: Record<SpareId, number>): string {
   return SPARE_IDS.map((s) => `${spares[s]} ${spares[s] === 1 ? t(`raidUi.spare.${s}` as StringKey) : t(`raidUi.spares.${s}` as StringKey)}`).join(', ')
 }
 

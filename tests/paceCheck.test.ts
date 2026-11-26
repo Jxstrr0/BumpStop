@@ -55,4 +55,18 @@ describe('Push wears the truck', () => {
     expect(at('push').spring[0]).toBeGreaterThan(at('steady').spring[0]!)
     expect(at('conserve').spring[0]).toBeLessThan(at('steady').spring[0]!)
   })
+
+  it('tires the oil and sags the springs slower with the garage’s shock dyno and spring rig', () => {
+    const truck = buildTruck(stockBuild('light4x4'))
+    const load = { damperEnergy: [4e5, 4e5, 4e5, 4e5], peakTemp: [340, 340, 340, 340], bottomOuts: [3, 3, 3, 3], distance: 10_000, harsh: true }
+    const plain = newCondition()
+    tireCondition(plain, truck, load)
+    const cared = newCondition()
+    tireCondition(cared, truck, { ...load, oilWear: 0.65, springSag: 0.6 })
+    expect(plain.oil[0]).toBeGreaterThan(0)
+    expect(cared.oil[0]).toBeCloseTo(plain.oil[0]! * 0.65, 9)
+    expect(cared.spring[0]).toBeCloseTo(plain.spring[0]! * 0.6, 9)
+    // The bushings don't change.
+    expect(cared.bushing[0]).toBeCloseTo(plain.bushing[0]!, 9)
+  })
 })

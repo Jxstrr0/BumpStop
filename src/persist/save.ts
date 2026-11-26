@@ -200,6 +200,24 @@ function readRaid(raw: unknown): RaidState {
     entry.budget = finite(raw.entry.budget, 'raid parts money')
     if (entry.budget < 0) fail('raid parts money is below zero')
   }
+  // The garage's late tools (after 1.10): older raids have none, so they carry on as they were.
+  if (raw.entry.extraSpares !== undefined) {
+    if (!isObj(raw.entry.extraSpares)) fail('raid extra spares are not a list')
+    const more = raw.entry.extraSpares
+    const extra = { tire: 0, shock: 0, cv: 0 }
+    for (const k of ['tire', 'shock', 'cv'] as const) {
+      const n = finite(more[k], `${k} extra spares`)
+      if (n < 0 || !Number.isInteger(n)) fail(`${k} extra spares are not a count`)
+      extra[k] = n
+    }
+    entry.extraSpares = extra
+  }
+  for (const k of ['oilWear', 'springSag'] as const) {
+    if (raw.entry[k] === undefined) continue
+    const v = finite(raw.entry[k], `raid ${k}`)
+    if (v <= 0 || v > 1) fail(`raid ${k} is out of range`)
+    entry[k] = v
+  }
   // Bivouac breakdowns (after 1.2): a raid saved before them has no condition
   // or parts money spent, so it carries on with fresh oil, springs and bushings.
   const cond = newCondition()
