@@ -16,6 +16,7 @@
 import { SAVE } from '../data/save'
 import { hasProgress, newSave, type GarageSave } from '../persist/save'
 import { keepStorage } from '../persist/safety'
+import { careerScope } from '../persist/ghost'
 import { activeSlot, listSlots, setActiveSlot, writeSlot, type SlotNo, type SlotView } from '../persist/slots'
 import type { RaidState } from '../sim/raid'
 import { makeBuildStore, type BuildStore } from './buildStore'
@@ -113,6 +114,8 @@ export async function openGarage(): Promise<Garage> {
         ghosts = g
         changed()
       },
+      // A career's runs and ghosts are its own (Kelbo's playtest, 26 November 2026).
+      scope: () => careerScope(career?.seed),
     },
     raid: {
       raid: start.raid,

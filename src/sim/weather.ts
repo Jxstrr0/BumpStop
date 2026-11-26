@@ -56,6 +56,19 @@ export function forecastWord(chance: number): 'possible' | 'likely' | 'expected'
   return (FORECAST_WORDS.find((f) => chance < f.below) ?? FORECAST_WORDS[FORECAST_WORDS.length - 1]!).word
 }
 
+/**
+ * The forecast as it stands at `at` metres, for a checkpoint: the chance
+ * moves part of the way towards what will really happen (honest, but still
+ * not a promise), and once inside the window it starts from here. Only for
+ * weather that hasn't come in yet.
+ */
+export function forecastAt(w: StageWeather, at: number): { chance: number; from: number; to: number } {
+  const inside = at >= w.from
+  const share = WEATHER_ROLL.update.inside * (inside ? 1 : WEATHER_ROLL.update.ahead)
+  const chance = w.chance + ((w.comes ? 1 : 0) - w.chance) * share
+  return { chance, from: inside ? at : w.from, to: w.to }
+}
+
 /** Is the weather on at this place (m from the start)? */
 export function weatherOn(w: StageWeather | null, at: number): boolean {
   return !!w && w.comes && at >= w.at - 0.5

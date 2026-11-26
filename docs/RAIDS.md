@@ -231,9 +231,14 @@ roll: `src/sim/weather.ts`; driving it: `advanceStage` in `src/sim/raid.ts`.
   up by `rivalRisk` times the share of the stage it covers.
 - **On screen:** the forecast in the morning and in the roadbook, a line in
   the stage log as the highlight passes the turn, the weather at each
-  checkpoint (on since km n, still forecast, or held off), a line in the
+  checkpoint (on since km n, an updated forecast, or held off), a line in the
   day's results, and in the 3D highlight the fog closes in and changes
   colour (`WEATHER_LOOK`), with the weather named under it.
+- **Updated forecast** (Kelbo's playtest): at a checkpoint before the
+  weather comes, the chance moves part of the way towards what will really
+  happen (`forecastAt` in `src/sim/weather.ts`, shares in
+  `WEATHER_ROLL.update`), further once the truck is inside the window, which
+  then starts from where the truck is. Honest, never certain.
 - **Saves:** each stage result keeps the day's weather (`StageRecord.weather`);
   saves from before have none and load as they are.
 

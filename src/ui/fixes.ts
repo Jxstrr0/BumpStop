@@ -10,8 +10,8 @@
  */
 import type { FixTarget } from '../data/failures'
 import type { AxleSettings, TruckBuild } from '../data/kit'
-import type { SlotId } from '../data/parts'
-import { partIn } from '../sim/build'
+import type { DamperPart, SlotId } from '../data/parts'
+import { partIn, partsFor } from '../sim/build'
 
 export type End = 'front' | 'rear'
 
@@ -60,10 +60,51 @@ export function fixJump(target: FixTarget, end: End, b: TruckBuild): Jump | null
       return { kind: 'slot', slot: 'frame' }
     case 'lighterWheels':
       return { kind: 'slot', slot: 'wheels' }
-    case 'rebound': {
+    case 'rebound':
+    case 'lessRebound': {
       const clicks = partIn(b, 'dampers').clicks
       return clicks.rebound > 0 ? slider('rebound') : { kind: 'slot', slot: 'dampers' }
     }
+  }
+}
+
+/** The dampers this class can buy by `year`. */
+function dampersOnSale(b: TruckBuild, year: number): DamperPart[] {
+  return partsFor(b.cls, 'dampers').filter((p): p is DamperPart => p.slot === 'dampers' && p.year <= year)
+}
+
+/**
+ * Does this fix make sense for this truck in this year? A fix that only
+ * works with a part that isn't out yet (a remote-reservoir shock in 1985),
+ * or a slider that's already as far as it goes, doesn't: the report skips it
+ * and shows the next one instead (Kelbo's playtest, 26 November 2026).
+ */
+export function fixUseful(target: FixTarget, end: End, b: TruckBuild, year: number): boolean {
+  const fitted = partIn(b, 'dampers')
+  const set = b[end]
+  switch (target) {
+    case 'damperSize':
+      // A bigger shock: one on sale that holds more heat than the one fitted.
+      return dampersOnSale(b, year).some((p) => p.heat > fitted.heat)
+    case 'compression': {
+      // The slider if the shock has one and it isn't all the way soft; otherwise a shock with an adjuster that's on sale.
+      const c = fitted.clicks
+      if (c.compHigh > 0) return set.compHigh > -c.compHigh
+      if (c.compLow > 0) return set.compLow > -c.compLow
+      return dampersOnSale(b, year).some((p) => p.clicks.compLow > 0 || p.clicks.compHigh > 0)
+    }
+    case 'lessRebound':
+      if (fitted.clicks.rebound > 0) return set.rebound > -fitted.clicks.rebound
+      return dampersOnSale(b, year).some((p) => p.clicks.rebound > 0)
+    case 'rebound':
+      if (fitted.clicks.rebound > 0) return set.rebound < fitted.clicks.rebound
+      return dampersOnSale(b, year).some((p) => p.clicks.rebound > 0)
+    case 'lighterWheels': {
+      const wheels = partIn(b, 'wheels')
+      return partsFor(b.cls, 'wheels').some((p) => p.year <= year && (p.mass[b.cls] ?? Infinity) < (wheels.mass[b.cls] ?? 0))
+    }
+    default:
+      return true
   }
 }
 

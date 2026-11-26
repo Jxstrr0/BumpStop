@@ -84,16 +84,31 @@ One screen at the end of every run, laid out for a 360 px phone:
    slider (front or rear, whichever broke), opens it and outlines it. A bar
    at the bottom of the screen then offers to run the rig again. "A slower
    pace" has nowhere to go yet: the pace calls come with the raids.
+   Fixes that can't be done on this truck in this year are skipped and the
+   next one takes their place (`fixUseful` in `src/ui/fixes.ts`, after
+   Kelbo's playtest): a bigger shock or compression clicks need a shock
+   that's on sale, and a slider that's already all the way doesn't count.
+   So a 1985 fade offers fewer clicks of rebound (softer rebound makes less
+   heat) and a slower pace.
 
-The shaker's report says where the body bounces and the wheels hop, what
-that means on washboard, and jumps to the spring rate (moves the bounce) and
-the rebound clicks (calms the hop; the dampers part if they have no
-adjuster).
+The shaker's report opens with a verdict (Kelbo's playtest): Good, Fair or
+Poor, with a chip for the body (Calm, Lively, Floaty) and the wheels
+(Planted, Skipping, Hopping) in the trace rule's colours and a sentence on
+what it means for a raid. The limits are per class in `SHAKER.verdict`
+(`src/data/rigs.ts`), set so stock trucks are Fair, four more clicks of
+rebound Good and four fewer Poor. Then it says where the body bounces and
+the wheels hop, what that means on washboard, and jumps to the spring rate
+(moves the bounce) and the rebound clicks (calms the hop; the dampers part
+if they have no adjuster).
 
 ## Ghost runs
 
 The last finished run on each rig, for each class, is saved with the garage
-(plan PR 8, `docs/SAVES.md`), so it survives a reload. The next run draws it as a faint dashed line on
+(plan PR 8, `docs/SAVES.md`), so it survives a reload. A career keeps its
+own last runs and best-run ghosts, filed under `career<seed>:` in front of
+the key (`careerScope` in `src/persist/ghost.ts`), so free play's don't show
+up in it; an old career's are dropped when a new one starts in the slot.
+Friends' ghosts are shared. The next run draws it as a faint dashed line on
 the live trace and on the report's trace (when it broke the same way), and
 the report compares the two.
 
