@@ -94,3 +94,18 @@ One in the third or fourth season of podiums, and the works deal later; the
 wishbones and trailing arms snap no more axles than the stock truck. The
 Long One test (`tests/longOne.test.ts`) checks every class's stock truck
 gets home.
+
+## Six raids a year (PR 13d)
+
+Kelbo cut the year from eight raids to six on 26 November 2026 (the
+Blackfly Classic and the Gravel Pit Derby left the career). With two fewer
+regional raids a season, a podium at a regional raid went back to 3
+reputation (from 2) so the finale still opens in the third or fourth season.
+The bot again (one career a class, Push once the dampers are better than
+stock, 1985 to 1992):
+
+| Class | Wins | Finale open to its own truck | Finale won |
+| --- | --- | --- | --- |
+| Light 4x4 | 15 in 40 | fourth season | fourth season (1988) |
+| Heavy truck | 12 in 35 | fourth season | fifth season (1989) |
+| Side-by-side | 19 in 42 | third season | eighth season (1992), second three times before |

@@ -28,17 +28,19 @@ export interface CalendarEvent {
 }
 
 /**
- * The raids each year, in order: two winter raids, then six summer ones
- * (plan PR 10). The first job of a career is the three-stage Winter Sprint,
- * as the plan has it.
+ * The raids each year, in order: six a year (Kelbo, 26 November 2026; it was
+ * eight). Two winter raids, three summer ones, then the finale. The first job
+ * of a career is the three-stage Cold Start 300 (`winterSprint`), as the plan
+ * has it. The Blackfly Classic (`summerSprint`) and the Gravel Pit Derby
+ * (`midsummerSprint`) left the career here; the Blackfly Classic is still in
+ * free play. Saves from the eight-raid calendar move across in
+ * `src/persist/save.ts` (format 3).
  */
 export const CALENDAR: readonly CalendarEvent[] = [
   { raid: 'winterSprint', day: 40, tier: 'regional' },
   { raid: 'winterRaid', day: 75, tier: 'regional' },
-  { raid: 'summerSprint', day: 130, tier: 'regional' },
   { raid: 'summerRaid', day: 158, tier: 'regional' },
   { raid: 'nationalRaid', day: 186, tier: 'national' },
-  { raid: 'midsummerSprint', day: 216, tier: 'regional' },
   { raid: 'autumnRaid', day: 244, tier: 'national' },
   { raid: 'longOne', day: 268, tier: 'long' },
 ]
@@ -53,7 +55,7 @@ export const CAREER = {
   lastYear: LAST_YEAR,
   /** In the bank on day one: the garage, two people and not much else. */
   startMoney: 8000,
-  /** The career starts on this day of 1985, a few weeks before the first raid (the Winter Sprint). */
+  /** The career starts on this day of 1985, a few weeks before the first raid (the Cold Start 300). */
   startDay: 15,
   /** Selling a part (or the truck) back gets this share of its price. */
   resale: 0.5,
@@ -81,7 +83,7 @@ export interface TierRules {
 
 export const TIERS: Readonly<Record<Tier, TierRules>> = {
   regional: { entryFee: 1500, prizes: [6000, 3500, 2000], rep: 0, driverFee: 1,
-    repFor: { finish: 1, podium: 2, win: 4 } },
+    repFor: { finish: 1, podium: 3, win: 5 } },
   national: { entryFee: 4000, prizes: [15000, 9000, 5000, 2500], rep: 15, driverFee: 1.6,
     repFor: { finish: 2, podium: 4, win: 7 } },
   long: { entryFee: 9000, prizes: [40000, 22000, 12000, 6000, 3000], rep: 60, driverFee: 3,

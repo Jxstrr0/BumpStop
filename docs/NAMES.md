@@ -63,10 +63,10 @@ stay the old working names, so saves keep working.
 | --- | --- | --- | --- |
 | Winter, day 40 (the career's first raid) | `winterSprint` (Winter Sprint) | **Cold Start 300** | 3 stages, thin ice, down to -28 °C |
 | Winter, day 75 | `winterRaid` (Winter Raid) | **Frozen Knuckle** | 4 stages, longer lakes and the tundra |
-| Summer, day 130 | `summerSprint` (Summer Sprint) | **Blackfly Classic** | 3 stages, early summer |
+| Free play only (left the career on 26 November 2026) | `summerSprint` (Summer Sprint) | **Blackfly Classic** | 3 stages, early summer |
 | Summer, day 158 | `summerRaid` (Summer Raid) | **Washboard 800** | 5 stages, eskers, rock and haul roads |
 | Summer, day 186 (national) | `nationalRaid` (National Raid) | **Dust Supper** | 7 stages across the middle of the country |
-| Summer, day 216 | `midsummerSprint` (Midsummer Sprint) | **Gravel Pit Derby** | 3 quick stages |
+| Not in the game for now (left the career on 26 November 2026) | `midsummerSprint` (Midsummer Sprint) | **Gravel Pit Derby** | 3 quick stages |
 | End of the season, day 244 (national) | `autumnRaid` (Autumn Raid) | **Polar Night Raid** | 5 cold stages as the nights draw in |
 | The finale, day 268 | `longOne` (The Long One) | **The Whole Damn Country** | 14 stages and a rest day, end to end |
 

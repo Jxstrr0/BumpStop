@@ -220,9 +220,11 @@ kit, the most the bivouac could fix each night):
 
 ## Career raids (plan PR 9)
 
-The career (`docs/CAREER.md`) adds four raids to the data: the Gravel
-Pit Derby (3 stages), Dust Supper (7), the Polar Night Raid (5) and the
-finale, the Whole Damn Country (14). The free-play panel offers the two summer raids and the two winter
+The career (`docs/CAREER.md`) adds three raids to the data: Dust Supper
+(7 stages), the Polar Night Raid (5) and the finale, the Whole Damn Country
+(14). Its six-raid year also runs the two winter raids and the Washboard 800.
+The Gravel Pit Derby (`midsummerSprint`, 3 stages) stays in the data but
+left the calendar when the year went from eight raids to six. The free-play panel offers the two summer raids and the two winter
 raids (`FREE_RAID_IDS`). A career raid's entry also carries three things a
 free-play raid leaves out: `seed` (this year's roads, so the same raid is a
 new road each year), `field` (the rival teams with the trucks they have

@@ -3,7 +3,7 @@
  * privateers' trucks for money, then enters its own truck, then wins
  * sponsors and a works deal, and one day wins the Long One.
  *
- * - **The calendar:** eight raids a year, two in winter (`CALENDAR`). At each one the
+ * - **The calendar:** six raids a year, two in winter (`CALENDAR`). At each one the
  *   garage does one job: a prep contract, its own entry, or nothing. Time
  *   moves by days: from one raid to the next.
  * - **Prep contracts:** a privateer brings a class, a budget and a driver.
