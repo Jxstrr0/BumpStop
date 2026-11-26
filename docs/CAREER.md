@@ -88,7 +88,7 @@ rival teams buy for it.
 | 244 | Autumn Raid | 5 | national |
 | 268 | The Long One | 14 | the long one |
 
-A raid takes a day a stage plus two days of travel. A career starts on day
+A raid takes a day a stage plus two days of travel (and the Long One's rest day). A career starts on day
 15 of 1985, so its first job is the three-stage Winter Sprint, as the plan
 has it. The two winter raids (plan PR 10) bring cold oil, studs, snowbanks
 and lake ice (`docs/WINTER.md`); rivals don't fade in winter. The National
@@ -185,12 +185,25 @@ Money can go below zero after a repair bill. Then:
 There's no game over and no interest: one or two contracts get you going
 again.
 
-## The Long One
+## The Long One: the finale (plan PR 13)
 
-The last raid of every year: fourteen stages across the country. It needs a
-reputation of 60 to enter your own truck. Win it and it goes in the record
-(`longOne`); the career carries on. Making it the big finale (and its
-balance across the classes) is plan PR 13.
+The last raid of every year: fourteen stages across the whole country, with
+a **rest day** at halfway (after stage 7), so the trip takes two weeks and
+a bit. On the rest day the crew has a whole day in the bivouac, twice a
+night's hours (`RAID.restDayHours`), to put the truck right for the second
+week. It needs a reputation of 60 to enter your own truck.
+
+- **The road to it:** the career's status line always shows how far off it
+  is: the reputation it takes and a bar, then "open to your own truck",
+  then the years you won it (`longOneRoad`).
+- **The finale:** the first time your own truck wins its class, the results
+  card opens with the finale: the year and the garage's season, the class
+  and the driver, the record that got you there and the winning truck's
+  parts. The career carries on after it.
+- **The record:** that first win is kept in the career (`firstLongOne`, a
+  `LongOneStory`) and shown under the news for good; later wins add their
+  year to `longOne`. Saves from before have none and load as they were; a
+  story that doesn't add up is dropped, never the save.
 
 ## After 2025
 

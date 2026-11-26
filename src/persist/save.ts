@@ -19,7 +19,7 @@ import { FIRST_YEAR, LAST_YEAR, SLOTS } from '../data/parts'
 import { DRIVER_IDS, RAIDS, type DriverId, type RaidId, type Rival } from '../data/raids'
 import { SAVE } from '../data/save'
 import { findPart, fitsClass, stockBuild, tidyBuild } from '../sim/build'
-import type { CareerJob, CareerState, Contract, NewsItem } from '../sim/career'
+import type { CareerJob, CareerState, Contract, LongOneStory, NewsItem } from '../sim/career'
 import type { RaidState } from '../sim/raid'
 import { teamsForYear, type TeamGarage } from '../sim/teams'
 
@@ -248,6 +248,30 @@ function readTeams(raw: unknown, year: number): TeamGarage {
 
 const NEWS_KINDS: readonly NewsItem['kind'][] = ['result', 'winner', 'copied', 'newParts', 'sponsor', 'broke', 'longOne', 'skipped']
 
+/**
+ * The first Long One win (plan PR 13), for the finale card and the record.
+ * Only for reading: one that doesn't add up is dropped rather than failing the save.
+ */
+function readStory(raw: unknown): { firstLongOne?: LongOneStory } {
+  try {
+    if (!isObj(raw)) return {}
+    const cls = raw.cls as ClassId
+    if (!CLASS_IDS.includes(cls) || !DRIVER_IDS.includes(raw.driver as never)) return {}
+    const stats = isObj(raw.stats) ? raw.stats : fail('story stats are missing')
+    for (const k of ['raids', 'wins', 'podiums', 'contracts'] as const) finite(stats[k], `story ${k}`)
+    // The winning truck's parts, checked like any build's.
+    const parts = readBuild({ ...stockBuild(cls), parts: raw.parts }, cls).parts
+    return {
+      firstLongOne: {
+        year: finite(raw.year, 'story year'), seasons: finite(raw.seasons, 'story seasons'), cls, driver: raw.driver as DriverId, parts,
+        stats: { raids: stats.raids as number, wins: stats.wins as number, podiums: stats.podiums as number, contracts: stats.contracts as number },
+      },
+    }
+  } catch {
+    return {}
+  }
+}
+
 function readCareer(raw: unknown): CareerState {
   if (!isObj(raw)) fail('career is missing')
   const year = finite(raw.year, 'career year')
@@ -279,6 +303,7 @@ function readCareer(raw: unknown): CareerState {
     teams: readTeams(raw.teams, year),
     news,
     longOne,
+    ...(raw.firstLongOne === undefined ? {} : readStory(raw.firstLongOne)),
     stats: { raids: stats.raids as number, wins: stats.wins as number, podiums: stats.podiums as number, contracts: stats.contracts as number },
   }
 }

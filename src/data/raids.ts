@@ -87,6 +87,8 @@ export const RAID = {
   jobFrom: 0.05,
   /** A damper that faded is left to cool to its warm line, and never for less than this (s). */
   coolMin: 10 * 60,
+  /** On a rest day (`Raid.restAfter`) the crew has a whole day, not a night: this many times the hours. */
+  restDayHours: 2,
 } as const
 
 /** Jobs on a heavy truck take longer, on a side-by-side less (roadside fixes and the bivouac alike). */
@@ -215,6 +217,11 @@ export interface Raid {
   /** Every entry drives the same roads, so a second go shows what a change did. */
   seed: number
   stages: readonly RaidStage[]
+  /**
+   * A rest day after this many stages (plan PR 13): the Long One's halfway
+   * day in the bivouac, with `RAID.restDayHours` times the crew's hours.
+   */
+  restAfter?: number
 }
 
 /** Shorthand for writing stages: [ground, km] pairs. */
@@ -341,6 +348,8 @@ export const RAIDS: Readonly<Record<RaidId, Raid>> = {
       LONG_STAGES.haul, LONG_STAGES.mines, LONG_STAGES.fast, LONG_STAGES.eskers, LONG_STAGES.rock,
       LONG_STAGES.burn, LONG_STAGES.mines, LONG_STAGES.haul, LONG_STAGES.logging,
     ],
+    // Fourteen stages and a rest day at halfway: two weeks across the country.
+    restAfter: 7,
   },
 
   // ── Winter (plan PR 10) ──

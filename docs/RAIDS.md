@@ -139,7 +139,8 @@ and gets the closing time plus two hours.
 
 ## The bivouac
 
-Eight mechanic hours a night. Every part 5% worn or more gets jobs:
+Eight mechanic hours a night (more with the career's crew), and twice that on the
+Long One's rest day at halfway (plan PR 13). Every part 5% worn or more gets jobs:
 
 | Job | Hours | Uses | Wear left |
 | --- | --- | --- | --- |
