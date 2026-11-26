@@ -29,11 +29,13 @@ export interface CalendarEvent {
 }
 
 /**
- * The raids each year, in order (plan: about six a year). All summer for
- * now: winter raids join the calendar with plan PR 10, which is also when
- * the career's first job becomes the plan's three-stage winter raid.
+ * The raids each year, in order: two winter raids, then six summer ones
+ * (plan PR 10). The first job of a career is the three-stage Winter Sprint,
+ * as the plan has it.
  */
 export const CALENDAR: readonly CalendarEvent[] = [
+  { raid: 'winterSprint', day: 40, tier: 'regional' },
+  { raid: 'winterRaid', day: 75, tier: 'regional' },
   { raid: 'summerSprint', day: 130, tier: 'regional' },
   { raid: 'summerRaid', day: 158, tier: 'regional' },
   { raid: 'nationalRaid', day: 186, tier: 'national' },
@@ -52,8 +54,8 @@ export const CAREER = {
   lastYear: LAST_YEAR,
   /** In the bank on day one: the garage, two people and not much else. */
   startMoney: 8000,
-  /** The career starts on this day of 1985, a few weeks before the first raid. */
-  startDay: 100,
+  /** The career starts on this day of 1985, a few weeks before the first raid (the Winter Sprint). */
+  startDay: 15,
   /** Selling a part (or the truck) back gets this share of its price. */
   resale: 0.5,
   /** After a raid, putting a worn part right costs this share of its price for each unit of damage (1 = broken). */
