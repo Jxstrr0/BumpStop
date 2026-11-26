@@ -23,3 +23,34 @@ export function svg<K extends keyof SVGElementTagNameMap>(
 export function num(value: number, digits = 0): string {
   return value.toLocaleString('en-CA', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
+
+/**
+ * Make a fold-out section part of an accordion: opening it closes the other
+ * sections with the same group name under the same parent, so only one is
+ * open at a time. Phones with a recent browser do this natively through the
+ * `name` attribute; the toggle listener does the same on older ones. When the
+ * player taps a heading and a long section above it folds shut, the page is
+ * scrolled back so the heading they tapped stays under their thumb.
+ */
+export function oneOpenAtATime(details: HTMLDetailsElement, group: string): void {
+  details.setAttribute('name', group)
+  let tappedAt: number | null = null
+  details.addEventListener('click', (event) => {
+    const summary = details.querySelector(':scope > summary')
+    if (!details.open && summary && event.target instanceof Node && summary.contains(event.target)) {
+      tappedAt = summary.getBoundingClientRect().top
+    }
+  })
+  details.addEventListener('toggle', () => {
+    if (!details.open) return
+    for (const other of details.parentElement?.querySelectorAll<HTMLDetailsElement>(':scope > details[open]') ?? []) {
+      if (other !== details && other.getAttribute('name') === group) other.open = false
+    }
+    const summary = details.querySelector(':scope > summary')
+    if (tappedAt !== null && summary) {
+      const moved = summary.getBoundingClientRect().top - tappedAt
+      if (Math.abs(moved) > 1) window.scrollBy(0, moved)
+    }
+    tappedAt = null
+  })
+}

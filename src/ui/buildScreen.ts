@@ -14,7 +14,7 @@ import { changeCost, checkBuild, minPressure, partIn, partsFor, type BuildProble
 import { FIRST_YEAR, LAST_YEAR, type BuildStore } from './buildStore'
 import { shareBuildBlock } from './saves'
 import { truckCardBlock } from './truckCard'
-import { el, num } from './dom'
+import { el, num, oneOpenAtATime } from './dom'
 import { truckView } from './truckView'
 
 type End = 'front' | 'rear'
@@ -230,6 +230,7 @@ export function buildPanel(store: BuildStore): HTMLElement {
     const details = el('details', 'slot')
     details.dataset.slot = slot
     details.open = open
+    oneOpenAtATime(details, 'build-parts')
     const head = el('summary')
     head.append(
       el('span', 'slot-name', t(`slot.${slot}` as StringKey)),
@@ -270,6 +271,7 @@ export function buildPanel(store: BuildStore): HTMLElement {
     const details = el('details', 'axle')
     details.dataset.end = end
     details.open = open
+    oneOpenAtATime(details, 'build-tune')
     details.append(el('summary', '', t(end === 'front' ? 'build.front' : 'build.rear')))
     const geo = el('p', 'small geometry')
     geometry.push({ end, p: geo })
