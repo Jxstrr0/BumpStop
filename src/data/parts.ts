@@ -150,9 +150,15 @@ export interface EnginePart extends PartCommon {
   torque: number
 }
 
-/** Spares carried for the bivouac (plan PR 7). For now they're just weight. */
+/** The spares a truck can carry for roadside fixes and the bivouac (plan PR 7). */
+export type SpareId = 'tire' | 'shock' | 'cv'
+export const SPARE_IDS: readonly SpareId[] = ['tire', 'shock', 'cv']
+
+/** Spares carried for roadside fixes and the bivouac (plan PR 7): weight now, repairs later. */
 export interface SparesPart extends PartCommon {
   slot: 'spares'
+  /** How many of each spare the kit holds. */
+  carries: Readonly<Record<SpareId, number>>
 }
 
 export type Part =
@@ -313,9 +319,12 @@ export const PARTS: readonly Part[] = [
 
   // ── Spares carried ──
   { slot: 'spares', id: 'noSpares', name: 'part.noSpares', text: 'part.noSparesText', year: 1985,
-    mass: { light4x4: 0, heavy: 0, sxs: 0 }, cost: { light4x4: 0, heavy: 0, sxs: 0 } },
+    mass: { light4x4: 0, heavy: 0, sxs: 0 }, cost: { light4x4: 0, heavy: 0, sxs: 0 },
+    carries: { tire: 0, shock: 0, cv: 0 } },
   { slot: 'spares', id: 'lightKit', name: 'part.lightKit', text: 'part.lightKitText', year: 1985,
-    mass: { light4x4: 45, heavy: 200, sxs: 25 }, cost: { light4x4: 2000, heavy: 8000, sxs: 1200 } },
+    mass: { light4x4: 45, heavy: 200, sxs: 25 }, cost: { light4x4: 2000, heavy: 8000, sxs: 1200 },
+    carries: { tire: 1, shock: 1, cv: 1 } },
   { slot: 'spares', id: 'fullKit', name: 'part.fullKit', text: 'part.fullKitText', year: 1985,
-    mass: { light4x4: 110, heavy: 500, sxs: 60 }, cost: { light4x4: 5000, heavy: 20000, sxs: 3000 } },
+    mass: { light4x4: 110, heavy: 500, sxs: 60 }, cost: { light4x4: 5000, heavy: 20000, sxs: 3000 },
+    carries: { tire: 2, shock: 2, cv: 2 } },
 ]

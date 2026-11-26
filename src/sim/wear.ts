@@ -26,6 +26,7 @@ import { FRAME_ZONES, WEAR, type AxleWear, type FailureKind, type FatigueSpec, t
 import { detAtan } from './det'
 import { heightAt, type Profile } from './ground'
 import { CORNERS, emptyForces, emptyStats, enterSection, stepRide, type RideParams, type RideState, type RideStats, type StepForces } from './ride'
+import { notePose, type PoseLog } from './poses'
 import { newRecorder, record, type TraceRecorder } from './trace'
 
 const DT = 1 / SIM.stepsPerSecond
@@ -393,6 +394,7 @@ export function newWearRun(setup: WearSetup, ride: RideParams, trace: boolean): 
 /**
  * Drive one section at `speed` with wear, from the rear axle on its start to
  * the front axle on its end, or until something breaks. Adds to `stats`.
+ * With a pose log, it also jots down the truck's pose for the 3D (read only).
  */
 export function driveSectionWithWear(
   s: RideState,
@@ -401,6 +403,7 @@ export function driveSectionWithWear(
   profile: Profile,
   speed: number,
   stats: RideStats = emptyStats(),
+  poses: PoseLog | null = null,
 ): RideStats {
   enterSection(s, p, profile)
   const usable = profile.length - p.setup.cgToFront - p.setup.cgToRear
@@ -413,6 +416,7 @@ export function driveSectionWithWear(
       record(rec, s.oilTemp, forces, readings, w)
       if (w.broken && rec.tick !== 0) record(rec, s.oilTemp, forces, readings, w, true)
     }
+    if (poses) notePose(poses, s, 0, w.distance, speed, 0, w.broken !== null)
   }
   return stats
 }

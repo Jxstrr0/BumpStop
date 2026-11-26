@@ -2,8 +2,13 @@
 
 **Status: proposed in PR 0.** Kelbo picked an English-flavoured north on
 25 November 2026 (over two Finnish-flavoured options); the names below are
-proposals in that style, waiting on his OK. Nothing here shows in the game
-yet. Propose any new name to Kelbo before using it, and add it here.
+proposals in that style. **Birchland** is settled. Kelbo **turned down the
+antler and the raid names** below; new ones are still to pick, so the game
+uses plain working names for now (see each section). Propose any new name
+to Kelbo before using it, and add it here.
+
+Every name the game shows lives in `src/data/strings.ts`, so a new pick is
+a one-line swap there (plus this file).
 
 Every name was checked against section 8 of `.github/LONGLIGHT-STUDIO.md`,
 the name lists in each game's profile there, and Mainline's `docs/NAMES.md`
@@ -31,7 +36,7 @@ suspension words are used as they are.
 | What | Proposed name | Other options |
 | --- | --- | --- |
 | Country | **Birchland** (the Republic of Birchland), after the birch woods that cover the south; it matches the game's birch-white roadbook paper | Tamarack; Hollowfell |
-| Money | **the antler**, written in full: `12,400 antlers` | the tally |
+| Money | ~~the antler~~ (turned down; still shown on the build screen until a new name is picked) | the tally |
 
 The money is written out in full rather than as a symbol, because the short
 forms clash with things the game already shows (h for hours at the
@@ -49,7 +54,13 @@ bivouac, hp for engine power, M for millions).
 
 ## Raids
 
-| Plan's working name | Proposed name | Shape |
+**Turned down.** The game uses working names until new ones are picked:
+**Summer Sprint** (3 stages) and **Summer Raid** (5 stages), in
+`raid.*.name` in `src/data/strings.ts` (plan PR 7). Stages are described,
+not named ("Logging roads", "Rock country", "The old burn", "Eskers and
+washboard", "Hot haul roads"). The first proposals, for the record:
+
+| Plan's working name | Proposed name (turned down) | Shape |
 | --- | --- | --- |
 | Regional winter raid (career start) | **the Frostbite 300** | 3 stages around Larchport, winter, about 300 km |
 | Summer gravel raid | **the Esker Run** | 4 to 5 stages from Sawbuck along the eskers, summer |
@@ -61,6 +72,9 @@ bivouac, hp for engine power, M for millions).
 
 Three or four rival teams with their own trucks and habits, who copy what
 wins (plan, The career). Each starts in one class and spreads to the others.
+Still proposed. The raids (plan PR 7) show them as placeholders, with
+privateer entries known only by their race number (`team.*` in
+`src/data/strings.ts`).
 
 | Team | Starts in | Habit |
 | --- | --- | --- |
@@ -69,8 +83,14 @@ wins (plan, The career). Each starts in one class and spreads to the others.
 | **Jackrabbit Sport** | Side-by-side | Quick and light; their dampers cook in the heat |
 | **Highbank Racing** | Light 4x4, later all three | New money: buys the newest parts the year they come out |
 
+## Drivers
+
+The hired drivers (plan PR 7) go by their trade until Kelbo picks names:
+the veteran, the charger, the gravel ace and the mechanic
+(`driver.*` in `src/data/strings.ts`).
+
 ## Still to name (later PRs)
 
-Drivers (plan PR 7), sponsors and parts makers (plan PR 3 and PR 9), the
-crew at the garage, privateer customers. Each gets checked the same way and
-proposed to Kelbo first.
+The money and the raids (above), drivers, sponsors and parts makers (plan
+PR 3 and PR 9), the crew at the garage, privateer customers. Each gets
+checked the same way and proposed to Kelbo first.
