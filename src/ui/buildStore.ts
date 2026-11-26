@@ -5,6 +5,7 @@
  */
 import { CLASSES, type ClassId } from '../data/classes'
 import type { TruckBuild } from '../data/kit'
+import { FIRST_YEAR, LAST_YEAR } from '../data/parts'
 import { buildTruck, stockBuild, tidyBuild, type BuiltTruck } from '../sim/build'
 
 /** What changed: the class (or year) means redraw everything; a part or setting just the numbers. */
@@ -23,8 +24,7 @@ export interface BuildStore {
   onChange(fn: (change: Change) => void): void
 }
 
-export const FIRST_YEAR = 1985
-export const LAST_YEAR = 2025
+export { FIRST_YEAR, LAST_YEAR }
 
 export function makeBuildStore(): BuildStore {
   const builds = Object.fromEntries(CLASSES.map((c) => [c.id, stockBuild(c.id)])) as Record<ClassId, TruckBuild>
