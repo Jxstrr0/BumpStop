@@ -100,7 +100,7 @@ export function rigView(): RigView {
       void load().then(async (v) => {
         if (!v || current !== run) return
         try {
-          await v.setRun({ cls: run.truck.build.cls, stance: stanceOf(run.truck), road: run.road, wheelbase: setup.cgToFront + setup.cgToRear })
+          await v.setRun({ cls: run.truck.build.cls, stance: stanceOf(run.truck), parts: run.truck.build.parts, road: run.road, wheelbase: setup.cgToFront + setup.cgToRear })
         } catch (err) {
           fail(err)
           return

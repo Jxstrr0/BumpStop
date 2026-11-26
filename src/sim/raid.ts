@@ -28,13 +28,13 @@ import { KITS } from '../data/kit'
 import { SPARE_IDS, type SpareId } from '../data/parts'
 import {
   CLASS_WORK, DRIVERS, JOB_KINDS, JOBS, PACE_SPEED, PACES, RAID, RAIDS, ROADSIDE, STEADY_KMH,
-  type DriverId, type JobKind, type JobPart, type PaceId, type Raid, type RaidGround, type RaidId, type RaidStage,
+  type DriverId, type JobKind, type JobPart, type PaceId, type Raid, type RaidGround, type RaidId, type RaidStage, type Rival,
 } from '../data/raids'
 import type { TruckBuild } from '../data/kit'
 import { buildTruck, partIn, type BuiltTruck } from './build'
 import { detExp, detLog, detPow } from './det'
 import { clipRecorder, type Clip } from './highlight'
-import { rivalStages, type RivalStage } from './rivals'
+import { rivalsIn, rivalStages, type RivalStage } from './rivals'
 import { hashString } from './rng'
 import { runStage } from './stage'
 import { fromCelsius } from './units'
@@ -45,6 +45,15 @@ export interface RaidEntry {
   raid: RaidId
   build: TruckBuild
   driver: DriverId
+  /**
+   * Career raids only (plan PR 9): the roads' seed for this year's running,
+   * the rivals entered (with the trucks they have this year), and the
+   * mechanic hours at each bivouac (the shop's crew). Free-play raids leave
+   * them out and use the raid's own seed, the usual rivals and `RAID.bivouacHours`.
+   */
+  seed?: number
+  field?: Rival[]
+  hours?: number
 }
 
 /** A stop on a stage: what broke, where, and what the crew did. */
@@ -218,11 +227,31 @@ export function raidOf(state: RaidState): Raid {
   return RAIDS[state.entry.raid]
 }
 
-export function enterRaid(raid: RaidId, build: TruckBuild, driver: DriverId): RaidState {
+/** The roads' seed for this running of the raid. */
+export function raidSeed(state: RaidState): number {
+  return state.entry.seed ?? raidOf(state).seed
+}
+
+/** Mechanic hours at each bivouac. */
+export function bivouacHours(state: RaidState): number {
+  return state.entry.hours ?? RAID.bivouacHours
+}
+
+/** Who else is entered in the player's class. */
+export function raidField(state: RaidState): readonly Rival[] {
+  return state.entry.field ?? rivalsIn(state.entry.build.cls)
+}
+
+/** Career raids pass `extra`: the year's seed, the field and the crew's hours (see `RaidEntry`). */
+export function enterRaid(raid: RaidId, build: TruckBuild, driver: DriverId, extra?: Pick<RaidEntry, 'seed' | 'field' | 'hours'>): RaidState {
   const b = structuredClone(build)
   const carries = partIn(b, 'spares').carries
+  const entry: RaidEntry = { raid, build: b, driver }
+  if (extra?.seed !== undefined) entry.seed = extra.seed
+  if (extra?.field) entry.field = structuredClone(extra.field)
+  if (extra?.hours !== undefined) entry.hours = extra.hours
   return {
-    entry: { raid, build: b, driver },
+    entry,
     stage: 0,
     phase: 'morning',
     wear: newWearState(),
@@ -273,7 +302,7 @@ export function startStage(state: RaidState, truck: BuiltTruck, pace: PaceId): S
     stops: [],
     trace: { distance: [0], oil: [airTemp], wear: [worstDamage(state.wear)] },
     clips: [],
-    rivals: rivalStages(cls, legs.map((l) => l.par), stageKm(spec), harshShare(spec), raid.seed * 100 + state.stage),
+    rivals: rivalStages(cls, legs.map((l) => l.par), stageKm(spec), harshShare(spec), raidSeed(state) * 100 + state.stage, raidField(state)),
     status: 'driving',
     late: false,
   }
@@ -309,7 +338,7 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     limp(run, seg.ground, remaining)
   } else {
     const speed = groundSpeed(run.truck, driver, seg.ground, currentPace(run))
-    const seed = hashString(`${raidOf(state).seed}:${run.stage}:${run.leg}:${run.seg}:${run.restarts}`)
+    const seed = hashString(`${raidSeed(state)}:${run.stage}:${run.leg}:${run.seg}:${run.restarts}`)
     const res = runStage(
       run.truck.ride,
       { airTemp: run.airTemp, oilTemp: run.oil, segments: [{ ground: seg.ground, length: remaining, speed }] },
@@ -555,7 +584,8 @@ export type JobProblem = { kind: 'hours'; over: number } | { kind: 'spare'; spar
 /** What's wrong with a night's plan, or null if the crew can do it all. */
 export function checkJobs(state: RaidState, jobs: readonly Job[]): JobProblem | null {
   const hours = jobs.reduce((sum, j) => sum + j.hours, 0)
-  if (hours > RAID.bivouacHours + 1e-9) return { kind: 'hours', over: hours - RAID.bivouacHours }
+  const have = bivouacHours(state)
+  if (hours > have + 1e-9) return { kind: 'hours', over: hours - have }
   const used: Record<SpareId, number> = { tire: 0, shock: 0, cv: 0 }
   const seen = new Set<string>()
   for (const j of jobs) {

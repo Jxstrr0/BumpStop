@@ -20,12 +20,12 @@
  */
 import { CLASSES } from '../data/classes'
 import { SPARE_IDS, type SpareId } from '../data/parts'
-import { DRIVER_IDS, DRIVERS, JOBS, PACES, RAID, RAID_IDS, RAIDS, RIVALS, type DriverId, type PaceId, type RaidId } from '../data/raids'
+import { DRIVER_IDS, DRIVERS, FREE_RAID_IDS, JOBS, PACES, RAID, RAIDS, RIVALS, type DriverId, type PaceId, type RaidId } from '../data/raids'
 import { t, tf, type StringKey } from '../data/strings'
 import { checkBuild, partIn, shopRules } from '../sim/build'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
-  advanceStage, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, leaveCheckpoint,
+  advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, leaveCheckpoint,
   parTime, raidOf, raidTruck, stageKm, standings, startStage, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
 } from '../sim/raid'
 import type { BuildStore } from './buildStore'
@@ -181,7 +181,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
       raidText.textContent = `${t(raid.text)} ${tf('raidUi.stagesLine', { n: String(raid.stages.length), km: num(raid.stages.reduce((s, st) => s + stageKm(st), 0)) })}`
       driverText.textContent = t(DRIVERS[driver].text)
     }
-    const raidRow = picker(RAID_IDS, (id) => t(RAIDS[id].name), () => raidId, (id) => {
+    const raidRow = picker(FREE_RAID_IDS, (id) => t(RAIDS[id].name), () => raidId, (id) => {
       raidId = id
       syncText()
     })
@@ -601,8 +601,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
     function sync(): void {
       const chosen = [...picked]
       const used = chosen.reduce((sum, j) => sum + j.hours, 0)
-      hoursLine.textContent = tf('raidUi.hoursUsed', { used: num(used, 2).replace(/\.?0+$/, ''), total: num(RAID.bivouacHours) })
-      hoursFill.style.width = `${Math.min(100, (used / RAID.bivouacHours) * 100)}%`
+      hoursLine.textContent = tf('raidUi.hoursUsed', { used: num(used, 2).replace(/\.?0+$/, ''), total: num(bivouacHours(s)) })
+      hoursFill.style.width = `${Math.min(100, (used / bivouacHours(s)) * 100)}%`
       const left = { ...s.spares }
       for (const j of chosen) if (j.spare) left[j.spare]--
       sparesLine.textContent = tf('raidUi.sparesLine', { list: sparesList(left) })
@@ -627,7 +627,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
     sync()
     show(
       head,
-      el('p', 'small', tf('raidUi.bivouacLead', { hours: num(RAID.bivouacHours) })),
+      el('p', 'small', tf('raidUi.bivouacLead', { hours: num(bivouacHours(s)) })),
       hoursLine, hoursBar, sparesLine,
       jobs.length ? list : el('p', 'small', t('raidUi.noJobs')),
       done, retireButton(),

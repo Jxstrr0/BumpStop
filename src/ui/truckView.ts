@@ -64,7 +64,7 @@ export function truckView(store: BuildStore): HTMLElement {
     describe()
     if (!garage || failed) return
     const truck = store.truck()
-    garage.show(truck.build.cls, stanceOf(truck)).then(
+    garage.show(truck.build.cls, stanceOf(truck), truck.build.parts).then(
       () => { status.hidden = true },
       (err) => fail(err),
     )

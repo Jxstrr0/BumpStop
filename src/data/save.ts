@@ -3,7 +3,7 @@
  */
 export const SAVE = {
   /** The newest save format. Older ones are moved up by `src/persist/save.ts`. */
-  version: 1,
+  version: 2,
   /** Wait this long after the last change before writing the slot (ms), so a slider drag is one write. */
   autosaveDelayMs: 1200,
   /** Remind the player to make a backup after this many days without one. */

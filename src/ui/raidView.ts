@@ -77,7 +77,7 @@ export function raidView(): RaidView {
       if (!v || clips !== legClips) return
       const ride = truck.ride
       try {
-        await v.setRun({ cls: truck.build.cls, stance: stanceOf(truck), road: legClips.map((c) => c.road), wheelbase: ride.cgToFront + ride.cgToRear })
+        await v.setRun({ cls: truck.build.cls, stance: stanceOf(truck), parts: truck.build.parts, road: legClips.map((c) => c.road), wheelbase: ride.cgToFront + ride.cgToRear })
         ready = true
       } catch (err) {
         fail(err)

@@ -173,8 +173,10 @@ export const JOB_KINDS = Object.keys(JOBS) as JobKind[]
 
 // ── Raids ──
 
-export type RaidId = 'summerSprint' | 'summerRaid'
-export const RAID_IDS: readonly RaidId[] = ['summerSprint', 'summerRaid']
+export type RaidId = 'summerSprint' | 'summerRaid' | 'midsummerSprint' | 'nationalRaid' | 'autumnRaid' | 'longOne'
+export const RAID_IDS: readonly RaidId[] = ['summerSprint', 'summerRaid', 'midsummerSprint', 'nationalRaid', 'autumnRaid', 'longOne']
+/** The raids the free-play raid panel offers; the rest come with the career's calendar (plan PR 9). */
+export const FREE_RAID_IDS: readonly RaidId[] = ['summerSprint', 'summerRaid']
 
 export interface RaidSegment {
   ground: RaidGround
@@ -202,6 +204,34 @@ export interface Raid {
 
 /** Shorthand for writing stages: [ground, km] pairs. */
 const route = (...pairs: [RaidGround, number][]): RaidSegment[] => pairs.map(([ground, km]) => ({ ground, km }))
+
+/**
+ * Stages the career's longer raids share (plan PR 9). Each raid drives them
+ * on its own seed, so the same kind of stage is a different road each time.
+ */
+const LONG_STAGES = {
+  logging: { tag: 'stage.loggingRoads', airC: 17, segments: route(
+    ['graded', 24], ['washboard', 10], ['graded', 20], ['rough', 8], ['graded', 22], ['jumps', 5],
+    ['graded', 18], ['washboard', 8], ['rough', 5], ['graded', 20]) },
+  eskers: { tag: 'stage.eskers', airC: 21, segments: route(
+    ['graded', 18], ['washboard', 14], ['jumps', 6], ['graded', 16], ['rough', 10], ['washboard', 12],
+    ['graded', 22], ['jumps', 5], ['rough', 8], ['graded', 24], ['washboard', 10], ['graded', 15]) },
+  rock: { tag: 'stage.rockCountry', airC: 24, segments: route(
+    ['graded', 20], ['rocks', 5], ['graded', 15], ['rough', 10], ['rocks', 4], ['washboard', 10],
+    ['graded', 22], ['whoops', 4], ['graded', 15], ['rocks', 5], ['rough', 8], ['graded', 22]) },
+  haul: { tag: 'stage.haulRoads', airC: 28, segments: route(
+    ['graded', 26], ['rough', 12], ['washboard', 10], ['graded', 20], ['rough', 10], ['rocks', 4],
+    ['graded', 24], ['washboard', 12], ['rough', 8], ['graded', 24], ['jumps', 4], ['graded', 16]) },
+  burn: { tag: 'stage.oldBurn', airC: 23, segments: route(
+    ['graded', 20], ['whoops', 5], ['rough', 8], ['graded', 18], ['jumps', 6], ['washboard', 10],
+    ['graded', 16], ['whoops', 4], ['rocks', 4], ['graded', 20], ['rough', 8], ['jumps', 4], ['graded', 17]) },
+  mines: { tag: 'stage.minesRoad', airC: 20, segments: route(
+    ['graded', 24], ['rocks', 4], ['graded', 20], ['rough', 12], ['rocks', 3], ['graded', 25],
+    ['washboard', 8], ['rocks', 3], ['graded', 22], ['rough', 6], ['graded', 15]) },
+  fast: { tag: 'stage.longGravel', airC: 19, segments: route(
+    ['graded', 34], ['washboard', 12], ['graded', 30], ['rough', 6], ['graded', 28], ['washboard', 10],
+    ['graded', 32], ['jumps', 3], ['graded', 25]) },
+} as const satisfies Record<string, RaidStage>
 
 export const RAIDS: Readonly<Record<RaidId, Raid>> = {
   summerSprint: {
@@ -244,6 +274,57 @@ export const RAIDS: Readonly<Record<RaidId, Raid>> = {
       { tag: 'stage.oldBurn', airC: 23, segments: route(
         ['graded', 20], ['whoops', 5], ['rough', 8], ['graded', 18], ['jumps', 6], ['washboard', 10],
         ['graded', 16], ['whoops', 4], ['rocks', 4], ['graded', 20], ['rough', 8], ['jumps', 4], ['graded', 17]) },
+    ],
+  },
+  // The career's calendar adds these (plan PR 9). Winter raids come with plan PR 10.
+  midsummerSprint: {
+    id: 'midsummerSprint',
+    name: 'raid.midsummerSprint.name',
+    text: 'raid.midsummerSprint.text',
+    season: 'summer',
+    seed: 7301,
+    stages: [
+      { tag: 'stage.eskers', airC: 24, segments: route(
+        ['graded', 14], ['washboard', 10], ['jumps', 5], ['graded', 16], ['rough', 6], ['washboard', 8],
+        ['graded', 18], ['jumps', 4], ['graded', 12]) },
+      { tag: 'stage.longGravel', airC: 26, segments: route(
+        ['graded', 24], ['washboard', 10], ['graded', 20], ['rough', 5], ['graded', 22], ['washboard', 8], ['graded', 14]) },
+      { tag: 'stage.minesRoad', airC: 23, segments: route(
+        ['graded', 16], ['rocks', 4], ['graded', 14], ['rough', 8], ['rocks', 3], ['graded', 18], ['whoops', 3], ['graded', 16]) },
+    ],
+  },
+  nationalRaid: {
+    id: 'nationalRaid',
+    name: 'raid.nationalRaid.name',
+    text: 'raid.nationalRaid.text',
+    season: 'summer',
+    seed: 7401,
+    stages: [LONG_STAGES.fast, LONG_STAGES.logging, LONG_STAGES.eskers, LONG_STAGES.rock, LONG_STAGES.mines, LONG_STAGES.haul, LONG_STAGES.burn],
+  },
+  autumnRaid: {
+    id: 'autumnRaid',
+    name: 'raid.autumnRaid.name',
+    text: 'raid.autumnRaid.text',
+    season: 'summer',
+    seed: 7501,
+    stages: [
+      { ...LONG_STAGES.logging, airC: 14 },
+      { ...LONG_STAGES.burn, airC: 15 },
+      { ...LONG_STAGES.mines, airC: 13 },
+      { ...LONG_STAGES.eskers, airC: 14 },
+      { ...LONG_STAGES.rock, airC: 12 },
+    ],
+  },
+  longOne: {
+    id: 'longOne',
+    name: 'raid.longOne.name',
+    text: 'raid.longOne.text',
+    season: 'summer',
+    seed: 7601,
+    stages: [
+      LONG_STAGES.fast, LONG_STAGES.logging, LONG_STAGES.eskers, LONG_STAGES.burn, LONG_STAGES.rock,
+      LONG_STAGES.haul, LONG_STAGES.mines, LONG_STAGES.fast, LONG_STAGES.eskers, LONG_STAGES.rock,
+      LONG_STAGES.burn, LONG_STAGES.mines, LONG_STAGES.haul, LONG_STAGES.logging,
     ],
   },
 }

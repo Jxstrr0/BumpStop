@@ -70,7 +70,9 @@ now gone; every summer ground keeps 0.8, so nothing changed there). In PR
 Two new tires, in every class: **Studded rally tires** and **Studded
 heavy-ply tires**. They're the same casings as the plain ones, a few
 kilograms heavier and dearer, and they grip harder on ice and snow (the
-`studGrip` column above). On gravel they're just heavier tires.
+`studGrip` column above). On gravel they're just heavier tires. In 3D
+they share their plain twin's model (the studs are too small to see): the
+Blender script names those tire nodes for both parts.
 
 ## Lake ice
 

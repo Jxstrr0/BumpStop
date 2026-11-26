@@ -11,6 +11,12 @@
  * - arms swing to follow the wheels,
  * - each shock and spring stretches between its two mounts.
  *
+ * Each model also holds every part a player can bolt on (dampers, bump
+ * stops, bars, axles, wheels, tires, guards, spares, engine bits, frames,
+ * leaf or coil springs), in nodes named `Fit_<slot>_<part>[-<part>]_<where>`.
+ * `fit()` shows the build's own parts and hides the rest, so a swap on the
+ * build screen shows on the truck.
+ *
  * Coordinates are three.js's: X forward, Y up, Z to the truck's right. The
  * sim's "left side up" roll is a positive turn about X, and its "nose up"
  * pitch a positive turn about Z, so the numbers go straight in. Corners are
@@ -20,6 +26,8 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { ClassId } from '../data/classes'
+import { KITS } from '../data/kit'
+import type { SlotId } from '../data/parts'
 
 const CORNERS = ['FL', 'FR', 'RL', 'RR'] as const
 
@@ -65,16 +73,34 @@ interface Arm {
   restDir: THREE.Vector3
 }
 
+/** The part in each slot, as a build lists them (`TruckBuild.parts`). */
+export type FittedParts = Readonly<Partial<Record<SlotId, string>>>
+
 const loader = new GLTFLoader()
 const cache = new Map<ClassId, Promise<THREE.Group>>()
+
+/**
+ * The models are zipped (gzip) to about a fifth of their size, and the
+ * browser unzips them itself. If a server has already unzipped the file on
+ * the way (its first bytes are then "glTF"), it's used as it is.
+ */
+async function fetchModel(url: string): Promise<ArrayBuffer> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Couldn't load ${url}: ${res.status}`)
+  const bytes = await res.arrayBuffer()
+  const head = new Uint8Array(bytes, 0, 2)
+  if (head[0] !== 0x1f || head[1] !== 0x8b) return bytes
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
+  return new Response(stream).arrayBuffer()
+}
 
 /** Load a class's model once; each call after that gets a fresh copy to pose. */
 async function loadScene(cls: ClassId): Promise<THREE.Group> {
   let p = cache.get(cls)
   if (!p) {
     // Relative to the page, so it works at the site's root and under a sub-path.
-    const url = new URL(`./models/truck-${cls}.glb`, document.baseURI).href
-    p = loader.loadAsync(url).then((gltf) => gltf.scene)
+    const url = new URL(`./models/truck-${cls}.glb.gz`, document.baseURI).href
+    p = fetchModel(url).then((bytes) => loader.parseAsync(bytes, '')).then((gltf) => gltf.scene)
     cache.set(cls, p)
     // A failed load (offline, say) shouldn't stick: try again next time.
     p.catch(() => cache.delete(cls))
@@ -105,6 +131,8 @@ export class TruckModel {
   private shocks: Shock[]
   private arms: (Arm | null)[]
   private axles: { node: THREE.Object3D; left: number; right: number }[]
+  /** Every bolt-on part in the model, and the slot and part ids that show it. */
+  private fits: { node: THREE.Object3D; slot: string; parts: string[] }[] = []
   /** Corners whose wheel has been made to look broken, and how. */
   private broken = new Map<number, 'flat' | 'flop' | 'mount'>()
 
@@ -154,7 +182,19 @@ export class TruckModel {
         o.castShadow = true
         o.receiveShadow = true
       }
+      // Fit_<slot>_<part>[-<part>...]_<where>, as the Blender script names them.
+      const m = /^Fit_([A-Za-z]+)_([A-Za-z0-9-]+)/.exec(o.name)
+      if (m) this.fits.push({ node: o, slot: m[1]!, parts: m[2]!.split('-') })
     })
+    this.fit(KITS[cls].stock.parts)
+  }
+
+  /** Show the build's own parts and hide the rest. */
+  fit(parts: FittedParts): void {
+    for (const f of this.fits) {
+      const part = parts[f.slot as SlotId]
+      f.node.visible = part !== undefined && f.parts.includes(part)
+    }
   }
 
   /** Overall length (m), for framing the camera. */
