@@ -33,15 +33,14 @@ then send it into a multi-day raid where damage stacks from stage to stage.
 - Name **Bump Stop**. Repo `Jxstrr0/BumpStop`.
 - **Three classes from day one:** light 4x4, heavy truck and side-by-side
   (all in from plan PR 3).
-- **An English-flavoured north** for the made-up country (not Finnish). The
-  proposed names in `docs/NAMES.md` still wait on Kelbo's OK.
+- **An English-flavoured north** for the made-up country (not Finnish).
 - Address **`https://bumpstop.longlight.games/`**, approved for the studio
   DNS file. Chosen in PR 0 and **never to move** (a new address strands
   players' saves).
-- Still open, using the plan's defaults until Kelbo says otherwise: a
-  made-up northern country with summer and winter raids; the era 1985 to
-  2025; a hired driver while you call the pace; a raid calendar of about six
-  raids a year.
+- Settled since: a made-up northern country (Birchland) with summer and
+  winter raids; the era 1985 to 2025; a hired driver while you call the
+  pace; **six raids a year** (Kelbo, 26 November 2026). Every name the game
+  shows is picked (`docs/NAMES.md`). **1.0** shipped on 26 November 2026.
 - **Design and watch only**, no steering. **Nobody gets hurt:** trucks
   break and stop; crews are always fine.
 
