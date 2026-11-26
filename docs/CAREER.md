@@ -35,7 +35,9 @@ use another slot to keep playing free.
   - **Sit this one out** (tap twice).
 - **The calendar** for the year (folded away).
 - **Your truck:** buy one (stock, at its price), sell it (tap twice), and
-  when broke, sell its parts down to the cheapest for money back.
+  when broke, sell its parts down to the cheapest for money back. Its
+  **logbook** sits under it, and the trucks you sold under **Old trucks**
+  (`docs/LOGBOOK.md`).
 - **The shop:** crew and tools, with what each needs.
 - **News:** your results, who copied whom, new parts, sponsors; and your
   record.
@@ -234,7 +236,7 @@ it's **The career so far**, so it's there to look at any time.
 - **Biggest rival:** the rival team that finished ahead of your trucks most
   often (own entries and contract trucks both count; a retired truck counts
   as beaten). Most meetings breaks a tie.
-- **Favourite truck:** from the truck logbooks.
+- **Favourite truck:** from the truck logbooks (`docs/LOGBOOK.md`): the truck that raced most (then won most, then drove furthest), its years, raids, wins and kilometres, and the moment its logbook remembers (a Whole Damn Country win, else a win, else the latest).
 - **Drivers you hired** for your own entries: how many raids, wins and
   podiums each, and the year they first drove for you.
 - **The album:** in a career, photo mode has a **Keep for the album**

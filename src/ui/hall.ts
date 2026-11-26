@@ -8,7 +8,8 @@
  *   the garage won the Whole Damn Country.
  * - **Best seasons:** the top three (`HALL.bestSeasons`).
  * - **Biggest rival:** the team that finished ahead of your trucks most.
- * - **Favourite truck:** from the truck logbooks.
+ * - **Favourite truck:** from the truck logbooks (`src/sim/logbook.ts`):
+ *   the one that raced most, and the moment it's remembered for.
  * - **Drivers you hired**, and how each did.
  * - **The album:** photos kept from photo mode during the career.
  *
@@ -23,7 +24,9 @@ import { careerPhotos, removePhoto, albumWorks, type AlbumPhoto } from '../persi
 import type { SlotNo } from '../persist/slots'
 import { driverName, type CareerState } from '../sim/career'
 import { recap, type HallRecap, type SeasonLine } from '../sim/hall'
+import { favouriteTruck, type TruckLog } from '../sim/logbook'
 import { el, num } from './dom'
+import { momentText } from './logbook'
 import { ordinal } from './raid'
 
 const money = (n: number) => tf('career.money', { n: num(Math.round(n)) })
@@ -61,13 +64,29 @@ export function rivalText(r: NonNullable<HallRecap['rival']>): string {
   return tf('hall.rival', { team, met: String(r.tally.met), ahead: String(r.tally.ahead), behind: String(r.tally.behind) })
 }
 
-/** What the logbooks can say about the favourite truck (filled in by the career panel). */
-export type FavouriteTruck = (c: CareerState) => string | null
+/**
+ * The favourite truck in words, from its logbook (`src/sim/logbook.ts`):
+ * the truck that raced most, then won most. Null before any truck has raced.
+ */
+export function favouriteText(c: { trucks: readonly TruckLog[] }): string | null {
+  const log = favouriteTruck(c)
+  if (!log || log.raids === 0) return null
+  const years = log.sold === null
+    ? tf('hall.truckStill', { from: String(log.bought) })
+    : log.sold === log.bought ? String(log.bought) : `${log.bought}–${log.sold}`
+  let text = tf('hall.truck', {
+    n: String(log.n), cls: className(log.cls).toLowerCase(), years,
+    raids: counted(log.raids, 'hall.raid', 'hall.raids'), wins: counted(log.wins, 'hall.win', 'hall.wins'), km: num(Math.round(log.km)),
+  })
+  // The moment it's remembered for: a Whole Damn Country win, else a win, else the latest thing that happened to it.
+  const moment = log.moments.find((m) => m.kind === 'longOne') ?? log.moments.find((m) => m.kind === 'win') ?? log.moments[0]
+  if (moment) text += ` ${tf('hall.truckMoment', { moment: momentText(moment) })}`
+  return text
+}
 
 export interface HallOptions {
   /** The slot the career is in, for its album. */
   slot?: SlotNo
-  favourite?: FavouriteTruck
 }
 
 export interface HallBlock {
@@ -93,7 +112,7 @@ export function hallBlock(c: CareerState, opts: HallOptions = {}): HallBlock {
   function draw(): void {
     for (const u of urls) URL.revokeObjectURL(u)
     urls = []
-    body.replaceChildren(...recapParts(c, recap(c), opts.favourite), albumPart())
+    body.replaceChildren(...recapParts(c, recap(c)), albumPart())
   }
 
   function albumPart(): HTMLElement {
@@ -173,7 +192,7 @@ export function hallBlock(c: CareerState, opts: HallOptions = {}): HallBlock {
 }
 
 /** Everything but the album: pure words from the recap, so the tests can read them. */
-export function recapParts(c: CareerState, r: HallRecap, favourite?: FavouriteTruck): HTMLElement[] {
+export function recapParts(c: CareerState, r: HallRecap): HTMLElement[] {
   const out: HTMLElement[] = []
   const years = r.lastYear > r.firstYear ? `${r.firstYear}–${r.lastYear}` : String(r.firstYear)
   out.push(el('h3', 'raid-sub', tf(r.ended ? 'hall.head' : 'hall.headSoFar', { years })))
@@ -198,7 +217,7 @@ export function recapParts(c: CareerState, r: HallRecap, favourite?: FavouriteTr
   out.push(el('p', 'small', r.rival ? rivalText(r.rival) : t('hall.noRival')))
 
   out.push(el('h4', 'raid-sub', t('hall.truckHead')))
-  out.push(el('p', 'small', favourite?.(c) ?? t('hall.noTruck')))
+  out.push(el('p', 'small', favouriteText(c) ?? t('hall.noTruck')))
 
   out.push(el('h4', 'raid-sub', t('hall.driversHead')))
   if (r.drivers.length) {

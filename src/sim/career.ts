@@ -43,6 +43,7 @@ import {
   bivouacJobs, checkJobs, doJobs, driveStage, enterRaid, finishStage, harshShare, raidTruck, stageKm, stageLegs, standings,
   startStage, type Job as NightJob, type RaidState,
 } from './raid'
+import { logBought, logParts, logRaid, logSold, type TruckLog } from './logbook'
 import { rivalStages } from './rivals'
 import { hashString, Rng } from './rng'
 import { markEnd, newHall, recordResult, recordSkip, type CareerHall } from './hall'
@@ -132,6 +133,8 @@ export interface CareerState {
   stats: CareerStats
   /** The hall of fame's record: seasons, rivals, drivers (`hall.ts`). Missing in saves from before it, and started then. */
   hall?: CareerHall
+  /** Every truck the garage has owned, oldest first, each with its logbook (`logbook.ts`). The last unsold one is `own`. */
+  trucks: TruckLog[]
 }
 
 // ── Starting ──
@@ -153,6 +156,7 @@ export function newCareer(seed: number): CareerState {
     longOne: [],
     stats: { raids: 0, wins: 0, podiums: 0, contracts: 0 },
     hall: newHall(0),
+    trucks: [],
   }
 }
 
@@ -348,12 +352,14 @@ export function buyTruck(c: CareerState, cls: ClassId): void {
   if (c.money < price) throw new Error('Not enough money for the truck')
   c.money -= price
   c.own = stockBuild(cls)
+  logBought(c)
 }
 
 export function sellTruck(c: CareerState): void {
   if (!c.own) return
   if (c.job?.kind === 'own') throw new Error("Can't sell the truck in the middle of a raid")
   c.money += truckValue(c.own)
+  logSold(c)
   c.own = null
 }
 
@@ -369,6 +375,7 @@ export function fitOwn(c: CareerState, b: TruckBuild): number {
   for (const slot of SLOTS) if (partIn(b, slot).year > c.year) throw new Error(`The ${slot} part isn't out yet`)
   if (cost > 0 && cost > c.money) throw new Error('Not enough money for those parts')
   c.money -= cost
+  logParts(c, c.own, b)
   c.own = tidyBuild(b)
   return cost
 }
@@ -625,6 +632,7 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
       c.stats.raids++
       if (pos === 1) c.stats.wins++
       if (pos !== null && pos <= 3) c.stats.podiums++
+      logRaid(c, state, pos, retired, e.tier === 'long')
       if (e.tier === 'long' && pos === 1) {
         out.wonLongOne = true
         c.longOne.push(c.year)

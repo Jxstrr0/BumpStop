@@ -217,4 +217,18 @@ describe('the hall of fame in words', () => {
     expect(texts[3]).toContain('Ironwood Brothers')
     expect(texts[4]).toContain('never once ahead')
   })
+
+  it('names the favourite truck from its logbook, with the moment it’s remembered for', async () => {
+    const { favouriteText } = await import('../src/ui/hall')
+    const c = newCareer(14)
+    expect(favouriteText(c)).toBeNull()
+    c.money = 500_000
+    buyTruck(c, 'light4x4')
+    race(c, false)
+    race(c, true)
+    const text = favouriteText(c)!
+    expect(text).toContain('Truck 1, a light 4x4, from 1985, still in the garage: 2 raids, 1 win')
+    expect(text).toContain('won it')
+    expect(text).not.toMatch(/\{|hall\.|log\.|undefined|NaN/)
+  })
 })

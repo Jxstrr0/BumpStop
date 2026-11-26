@@ -15,12 +15,15 @@
 import { CALENDAR, TEAM_IDS, UPGRADES, type UpgradeId } from '../data/career'
 import { CLASSES, type ClassId } from '../data/classes'
 import { KITS, type AxleSettings, type TruckBuild } from '../data/kit'
+import { LOGBOOK } from '../data/logbook'
 import { FIRST_YEAR, LAST_YEAR, SLOTS } from '../data/parts'
 import { DRIVER_IDS, RAIDS, type DriverId, type RaidId, type Rival } from '../data/raids'
 import { SAVE } from '../data/save'
+import { FAILURE_KINDS, type FailureKind } from '../data/wear'
 import { findPart, fitsClass, stockBuild, tidyBuild } from '../sim/build'
 import type { CareerJob, CareerState, Contract, LongOneStory, NewsItem } from '../sim/career'
 import type { CareerHall, DriverTally, RivalTally, SeasonLine } from '../sim/hall'
+import { MOMENT_KINDS, newLog, tidyLogs, type TruckLog, type TruckMoment } from '../sim/logbook'
 import type { RaidState } from '../sim/raid'
 import { teamsForYear, type TeamGarage } from '../sim/teams'
 
@@ -274,7 +277,7 @@ function readStory(raw: unknown): { firstLongOne?: LongOneStory } {
 }
 
 /** A count in the hall of fame: a whole number, never below zero. */
-function count(v: unknown, what: string): number {
+function hallCount(v: unknown, what: string): number {
   const n = finite(v, what)
   if (!Number.isInteger(n) || n < 0) fail(`${what} is not a count`)
   return n
@@ -287,13 +290,13 @@ function readSeasonLine(raw: unknown): SeasonLine | null {
     if (isObj(raw.best)) {
       const b = raw.best
       if (RAIDS[b.raid as RaidId] && CLASS_IDS.includes(b.cls as ClassId) && (b.job === 'own' || b.job === 'contract')) {
-        best = { raid: b.raid as RaidId, cls: b.cls as ClassId, job: b.job, pos: count(b.pos, 'best place'), of: count(b.of, 'best of') }
+        best = { raid: b.raid as RaidId, cls: b.cls as ClassId, job: b.job, pos: hallCount(b.pos, 'best place'), of: hallCount(b.of, 'best of') }
       }
     }
     return {
-      season: count(raw.season, 'season'), year: count(raw.year, 'season year'),
-      raids: count(raw.raids, 'season raids'), wins: count(raw.wins, 'season wins'), podiums: count(raw.podiums, 'season podiums'),
-      contracts: count(raw.contracts, 'season contracts'), rep: finite(raw.rep, 'season rep'), money: finite(raw.money, 'season money'),
+      season: hallCount(raw.season, 'season'), year: hallCount(raw.year, 'season year'),
+      raids: hallCount(raw.raids, 'season raids'), wins: hallCount(raw.wins, 'season wins'), podiums: hallCount(raw.podiums, 'season podiums'),
+      contracts: hallCount(raw.contracts, 'season contracts'), rep: finite(raw.rep, 'season rep'), money: finite(raw.money, 'season money'),
       longOne: raw.longOne === true, best,
     }
   } catch {
@@ -309,28 +312,66 @@ function readSeasonLine(raw: unknown): SeasonLine | null {
 function readHall(raw: unknown, season: number): { hall?: CareerHall } {
   if (!isObj(raw)) return {}
   try {
-    const from = count(raw.from, 'hall start')
+    const from = hallCount(raw.from, 'hall start')
     const seasons = arrayOf(raw.seasons, 'hall seasons').map(readSeasonLine).filter((x): x is SeasonLine => x !== null && x.season <= season)
     const rivals: CareerHall['rivals'] = {}
     if (isObj(raw.rivals)) {
       for (const id of TEAM_IDS) {
         const r = raw.rivals[id]
-        if (isObj(r)) rivals[id] = { met: count(r.met, 'rival met'), ahead: count(r.ahead, 'rival ahead'), behind: count(r.behind, 'rival behind') } satisfies RivalTally
+        if (isObj(r)) rivals[id] = { met: hallCount(r.met, 'rival met'), ahead: hallCount(r.ahead, 'rival ahead'), behind: hallCount(r.behind, 'rival behind') } satisfies RivalTally
       }
     }
     const drivers: CareerHall['drivers'] = {}
     if (isObj(raw.drivers)) {
       for (const id of DRIVER_IDS) {
         const d = raw.drivers[id]
-        if (isObj(d)) drivers[id] = { raids: count(d.raids, 'driver raids'), wins: count(d.wins, 'driver wins'), podiums: count(d.podiums, 'driver podiums'), first: count(d.first, 'driver first year') } satisfies DriverTally
+        if (isObj(d)) drivers[id] = { raids: hallCount(d.raids, 'driver raids'), wins: hallCount(d.wins, 'driver wins'), podiums: hallCount(d.podiums, 'driver podiums'), first: hallCount(d.first, 'driver first year') } satisfies DriverTally
       }
     }
     const hall: CareerHall = { from: Math.min(from, season), seasons, rivals, drivers }
-    if (raw.ended !== undefined) hall.ended = Math.min(count(raw.ended, 'hall end'), season)
+    if (raw.ended !== undefined) hall.ended = Math.min(hallCount(raw.ended, 'hall end'), season)
     return { hall }
   } catch {
     return {}
   }
+}
+
+/** A whole number of at least 0, or 0 if it isn't one. */
+function count(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0
+}
+
+/**
+ * The trucks' logbooks (added after 1.2, with no new save format: a save
+ * without them gets a fresh log for the truck it has). Only for reading,
+ * like the news: a log or moment that doesn't add up is dropped rather than
+ * failing the save.
+ */
+function isMoment(m: unknown): m is TruckMoment {
+  if (!isObj(m) || !MOMENT_KINDS.includes(m.kind as TruckMoment['kind'])) return false
+  if (typeof m.raid !== 'string' || !Object.hasOwn(RAIDS, m.raid) || typeof m.year !== 'number') return false
+  if (m.kind !== 'broke') return true
+  return FAILURE_KINDS.includes(m.part as FailureKind) && Number.isInteger(m.corner) && (m.corner as number) >= -1 && (m.corner as number) <= 3
+}
+
+function readTrucks(raw: unknown): TruckLog[] {
+  if (!Array.isArray(raw)) return []
+  const out: TruckLog[] = []
+  for (const x of raw) {
+    if (!isObj(x) || !CLASS_IDS.includes(x.cls as ClassId)) continue
+    const n = count(x.n)
+    const bought = count(x.bought)
+    if (n < 1 || bought < FIRST_YEAR) continue
+    const log = newLog(n, x.cls as ClassId, bought)
+    log.sold = typeof x.sold === 'number' && Number.isFinite(x.sold) ? x.sold : null
+    for (const k of ['raids', 'finishes', 'wins', 'podiums', 'longOnes', 'retired', 'km', 'stops', 'parts'] as const) log[k] = k === 'km' ? Math.max(0, Number(x.km) || 0) : count(x[k])
+    log.best = typeof x.best === 'number' && Number.isInteger(x.best) && x.best >= 1 ? x.best : null
+    log.moments = Array.isArray(x.moments)
+      ? x.moments.filter(isMoment).slice(0, LOGBOOK.moments)
+      : []
+    out.push(log)
+  }
+  return out
 }
 
 function readCareer(raw: unknown): CareerState {
@@ -350,7 +391,7 @@ function readCareer(raw: unknown): CareerState {
   const longOne = arrayOf(raw.longOne, 'career Long One wins').map((y) => finite(y, 'career Long One year'))
   // News is only for reading: anything that doesn't look like news is dropped rather than failing the save.
   const news = Array.isArray(raw.news) ? raw.news.filter((n): n is NewsItem => isObj(n) && NEWS_KINDS.includes(n.kind as NewsItem['kind'])) : []
-  return {
+  const career: CareerState = {
     seed: finite(raw.seed, 'career seed') >>> 0,
     season,
     year,
@@ -367,7 +408,11 @@ function readCareer(raw: unknown): CareerState {
     ...(raw.firstLongOne === undefined ? {} : readStory(raw.firstLongOne)),
     ...readHall(raw.hall, season),
     stats: { raids: stats.raids as number, wins: stats.wins as number, podiums: stats.podiums as number, contracts: stats.contracts as number },
+    trucks: readTrucks(raw.trucks),
   }
+  // The garage's truck always has a logbook (a save from before logbooks gets a fresh one).
+  tidyLogs(career)
+  return career
 }
 
 /**
