@@ -97,9 +97,50 @@ The last finished run on each rig, for each class, is saved with the garage
 the live trace and on the report's trace (when it broke the same way), and
 the report compares the two.
 
+## Ghost trucks
+
+Added after 1.0 (Kelbo asked, 26 November 2026). On the washboard ladder
+and the torture loop your **best run** for each class becomes a ghost
+truck you can race; a friend's run can be raced the same way. The shaker
+has nothing to race, so it has no ghost. The dashed line above is still
+the *last* run; the ghost truck is the *best* (or a friend's).
+
+- **What a ghost is.** Just the build and what happened: how far it got,
+  how many laps, what broke and where (`src/sim/ghost.ts`). No recording.
+  The sim is deterministic (seeded roads, no clocks, its own maths in
+  `det.ts`), so the same build on the same loop drives exactly the same
+  run on any phone. A test checks a ghost read back from its code drives
+  the very same run, and that one driven beside another truck ends where it
+  ended alone.
+- **Best.** A finished run (not stopped) that goes further than the best so
+  far replaces it; a tie keeps the old one. The report says "New best here".
+- **Racing.** Pick No ghost, Your best or Friend's ghost under the start
+  button (it starts on your best). The shop starts the ghost's own run
+  beside yours and steps it exactly as many steps as yours each frame, so
+  both are always at the same moment of the run. Every truck drives the
+  same speeds on a loop (the rig sets them), so the race is about lasting:
+  whoever keeps going longer wins. A line under the chart says when the
+  ghost is out, and the report says who went further and by how much.
+- **In 3D.** The ghost is a second copy of the truck with its own parts and
+  ride height, tinted blue and see-through, drawn over everything like an
+  X-ray (it's usually almost exactly where your truck is, so it would
+  otherwise hide inside it). Its own pose log is handed to the view with
+  each clip. Once it breaks it stays where it stopped, showing the flat or
+  the flopped wheel, and drops out of the picture behind you. Colours in
+  `GHOST_LOOK` (`src/data/rigs.ts`).
+- **Sharing.** Share my best ghost turns it into a `BMPG1:` code (see
+  `docs/SAVES.md`) and opens the share sheet, or copies it. Paste a
+  friend's under Share or race a friend's ghost: it's kept for its class
+  and loop, and put on the bench if the career allows that class.
+- **Saved** with the garage, in the save's `ghosts` record under
+  `best:<class>:<rig>` and `friend:<class>:<rig>` (`src/persist/ghost.ts`),
+  so the save format didn't change. Save codes leave them out, like the
+  last-run lines.
+
 ## Tests
 
-`tests/rigs.test.ts`: step by step equals all at once; the history; the
+`tests/ghost.test.ts`: ghosts drive again exactly, best and race results,
+ghost codes. `tests/rigs.test.ts`: step by step equals all at once; the history; the
 trace ending on the breaking step; the ladder getting hotter every lap; the
 shaker finding the bounce and the hop for every class, and stiffer springs
 moving the bounce; every fix jumping somewhere the build screen has.
