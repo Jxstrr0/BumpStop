@@ -34,6 +34,7 @@ import { fromCelsius, msToKmh } from '../sim/units'
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, bandOf, ghostLegend, lineChart, shakerChart, type Band, type Series } from './charts'
 import { el, num } from './dom'
+import { SHOP_EVENT, type ShopEvent } from './events'
 import { jumpTo, type Jump } from './fixes'
 import { lapReport, shakerReport, type LapGhost } from './report'
 import { rigView } from './rigView'
@@ -264,6 +265,8 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
 
   function onFix(jump: Jump): void {
     if (!jumpTo(jump)) return
+    // The first-job guide (plan PR 11b) listens for this.
+    document.dispatchEvent(new CustomEvent<ShopEvent>(SHOP_EVENT, { detail: { kind: 'fix', cls: store.cls(), rig } }))
     rerunGo.textContent = tf('rerun.go', { rig: t(`rig.${rig}` as StringKey).toLowerCase() })
     // Let the scroll start before the bar appears, so the observer doesn't hide it straight away.
     window.setTimeout(() => {
@@ -549,6 +552,8 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
       })
     }
     ghostsChanged()
+    // The first-job guide (plan PR 11b) listens for this: a finished run, not a stopped one.
+    if (!stopped) document.dispatchEvent(new CustomEvent<ShopEvent>(SHOP_EVENT, { detail: { kind: 'run', cls: a.cls, rig: a.kind === 'laps' ? a.rig : 'shaker' } }))
     reportHolder.replaceChildren(report)
     sync()
     const head = report.querySelector<HTMLElement>('.report-head')

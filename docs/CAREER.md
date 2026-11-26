@@ -15,6 +15,8 @@ panel under "The loop") turns the slot into a career: from then on the
 year, the money and the raids follow it. Free-play trucks stay in the slot;
 use another slot to keep playing free.
 
+- **The first-job guide** (plan PR 11b): on the career's first raid, a box
+  at the top walks through the first job step by step. See `docs/HELP.md`.
 - **The status line:** the date, the money (red when broke), the
   reputation, the sponsor, and any Long One wins.
 - **Next raid:** its date, stages and size, then the garage's job:

@@ -650,3 +650,30 @@ input[type='range'] {
 .glossary dt:focus { outline: none; }
 .glossary dd { margin: 2px 0 0; }
 .glossary .see-btn { display: block; width: fit-content; margin-top: 6px; }
+
+/* The first-job guide (plan PR 11b): a highlighted roadbook note at the top of the Career panel. */
+.guide:not([hidden]) {
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 2px solid var(--ink);
+  border-left: 8px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+.guide.folded { padding: 8px 12px; }
+.guide-title { margin: 0; font-family: var(--head); font-size: 22px; text-transform: uppercase; }
+.guide-title:focus { outline: none; }
+.guide .small { margin-top: 4px; }
+.guide-steps { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.guide-head { margin: 0; }
+.guide-mark { font-family: var(--mono); font-weight: 600; display: inline-block; width: 1.2em; }
+.guide-state { font-weight: 600; }
+.guide-step.done .guide-head { color: var(--muted); }
+.guide-step.done .guide-mark { color: var(--cool); }
+.guide-step.now .guide-head { font-weight: 600; }
+.guide-step.now .guide-mark { color: var(--accent-text); }
+.guide-step.later .guide-head { color: var(--muted); }
+.guide-step .btn-row { margin: 8px 0 0; }
+.guide-finished { margin: 12px 0 0; font-weight: 600; }
+.guide > .btn { margin-top: 12px; }
+.guide.folded > .btn { margin-top: 0; }

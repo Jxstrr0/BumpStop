@@ -49,6 +49,34 @@ the part or slider, **Show me** jumps to it. The list is
 `src/data/glossary.ts`; the words are `glossary.<id>` and
 `glossary.<id>Text` in `src/data/strings.ts`.
 
+## The first-job guide (11b)
+
+The career's very first job is a tutorial. While the garage is on its first
+raid (the Winter Sprint since PR 10c), a **Your first job** box sits at the
+top of the Career panel with the steps, each ticking itself off when it's
+done, in any order:
+
+1. **Take privateer #n's job.** The career's first offer is always an old
+   light 4x4 with 85% of the class's test budget, enough for studded tires
+   (`CONTRACTS.firstJob` in `src/data/career.ts`). Every other offer is as
+   it was.
+2. **Fit studded tires** (only when the first raid is a winter one).
+3. **Break it on the test track:** any finished rig run with their truck.
+4. **Read the report, fix it, run it again:** a second finished run.
+5. **Hand it over.**
+6. **Read the results**, with a last word on what comes next.
+
+Only the step being done now opens up, with its words, a **Show me** that
+scrolls to the right button and a **What's ...?** that opens the glossary
+at the word. **Hide the guide** folds it to one button. Taking your own
+truck to the first raid, or sitting it out, puts the guide away.
+
+How far you got (runs, the privateer's number, hidden or not) is kept in
+the browser under `bumpstop.guide`, tied to the career's seed. It isn't in
+the save or the save code: losing it only means the run steps tick again.
+The shop tells the page about finished runs and tapped fixes with an event
+(`src/ui/events.ts`); the guide is `src/ui/tutorial.ts`.
+
 ## Tests
 
 `tests/help.test.ts` checks the toy shows what each lesson says (no damping
@@ -57,3 +85,8 @@ washboard at every step; the factory corner just keeps off the hard limit
 while soft springs or a short bump stop bottom out), that every dial step
 has a number, and that every glossary word has its words and a jump that
 works in every class.
+
+`tests/tutorial.test.ts` checks the first job is always a light 4x4 that can
+afford studded tires (60 careers), that later raids still roll their own
+first offer, and that the guide's steps tick off in order through to the
+results and step aside for your own entry or a skipped raid.

@@ -14,6 +14,9 @@
  * - **The shop:** crew and tools.
  * - **News:** results, winners, who copied whom, new parts, sponsors.
  *
+ * - **The first-job guide** (plan PR 11b, `src/ui/tutorial.ts`): on the
+ *   career's first raid, a list of steps at the top walks through the job.
+ *
  * The career's numbers and rules are all in `src/sim/career.ts`; this file
  * only shows them and calls it. The build screen is locked to the career's
  * truck and year through the build store's bench (`setBench`).
@@ -32,9 +35,11 @@ import {
   type CareerState, type Contract, type EntryProblem, type NewsItem, type Settlement,
 } from '../sim/career'
 import { raidOf, standings, type RaidState } from '../sim/raid'
+import type { GlossaryId } from '../data/glossary'
 import type { BuildStore } from './buildStore'
 import { el, num } from './dom'
 import { ordinal, raidTable, type RaidCareer } from './raid'
+import { firstJobGuide } from './tutorial'
 
 /** What the career needs from the garage: the saved career, and who to tell when it changes. */
 export interface CareerSaves {
@@ -173,11 +178,12 @@ export interface CareerPanel {
   raid: RaidCareer
 }
 
-export function careerPanel(store: BuildStore, saves?: CareerSaves): CareerPanel {
+export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (id: GlossaryId) => void = () => {}): CareerPanel {
   const box = el('section', 'panel career')
   box.id = 'career'
   const body = el('div', 'career-body')
-  box.append(el('h2', '', t('career.title')), body)
+  const guide = firstJobGuide(showTerm)
+  box.append(el('h2', '', t('career.title')), guide.element, body)
 
   let c: CareerState | null = saves?.career ?? null
   /** The raid panel's way in, once it registers. */
@@ -322,6 +328,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves): CareerPanel
   const jobHolder = el('div', 'career-job')
 
   function renderJob(): void {
+    guide.update(c, shown?.settlement ?? null)
     if (!c || driving) return
     const career = c
     jobHolder.replaceChildren()

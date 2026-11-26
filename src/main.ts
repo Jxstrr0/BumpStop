@@ -70,8 +70,8 @@ function gameScreen(app: HTMLElement, garage: Garage): void {
   const store = garage.store
   const reminder = backupReminder(garage)
   // The career goes first: it sets the bench (the build screen's truck and year) before the build screen draws.
-  const career = careerPanel(store, garage.career)
   const help = helpPanel(store)
+  const career = careerPanel(store, garage.career, help.showTerm)
   app.append(
     head,
     ...(reminder ? [reminder] : []),
