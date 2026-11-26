@@ -1093,7 +1093,7 @@ const STRINGS = {
   'log.oldLead': 'Every truck the garage sold, with its logbook.',
   'log.farewell': 'Truck No. {n} is retired after {raids} raids and {km} km. Its logbook stays on the wall under Old trucks.',
   'log.m.win': '{raid} ’{yy}: won it',
-  'log.m.longOne': '{raid} ’{yy}: won the Long One',
+  'log.m.longOne': '{raid} ’{yy}: won it, the whole country',
   'log.m.podium': '{raid} ’{yy}: {pos} place',
   'log.m.firstRaid': '{raid} ’{yy}: first raid, {pos} place',
   'log.m.retired': '{raid} ’{yy}: didn’t finish',
