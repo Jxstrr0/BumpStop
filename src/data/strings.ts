@@ -6,7 +6,7 @@ const STRINGS = {
   'game.name': 'Bump Stop',
   'game.tagline': 'Build a rally truck, find the speed where it breaks, then go racing.',
   'preview.kicker': 'A rally-raid truck builder',
-  'preview.note': 'Nearly 1.0: the build screen, the 3D trucks, the three rigs, the report, the sound, the raids, saves, the career from 1985 to the Whole Damn Country, the help, offline play and photo mode are all in. A last round of names and polish comes before 1.0.',
+  'preview.note': 'Version 1.0: build the truck, break it on the rigs, read why, then run a garage from the Cold Start 300 in 1985 to the Whole Damn Country. Once it has loaded, it plays with no signal.',
 
   'loop.title': 'The loop',
   'loop.build': 'Build it',
