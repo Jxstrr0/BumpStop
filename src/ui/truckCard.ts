@@ -20,15 +20,17 @@ import type { Garage } from '../render/garage'
 import { findPart } from '../sim/build'
 import type { BuildStore } from './buildStore'
 import { el, num } from './dom'
+import { cardLines } from './logbook'
 import { cssVar, pictureName, pngFile, shareFile } from './shareImage'
 import { signedMm, stanceOf } from './truckView'
 
 const W = 1080
 const H = 1350
 const M = 60
-/** The truck's picture on the card (pixels). */
+/** The truck's picture on the card (pixels): a little shorter when the card carries the truck's logbook lines. */
 const SHOT_W = W - 2 * M
-const SHOT_H = 560
+const SHOT_H_FULL = 560
+const SHOT_H_LOG = 440
 /** The parts the card lists, in this order. */
 const CARD_SLOTS: readonly SlotId[] = ['frontSusp', 'rearSusp', 'dampers', 'bumpStops', 'tires', 'axles', 'engine']
 const ADDRESS = 'bumpstop.longlight.games'
@@ -67,9 +69,17 @@ async function prepareCard(): Promise<void> {
   ])
 }
 
+/** How tall the truck's picture is on this store's card. */
+function shotHeight(store: BuildStore): number {
+  return store.bench()?.log?.() ? SHOT_H_LOG : SHOT_H_FULL
+}
+
 /** Draw the card for the store's truck, with `shot` (the 3D truck) if there is one. */
 export function drawCard(store: BuildStore, shot: HTMLCanvasElement | null): HTMLCanvasElement {
   const truck = store.truck()
+  // The garage's own truck in a career carries its logbook: its record and newest moment.
+  const log = store.bench()?.log?.() ?? null
+  const shotH = log ? SHOT_H_LOG : SHOT_H_FULL
   const b = truck.build
   const cls = CLASSES.find((c) => c.id === b.cls)!
   const dark = isDark()
@@ -114,11 +124,11 @@ export function drawCard(store: BuildStore, shot: HTMLCanvasElement | null): HTM
   g.fillRect(M, 190, W - 2 * M, 4)
   const shotY = 214
   g.fillStyle = c.panel
-  g.fillRect(M, shotY, SHOT_W, SHOT_H)
-  if (shot) g.drawImage(shot, M, shotY, SHOT_W, SHOT_H)
+  g.fillRect(M, shotY, SHOT_W, shotH)
+  if (shot) g.drawImage(shot, M, shotY, SHOT_W, shotH)
   g.strokeStyle = c.line
   g.lineWidth = 2
-  g.strokeRect(M + 1, shotY + 1, SHOT_W - 2, SHOT_H - 2)
+  g.strokeRect(M + 1, shotY + 1, SHOT_W - 2, shotH - 2)
 
   // Weight and ride height.
   const s = stanceOf(truck)
@@ -127,12 +137,24 @@ export function drawCard(store: BuildStore, shot: HTMLCanvasElement | null): HTM
   const ride = front === 0 && rear === 0 ? t('card.rideStock') : tf('card.ride', { front: signedMm(front), rear: signedMm(rear) })
   g.font = `400 26px ${MONO}`
   g.fillStyle = c.ink
-  g.fillText(tf('card.weight', { kg: num(truck.mass), min: num(cls.minMass), max: num(cls.maxMass) }), M, shotY + SHOT_H + 44)
+  g.fillText(tf('card.weight', { kg: num(truck.mass), min: num(cls.minMass), max: num(cls.maxMass) }), M, shotY + shotH + 44)
   g.fillStyle = c.muted
-  g.fillText(ride, M, shotY + SHOT_H + 80)
+  g.fillText(ride, M, shotY + shotH + 80)
+  let y = shotY + shotH + 108
+  if (log) {
+    const lines = cardLines(log)
+    g.font = `600 26px ${MONO}`
+    g.fillStyle = c.ink
+    g.fillText(lines.record, M, shotY + shotH + 124, W - 2 * M)
+    if (lines.moment) {
+      g.font = `italic 400 26px ${UI}`
+      g.fillStyle = c.muted
+      g.fillText(lines.moment, M, shotY + shotH + 162, W - 2 * M)
+    }
+    y = shotY + shotH + 188
+  }
 
   // The parts, one roadbook row each.
-  let y = shotY + SHOT_H + 108
   const rowH = 54
   for (const slot of CARD_SLOTS) {
     const part = findPart(b.parts[slot])
@@ -203,7 +225,7 @@ export function truckCardBlock(store: BuildStore, garage: () => Promise<Garage |
   }
 
   function card(): HTMLCanvasElement {
-    return drawCard(store, garageNow()?.snapshot(SHOT_W, SHOT_H) ?? null)
+    return drawCard(store, garageNow()?.snapshot(SHOT_W, shotHeight(store)) ?? null)
   }
 
   /** Redraw the preview (and the build code) for the truck as it stands. */

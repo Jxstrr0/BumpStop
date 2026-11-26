@@ -34,11 +34,13 @@ import {
   sellTruck, setContractBuild, settle, sponsorName, sponsorOf, sponsorPay, takeContract, truckPrice, truckValue, upgradeProblem,
   type CareerState, type Contract, type EntryProblem, type LongOneStory, type NewsItem, type Settlement,
 } from '../sim/career'
+import { ownLog } from '../sim/logbook'
 import { raidOf, standings, type RaidState } from '../sim/raid'
 import type { GlossaryId } from '../data/glossary'
 import type { BuildStore } from './buildStore'
 import { el, num } from './dom'
 import { ordinal, raidTable, type RaidCareer } from './raid'
+import { farewellText, logbookBlock, oldTrucksBlock } from './logbook'
 import { firstJobGuide } from './tutorial'
 
 /** What the career needs from the garage: the saved career, and who to tell when it changes. */
@@ -201,6 +203,8 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
   let firstSync = true
   /** The driver picked for your own entry. */
   let driver: DriverId = 'veteran'
+  /** The goodbye line after selling a truck, shown until the next change. */
+  let farewell = ''
 
   const save = () => saves?.onCareer(c ? structuredClone(c) : null)
 
@@ -238,6 +242,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
         label: tf('career.benchOwn', { cls: className(own.cls).toLowerCase() }),
         reset: () => career.own ?? own,
         note: (b) => ownNote(career, b),
+        log: () => ownLog(career),
       }, key !== benchKey && !keep ? own : undefined)
       benchKey = key
     } else {
@@ -596,6 +601,9 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     const wrap = el('div')
     wrap.append(el('h3', 'raid-sub', t('career.truck')))
     const own = career.own
+    if (farewell) wrap.append(el('p', 'logbook-farewell', farewell))
+    farewell = ''
+    const old = oldTrucksBlock(career)
     if (!own) {
       wrap.append(el('p', 'small', t('career.noTruck')))
       const row = el('div', 'btn-row')
@@ -612,9 +620,13 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
         row.append(b)
       }
       wrap.append(row)
+      if (old) wrap.append(old)
       return wrap
     }
     wrap.append(el('p', 'small', tf('career.truckLine', { cls: className(own.cls), value: money(truckValue(own)) })))
+    const log = logbookBlock(career)
+    if (log) wrap.append(log)
+    if (old) wrap.append(old)
     if (career.job?.kind === 'own') return wrap
     if (isBroke(career)) {
       const cheap = cheapestBuild(own, career.year)
@@ -631,7 +643,9 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
       }
     }
     wrap.append(sureButton(tf('career.sellTruck', { n: money(truckValue(own)) }), t('career.sellTruckSure'), () => {
+      const sold = ownLog(career)
       sellTruck(career)
+      if (sold) farewell = farewellText(sold)
       save()
       syncBench()
       render()
