@@ -1,9 +1,9 @@
 /**
  * Bump Stop's entry point. It opens the garage slot from last time (plan
  * PR 8), then shows one screen: the "roadbook" look (plan PR 0) with the
- * build screen (plan PR 3), the shop's three rigs and the report (plan PR 4),
- * which test the truck, the raids (plan PR 7), which race it, and the saves
- * and backups. Then it hides the loading screen.
+ * career (plan PR 9), the build screen (plan PR 3), the shop's three rigs
+ * and the report (plan PR 4), which test the truck, the raids (plan PR 7),
+ * which race it, and the saves and backups. Then it hides the loading screen.
  */
 import '@fontsource/space-grotesk/latin-500.css'
 import '@fontsource/big-shoulders/latin-700.css'
@@ -13,6 +13,7 @@ import '@fontsource/overpass-mono/latin-600.css'
 import './style.css'
 import { t } from './data/strings'
 import { buildPanel } from './ui/buildScreen'
+import { careerPanel } from './ui/career'
 import { el } from './ui/dom'
 import { openGarage, type Garage } from './ui/garage'
 import { bindLoadingScreen } from './ui/loading'
@@ -58,13 +59,16 @@ function gameScreen(app: HTMLElement, garage: Garage): void {
   head.append(el('p', 'kicker', t('preview.kicker')), h1, el('p', 'tagline', t('game.tagline')))
   const store = garage.store
   const reminder = backupReminder(garage)
+  // The career goes first: it sets the bench (the build screen's truck and year) before the build screen draws.
+  const career = careerPanel(store, garage.career)
   app.append(
     head,
     ...(reminder ? [reminder] : []),
     loopPanel(),
+    career.element,
     buildPanel(store),
     shopPanel(store, garage.shop),
-    raidPanel(store, garage.raid),
+    raidPanel(store, garage.raid, career.raid),
     savesPanel(garage),
     roadbookStrip(),
     el('p', 'note', t('preview.note')),

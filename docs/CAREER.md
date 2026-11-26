@@ -5,7 +5,51 @@ How the career works, in plain words. The code is in `src/sim/career.ts`
 and `src/sim/teams.ts` (the rival teams and their trucks). Every number is
 in `src/data/career.ts`.
 
-Part 9a is the sim, the save and the tests. Part 9b adds the screens.
+Part 9a is the sim, the save and the tests. Part 9b adds the screens
+(`src/ui/career.ts`).
+
+## The screens (9b)
+
+The career lives in a save slot. **Start a career in 1985** (on the Career
+panel under "The loop") turns the slot into a career: from then on the
+year, the money and the raids follow it. Free-play trucks stay in the slot;
+use another slot to keep playing free.
+
+- **The status line:** the date, the money (red when broke), the
+  reputation, the sponsor, and any Long One wins.
+- **Next raid:** its date, stages and size, then the garage's job:
+  - **Prep a privateer's truck:** three offers (the ones you haven't the
+    reputation for are greyed out). Take one and the build screen locks to
+    their class and budget, with a line at the top saying whose truck it is.
+    Build it until it's legal, then **Hand it over**: the privateer races
+    it there and then, a stage at a time, and the results card shows the
+    table, the fee and the bonus. **Give the contract back** (tap twice)
+    lets it go.
+  - **Enter your own truck:** pick a driver; the fees, the sponsor's money,
+    the prize money and anything stopping you are listed. **Enter the raid**
+    hands over to the Raids panel below, which runs it as usual. At the end
+    (or if you retire), **Back to the garage** brings you back here to the
+    results: prize money, repairs, spares and reputation.
+  - **Sit this one out** (tap twice).
+- **The calendar** for the year (folded away).
+- **Your truck:** buy one (stock, at its price), sell it (tap twice), and
+  when broke, sell its parts down to the cheapest for money back.
+- **The shop:** crew and tools, with what each needs.
+- **News:** your results, who copied whom, new parts, sponsors; and your
+  record.
+
+**The build screen in the career.** The class and the year are locked to
+the truck on the bench:
+
+- a **contract** truck is built against the privateer's budget;
+- **your own truck:** settings are free and kept as you tune; changing a
+  part shows what it costs (new part less half the old one's price) against
+  the bank, with a **Buy these parts** button. You can't enter with parts you
+  haven't bought. **Reset** puts your truck back as you own it.
+- **no truck yet:** look at the parts, nothing to buy.
+
+This goes through the build store's bench (`setBench` in
+`src/ui/buildStore.ts`).
 
 ## The shape of it
 
@@ -150,8 +194,6 @@ roads and the contracts keep changing.
 
 ## What's not here yet
 
-- **The screens** (9b): the garage, the calendar, contracts, the bank and
-  the news.
 - **Winter raids** (plan PR 10).
 - **Names** for the money, the raids, the sponsors, the drivers and the
   privateers: all working names until Kelbo picks.

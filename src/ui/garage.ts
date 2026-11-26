@@ -19,6 +19,7 @@ import { keepStorage } from '../persist/safety'
 import { activeSlot, listSlots, setActiveSlot, writeSlot, type SlotNo, type SlotView } from '../persist/slots'
 import type { RaidState } from '../sim/raid'
 import { makeBuildStore, type BuildStore } from './buildStore'
+import type { CareerSaves } from './career'
 import type { RaidSaves } from './raid'
 import type { ShopSaves } from './shop'
 
@@ -32,6 +33,7 @@ export interface Garage {
   store: BuildStore
   shop: ShopSaves
   raid: RaidSaves
+  career: CareerSaves
   /** The garage as it stands now. */
   current(): GarageSave
   status(): SaveStatus
@@ -57,8 +59,7 @@ export async function openGarage(): Promise<Garage> {
   const store = makeBuildStore({ builds: start.builds, cls: start.cls, year: start.year })
   let ghosts = start.ghosts
   let raid: RaidState | null = start.raid
-  // The career (plan PR 9) is carried through untouched until its screens arrive (9b).
-  const career = start.career
+  let career = start.career
   let status: SaveStatus = writable ? (view.empty ? { kind: 'idle' } : { kind: 'saved', at: view.savedAt }) : { kind: 'readOnly' }
   const listeners: ((s: SaveStatus) => void)[] = []
   let timer = 0
@@ -117,6 +118,13 @@ export async function openGarage(): Promise<Garage> {
       raid: start.raid,
       onRaid(r) {
         raid = r
+        changed()
+      },
+    },
+    career: {
+      career: start.career,
+      onCareer(next) {
+        career = next
         changed()
       },
     },

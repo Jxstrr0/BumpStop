@@ -7,10 +7,29 @@
 import { CLASSES, type ClassId } from '../data/classes'
 import type { TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR } from '../data/parts'
-import { buildTruck, stockBuild, tidyBuild, type BuiltTruck } from '../sim/build'
+import { buildTruck, shopRules, stockBuild, tidyBuild, type BuildRules, type BuiltTruck } from '../sim/build'
 
 /** What changed: the class (or year) means redraw everything; a part or setting just the numbers. */
-export type Change = 'class' | 'year' | 'part' | 'setting'
+export type Change = 'class' | 'year' | 'part' | 'setting' | 'bench'
+
+/**
+ * The career's hold on the bench (plan PR 9): whose truck it is, the class
+ * and year it's locked to, and the rules it's built under (a privateer's
+ * budget, or your own money with the parts you own). Null in free play.
+ */
+export interface Bench {
+  kind: 'contract' | 'own' | 'shop'
+  /** Locked to this class, or null to let the player pick (window shopping with no truck yet). */
+  cls: ClassId | null
+  year: number
+  rules(b: TruckBuild): BuildRules
+  /** A line at the top of the build screen saying whose truck this is. */
+  label: string
+  /** What "Reset" puts back (your own truck as you own it, say); stock if left out. */
+  reset?(): TruckBuild
+  /** A note and maybe a button under the money line (e.g. "Buy these parts"), checked after every change. */
+  note?(b: TruckBuild): { text: string; button?: { text: string; run(): void } } | null
+}
 
 export interface BuildStore {
   cls(): ClassId
@@ -25,6 +44,12 @@ export interface BuildStore {
   onChange(fn: (change: Change) => void): void
   /** Every class's build, for saving. */
   builds(): Record<ClassId, TruckBuild>
+  /** The career's hold on the bench, or null in free play. */
+  bench(): Bench | null
+  /** Lock the bench for the career (or free it with null); with a build, put that truck on it. */
+  setBench(bench: Bench | null, b?: TruckBuild): void
+  /** The rules the truck on the bench is built under. */
+  rules(): BuildRules
 }
 
 /** Where a store starts: a saved garage's builds, class and year. */
@@ -41,6 +66,7 @@ export function makeBuildStore(start?: StoreStart): BuildStore {
   let cls: ClassId = start?.cls ?? 'light4x4'
   let year = start?.year ?? FIRST_YEAR
   let built: BuiltTruck | null = null
+  let bench: Bench | null = null
   const listeners: ((change: Change) => void)[] = []
 
   function changed(change: Change): void {
@@ -54,11 +80,12 @@ export function makeBuildStore(start?: StoreStart): BuildStore {
     truck: () => (built ??= buildTruck(builds[cls])),
     year: () => year,
     setClass(next) {
-      if (next === cls) return
+      if (next === cls || (bench?.cls && bench.cls !== next)) return
       cls = next
       changed('class')
     },
     setYear(next) {
+      if (bench) return
       year = next
       changed('year')
     },
@@ -67,12 +94,23 @@ export function makeBuildStore(start?: StoreStart): BuildStore {
       changed(change)
     },
     resetClass() {
-      builds[cls] = stockBuild(cls)
+      builds[cls] = bench?.reset ? tidyBuild(bench.reset()) : stockBuild(cls)
       changed('part')
     },
     onChange(fn) {
       listeners.push(fn)
     },
     builds: () => ({ ...builds }),
+    bench: () => bench,
+    setBench(next, b) {
+      bench = next
+      if (next) {
+        year = next.year
+        if (next.cls) cls = next.cls
+      }
+      if (b) builds[b.cls] = tidyBuild(b)
+      changed('bench')
+    },
+    rules: () => (bench ? bench.rules(builds[cls]) : shopRules(cls, year)),
   }
 }

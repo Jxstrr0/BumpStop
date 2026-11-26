@@ -10,7 +10,7 @@ import { CLASSES } from '../data/classes'
 import { KITS, TUNE, type AxleSettings } from '../data/kit'
 import { SLOTS, type Part, type SlotId } from '../data/parts'
 import { t, tf, type StringKey } from '../data/strings'
-import { checkBuild, minPressure, partIn, partsFor, shopRules, type BuildProblem, type CornerGeometry } from '../sim/build'
+import { changeCost, checkBuild, minPressure, partIn, partsFor, type BuildProblem, type CornerGeometry } from '../sim/build'
 import { FIRST_YEAR, LAST_YEAR, type BuildStore } from './buildStore'
 import { shareBuildBlock } from './saves'
 import { el, num } from './dom'
@@ -141,7 +141,10 @@ export function buildPanel(store: BuildStore): HTMLElement {
   const moneyFill = el('div', 'sum-fill')
   moneyBar.append(moneyFill)
   const problems = el('ul', 'problems')
-  summary.append(weightLine, weightBar, moneyLine, moneyBar, problems)
+  // The career's note under the money (plan PR 9): e.g. what the changes cost, and "Buy these parts".
+  const benchNote = el('div', 'bench-note')
+  summary.append(weightLine, weightBar, moneyLine, moneyBar, problems, benchNote)
+  const benchLabel = el('p', 'bench-label')
 
   const partsHolder = el('div', 'slots')
   const tuneHolder = el('div', 'tune')
@@ -157,7 +160,8 @@ export function buildPanel(store: BuildStore): HTMLElement {
     const b = store.build()
     const truck = store.truck()
     const cls = CLASSES.find((c) => c.id === b.cls)!
-    const found = checkBuild(b, shopRules(b.cls, store.year()))
+    const rules = store.rules()
+    const found = checkBuild(b, rules)
 
     // Weight: the window shaded on a bar from 10% under to 10% over, with a mark for the truck.
     const lo = cls.minMass * 0.9
@@ -178,15 +182,30 @@ export function buildPanel(store: BuildStore): HTMLElement {
       el('span', `chip ${wBand}`, t(heavy ? 'build.tooHeavy' : light ? 'build.tooLight' : 'build.inWindow')),
     )
 
-    const budget = shopRules(b.cls, store.year()).budget
-    const over = truck.cost > budget
-    moneyFill.style.width = `${Math.min(100, (truck.cost / budget) * 100)}%`
+    const budget = rules.budget
+    // Your own truck (career): only the changes cost money, against what's in the bank.
+    const spend = rules.owned ? changeCost(rules.owned.build, b, rules.owned.resale, rules.owned.discount) : truck.cost
+    const over = found.some((p) => p.kind === 'overBudget')
+    moneyFill.style.width = `${budget > 0 ? Math.min(100, Math.max(0, (spend / budget) * 100)) : spend > 0 ? 100 : 0}%`
     moneyFill.className = `sum-fill ${over ? 'hot' : 'cool'}`
     moneyLine.replaceChildren(
-      el('span', 'label', t('build.budget')),
-      ` ${tf('build.of', { n: num(truck.cost), total: num(budget) })} `,
+      el('span', 'label', t(rules.owned ? 'build.changes' : 'build.budget')),
+      ` ${rules.owned
+        ? tf(spend < 0 ? 'build.refund' : 'build.spend', { n: num(Math.abs(spend)), total: num(budget) })
+        : tf('build.of', { n: num(truck.cost), total: num(budget) })} `,
       el('span', `chip ${over ? 'hot' : 'cool'}`, t(over ? 'build.overBudget' : 'build.inBudget')),
     )
+    const note = store.bench()?.note?.(b) ?? null
+    benchNote.replaceChildren()
+    if (note) {
+      benchNote.append(el('p', 'small', note.text))
+      if (note.button) {
+        const action = el('button', 'btn start-btn', note.button.text)
+        action.type = 'button'
+        action.addEventListener('click', note.button.run)
+        benchNote.append(action)
+      }
+    }
 
     problems.replaceChildren()
     for (const p of found) problems.append(el('li', '', problemText(p, store)))
@@ -284,11 +303,20 @@ export function buildPanel(store: BuildStore): HTMLElement {
   /** Rebuild the class, part and tune sections, keeping open sections open and focus where it was. */
   function render(): void {
     const b = store.build()
-    for (const { id, b: button } of classButtons) button.setAttribute('aria-pressed', String(id === b.cls))
+    const bench = store.bench()
+    for (const { id, b: button } of classButtons) {
+      button.setAttribute('aria-pressed', String(id === b.cls))
+      // The career locks the class to the truck on the bench.
+      button.disabled = !!bench?.cls && bench.cls !== id
+    }
     const cls = CLASSES.find((c) => c.id === b.cls)!
     blurb.textContent = t(cls.blurb)
     yearInput.value = String(store.year())
     yearOut.textContent = String(store.year())
+    yearInput.disabled = bench !== null
+    yearNote.textContent = t(bench ? 'build.yearCareer' : 'build.yearNote')
+    benchLabel.textContent = bench?.label ?? ''
+    benchLabel.hidden = !bench
 
     const openSlots = new Set([...partsHolder.querySelectorAll<HTMLDetailsElement>('details[open]')].map((d) => d.dataset.slot))
     const openEnds = new Set([...tuneHolder.querySelectorAll<HTMLDetailsElement>('details[open]')].map((d) => d.dataset.end))
@@ -309,7 +337,8 @@ export function buildPanel(store: BuildStore): HTMLElement {
   }
 
   store.onChange((change) => (change === 'setting' ? refresh() : render()))
-  box.append(classRow, blurb, truckView(store), yearRow, el('p', 'small', t('build.yearNote')), summary, partsHolder, tuneHolder, reset, shareBuildBlock(store))
+  const yearNote = el('p', 'small', t('build.yearNote'))
+  box.append(benchLabel, classRow, blurb, truckView(store), yearRow, yearNote, summary, partsHolder, tuneHolder, reset, shareBuildBlock(store))
   render()
   return box
 }
