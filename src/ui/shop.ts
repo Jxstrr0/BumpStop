@@ -47,9 +47,38 @@ const LIVE_CHANNELS: readonly LiveChannel[] = ['oil', 'travel', 'wear']
 const LIVE_LABEL: Record<LiveChannel, StringKey> = { oil: 'live.oil', travel: 'live.travel', wear: 'live.wear' }
 const LIVE_TITLE: Record<LiveChannel, StringKey> = { oil: 'live.chOil', travel: 'live.chTravel', wear: 'live.chWear' }
 
-/** The last run on a rig, kept for the ghost line and the report's comparison. In memory until saves (plan PR 8). */
+/** The last run on a rig, kept for the ghost line and the report's comparison, and saved with the garage (plan PR 8). */
 type LapGhostRun = LapGhost & { history: RunHistory }
 type Ghost = LapGhostRun | { kind: 'shaker'; points: ShakerPoint[] }
+
+/** What the shop needs from the garage: the saved ghosts, and who to tell when one changes. */
+export interface ShopSaves {
+  ghosts: Record<string, unknown>
+  onGhosts(ghosts: Record<string, unknown>): void
+}
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+const isNums = (v: unknown): v is number[] => Array.isArray(v) && v.every((x) => typeof x === 'number')
+
+/**
+ * A saved ghost, checked enough that the charts and the report can't trip
+ * over it. Anything odd is dropped: a ghost is only there for comparing.
+ */
+function readGhost(raw: unknown): Ghost | null {
+  if (!isObj(raw)) return null
+  if (raw.kind === 'shaker') {
+    const ok = Array.isArray(raw.points) && raw.points.every((p) => isObj(p) && typeof p.freq === 'number' && isNums(p.body) && p.body.length === 2 && isNums(p.wheel) && p.wheel.length === 2)
+    return ok ? (raw as Ghost) : null
+  }
+  if (raw.kind !== 'laps') return null
+  const h = raw.history
+  if (!isObj(h) || !(['distance', 'lap', 'oil', 'travel', 'wear'] as const).every((k) => isNums(h[k]))) return null
+  if (![raw.brokenLap, raw.laps, raw.lastSpeed].every((x) => typeof x === 'number') || typeof raw.stopped !== 'boolean') return null
+  if (raw.broken !== null && !isObj(raw.broken)) return null
+  const tr = raw.trace
+  if (tr !== null && !(isObj(tr) && isNums(tr.t) && isNums(tr.distance) && isObj(tr.channels))) return null
+  return raw as Ghost
+}
 
 type Active =
   | { kind: 'laps'; rig: RigId; cls: ClassId; truck: BuiltTruck; runner: LapRunner; ghost: LapGhostRun | null }
@@ -75,13 +104,21 @@ function cornerWear(r: LapRunner, i: number): number {
   return Math.max(w.bottoming[i]!.damage, w.mount[i]!.damage, w.axle[i]!.damage, w.tire[i]!.damage)
 }
 
-export function shopPanel(store: BuildStore): HTMLElement {
+export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
   const box = el('section', 'panel shop')
   box.id = 'shop'
   box.append(el('h2', '', t('shop.title')), el('p', 'lead', t('shop.lead')))
 
   const ghosts = new Map<string, Ghost>()
   const ghostKey = (cls: ClassId, rig: ShopRigId) => `${cls}:${rig}`
+  // Ghosts from the saved garage, only for a class and rig that exist.
+  for (const c of CLASSES) {
+    for (const r of SHOP_RIGS) {
+      const g = readGhost(saves?.ghosts[ghostKey(c.id, r)])
+      if (g) ghosts.set(ghostKey(c.id, r), g)
+    }
+  }
+  const ghostsChanged = () => saves?.onGhosts(Object.fromEntries(ghosts))
   let rig: ShopRigId = 'washboardLadder'
   let active: Active | null = null
   let raf = 0
@@ -511,6 +548,7 @@ export function shopPanel(store: BuildStore): HTMLElement {
         history: run.history,
       })
     }
+    ghostsChanged()
     reportHolder.replaceChildren(report)
     sync()
     const head = report.querySelector<HTMLElement>('.report-head')

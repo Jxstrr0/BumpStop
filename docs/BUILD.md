@@ -86,8 +86,8 @@ weak mounts, soft frame) had to be weaker to break first
 ## The build screen
 
 `src/ui/buildScreen.ts`, with the truck on the bench kept in
-`src/ui/buildStore.ts` (one build per class, in memory until saves arrive in
-plan PR 8). Class buttons and a year slider at the top; weight and money
+`src/ui/buildStore.ts` (one build per class, saved with the garage since plan PR 8,
+`docs/SAVES.md`). Class buttons and a year slider at the top; weight and money
 pinned in a strip that stays in sight while scrolling, with the problems
 listed under it; a row per slot that opens to its choices; then the front
 and rear axle's sliders. Only the adjusters a part has get a slider. The

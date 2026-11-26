@@ -12,6 +12,7 @@ import { SLOTS, type Part, type SlotId } from '../data/parts'
 import { t, tf, type StringKey } from '../data/strings'
 import { checkBuild, minPressure, partIn, partsFor, shopRules, type BuildProblem, type CornerGeometry } from '../sim/build'
 import { FIRST_YEAR, LAST_YEAR, type BuildStore } from './buildStore'
+import { shareBuildBlock } from './saves'
 import { el, num } from './dom'
 import { truckView } from './truckView'
 
@@ -308,7 +309,7 @@ export function buildPanel(store: BuildStore): HTMLElement {
   }
 
   store.onChange((change) => (change === 'setting' ? refresh() : render()))
-  box.append(classRow, blurb, truckView(store), yearRow, el('p', 'small', t('build.yearNote')), summary, partsHolder, tuneHolder, reset)
+  box.append(classRow, blurb, truckView(store), yearRow, el('p', 'small', t('build.yearNote')), summary, partsHolder, tuneHolder, reset, shareBuildBlock(store))
   render()
   return box
 }

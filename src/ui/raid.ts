@@ -14,7 +14,9 @@
  * 5. **The bivouac:** pick jobs for the night within the hours and spares.
  * 6. **Final results** after the last stage.
  *
- * The raid lives in memory until saves arrive (plan PR 8).
+ * Saves (plan PR 8): the raid goes into the garage each morning, after each
+ * stage and at the end, so a reload comes back to that screen. A reload in
+ * the middle of a stage starts that stage again from its morning.
  */
 import { CLASSES } from '../data/classes'
 import { SPARE_IDS, type SpareId } from '../data/parts'
@@ -120,7 +122,13 @@ function picker<T extends string>(ids: readonly T[], label: (id: T) => string, c
   return row
 }
 
-export function raidPanel(store: BuildStore): HTMLElement {
+/** What the raid needs from the garage: the saved raid, and who to tell when it moves on. */
+export interface RaidSaves {
+  raid: RaidState | null
+  onRaid(raid: RaidState | null): void
+}
+
+export function raidPanel(store: BuildStore, saves?: RaidSaves): HTMLElement {
   const box = el('section', 'panel raid')
   box.id = 'raid'
   box.append(el('h2', '', t('raidUi.title')), el('p', 'lead', t('raidUi.lead')))
@@ -135,6 +143,8 @@ export function raidPanel(store: BuildStore): HTMLElement {
   let timer = 0
   let raf = 0
   const view3d = raidView()
+  /** Hand the garage a copy, so a stage driven after this can't change what's saved. */
+  const saveRaid = () => saves?.onRaid(state ? structuredClone(state) : null)
 
   function stopTimers(): void {
     window.clearTimeout(timer)
@@ -146,7 +156,11 @@ export function raidPanel(store: BuildStore): HTMLElement {
     body.replaceChildren(...nodes)
   }
 
+  /** True while putting a saved raid back on screen at page load: no focus jump or scroll then. */
+  let restoring = false
+
   function focusHead(node: HTMLElement): void {
+    if (restoring) return
     node.tabIndex = -1
     node.focus({ preventScroll: true })
     box.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
@@ -156,7 +170,9 @@ export function raidPanel(store: BuildStore): HTMLElement {
 
   function entryScreen(): void {
     stopTimers()
+    const hadRaid = state !== null
     state = null
+    if (hadRaid) saveRaid()
     run = null
     const raidText = el('p', 'small')
     const driverText = el('p', 'small')
@@ -240,6 +256,7 @@ export function raidPanel(store: BuildStore): HTMLElement {
 
   function morningScreen(): void {
     stopTimers()
+    saveRaid()
     const s = state!
     const raid = raidOf(s)
     const spec = raid.stages[s.stage]!
@@ -522,6 +539,7 @@ export function raidPanel(store: BuildStore): HTMLElement {
 
   function resultsScreen(rec: StageRecord, late: boolean): void {
     stopTimers()
+    saveRaid()
     const s = state!
     const n = s.results.length
     const day = standings(s, n - 1)
@@ -637,6 +655,16 @@ export function raidPanel(store: BuildStore): HTMLElement {
     if (!state) entryScreen()
   })
 
-  entryScreen()
+  // Back to where the saved raid was: the morning, the bivouac, or the final results.
+  if (saves?.raid) {
+    restoring = true
+    state = saves.raid
+    raidId = state.entry.raid
+    driver = state.entry.driver
+    if (state.phase === 'morning') morningScreen()
+    else if (state.phase === 'bivouac') bivouacScreen()
+    else finalScreen()
+    restoring = false
+  } else entryScreen()
   return box
 }

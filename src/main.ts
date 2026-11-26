@@ -1,8 +1,9 @@
 /**
- * Bump Stop's entry point. For now it shows one screen: a preview of the
- * "roadbook" look (plan PR 0) with the build screen (plan PR 3) and the shop's
- * three rigs and the report (plan PR 4), which test the truck on it, and the
- * raids (plan PR 7), which race it. Then it hides the loading screen.
+ * Bump Stop's entry point. It opens the garage slot from last time (plan
+ * PR 8), then shows one screen: the "roadbook" look (plan PR 0) with the
+ * build screen (plan PR 3), the shop's three rigs and the report (plan PR 4),
+ * which test the truck, the raids (plan PR 7), which race it, and the saves
+ * and backups. Then it hides the loading screen.
  */
 import '@fontsource/space-grotesk/latin-500.css'
 import '@fontsource/big-shoulders/latin-700.css'
@@ -12,11 +13,12 @@ import '@fontsource/overpass-mono/latin-600.css'
 import './style.css'
 import { t } from './data/strings'
 import { buildPanel } from './ui/buildScreen'
-import { makeBuildStore } from './ui/buildStore'
 import { el } from './ui/dom'
+import { openGarage, type Garage } from './ui/garage'
 import { bindLoadingScreen } from './ui/loading'
 import { roadbookStrip } from './ui/preview'
 import { raidPanel } from './ui/raid'
+import { backupReminder, savesPanel } from './ui/saves'
 import { shopPanel } from './ui/shop'
 
 const loading = bindLoadingScreen()
@@ -49,31 +51,40 @@ function loopPanel(): HTMLElement {
   return box
 }
 
-function previewScreen(app: HTMLElement): void {
+function gameScreen(app: HTMLElement, garage: Garage): void {
   const head = el('header', 'title')
   const h1 = el('h1')
   h1.append(el('span', 'hi', t('game.name')))
   head.append(el('p', 'kicker', t('preview.kicker')), h1, el('p', 'tagline', t('game.tagline')))
-  const store = makeBuildStore()
+  const store = garage.store
+  const reminder = backupReminder(garage)
   app.append(
     head,
+    ...(reminder ? [reminder] : []),
     loopPanel(),
     buildPanel(store),
-    shopPanel(store),
-    raidPanel(store),
+    shopPanel(store, garage.shop),
+    raidPanel(store, garage.raid),
+    savesPanel(garage),
     roadbookStrip(),
     el('p', 'note', t('preview.note')),
     footer(),
   )
 }
 
-try {
-  const app = document.getElementById('app')
-  if (!app) throw new Error('No #app element')
-  loading.progress(0.6)
-  previewScreen(app)
-  loading.done()
-} catch (err) {
-  console.error(err)
-  loading.fail(t('boot.failed'))
+async function boot(): Promise<void> {
+  try {
+    const app = document.getElementById('app')
+    if (!app) throw new Error('No #app element')
+    loading.progress(0.4)
+    const garage = await openGarage()
+    loading.progress(0.6)
+    gameScreen(app, garage)
+    loading.done()
+  } catch (err) {
+    console.error(err)
+    loading.fail(t('boot.failed'))
+  }
 }
+
+void boot()

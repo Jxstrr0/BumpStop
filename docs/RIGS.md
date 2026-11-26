@@ -92,8 +92,8 @@ adjuster).
 
 ## Ghost runs
 
-The last finished run on each rig, for each class, stays in memory (until
-saves arrive in plan PR 8). The next run draws it as a faint dashed line on
+The last finished run on each rig, for each class, is saved with the garage
+(plan PR 8, `docs/SAVES.md`), so it survives a reload. The next run draws it as a faint dashed line on
 the live trace and on the report's trace (when it broke the same way), and
 the report compares the two.
 
