@@ -20,8 +20,8 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
 - The shop's three rigs (and how fast they play on screen):
   `src/data/rigs.ts`. The crew chief's notes and the report's words:
   `src/data/strings.ts`. In plain words: `docs/RIGS.md`.
-- The 3D trucks: `scripts/blender/make-trucks.py` builds them (sizes,
-  colours, bodies) into `public/models/`. Run it again after a change; how
+- The 3D trucks and every part you can bolt on: `scripts/blender/make-trucks.py`
+  builds them (sizes, colours, bodies, parts) into `public/models/`. Run it again after a change; how
   is at the top of the script and in `docs/3D.md`.
 - How it sounds (engine voices, gears, how loud each sound is, the buzz
   patterns): `src/data/sound.ts`. In plain words: `docs/SOUND.md`.
