@@ -26,7 +26,7 @@ import { RAIDS } from '../data/raids'
 import { t, tf, type StringKey } from '../data/strings'
 import { partIn } from '../sim/build'
 import { isFirstRaid, nextEvent, offers, type CareerState, type Settlement } from '../sim/career'
-import { el } from './dom'
+import { el, reveal } from './dom'
 import { jumpTo } from './fixes'
 import { SHOP_EVENT, type ShopEvent } from './events'
 
@@ -112,7 +112,7 @@ function smooth(): ScrollBehavior {
 
 function flash(node: Element | null): void {
   if (!(node instanceof HTMLElement)) return
-  node.scrollIntoView({ behavior: smooth(), block: 'center' })
+  reveal(node, { behavior: smooth(), block: 'center' })
   node.classList.remove('jumped')
   void node.offsetWidth
   node.classList.add('jumped')
@@ -214,7 +214,7 @@ export function firstJobGuide(showTerm: (id: GlossaryId) => void): Guide {
 
   /** Back to the guide: scroll it into view and put focus on its title. */
   function openGuide(): void {
-    box.scrollIntoView({ behavior: smooth(), block: 'start' })
+    reveal(box, { behavior: smooth(), block: 'start' })
     box.querySelector<HTMLElement>('h3')?.focus({ preventScroll: true })
   }
 

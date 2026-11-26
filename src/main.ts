@@ -4,8 +4,9 @@
  * career (plan PR 9), the build screen (plan PR 3), the shop's three rigs
  * and the report (plan PR 4), which test the truck, the raids (plan PR 7),
  * which race it, the saves and backups, the help (plan PR 11), and the
- * settings (graphics and offline play, plan PR 12). Then it hides the
- * loading screen and starts the offline worker.
+ * settings (graphics and offline play, plan PR 12), split over the bottom
+ * tabs (`src/ui/tabs.ts`). Then it hides the loading screen and starts the
+ * offline worker.
  */
 import '@fontsource/space-grotesk/latin-500.css'
 import '@fontsource/big-shoulders/latin-700.css'
@@ -16,7 +17,7 @@ import './style.css'
 import { t } from './data/strings'
 import { buildPanel } from './ui/buildScreen'
 import { careerPanel } from './ui/career'
-import { el } from './ui/dom'
+import { el, reveal } from './ui/dom'
 import { openGarage, type Garage } from './ui/garage'
 import { helpPanel } from './ui/help'
 import { bindLoadingScreen } from './ui/loading'
@@ -26,6 +27,7 @@ import { raidPanel } from './ui/raid'
 import { backupReminder, savesPanel } from './ui/saves'
 import { settingsPanel } from './ui/settings'
 import { shopPanel } from './ui/shop'
+import { makeTabs } from './ui/tabs'
 
 const loading = bindLoadingScreen()
 
@@ -57,7 +59,7 @@ function loopPanel(help: HTMLElement): HTMLElement {
   const pointer = el('p', 'small help-pointer', t('help.pointer'))
   const go = el('button', 'btn small-btn', t('help.toHelp'))
   go.type = 'button'
-  go.addEventListener('click', () => help.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  go.addEventListener('click', () => reveal(help, { behavior: 'smooth', block: 'start' }))
   box.append(list, pointer, go)
   return box
 }
@@ -72,21 +74,15 @@ function gameScreen(app: HTMLElement, garage: Garage): void {
   // The career goes first: it sets the bench (the build screen's truck and year) before the build screen draws.
   const help = helpPanel(store)
   const career = careerPanel(store, garage.career, help.showTerm)
-  app.append(
-    head,
-    ...(reminder ? [reminder] : []),
-    loopPanel(help.element),
-    career.element,
-    buildPanel(store),
-    shopPanel(store, garage.shop),
-    raidPanel(store, garage.raid, career.raid),
-    savesPanel(garage),
-    help.element,
-    settingsPanel(),
-    roadbookStrip(),
-    el('p', 'note', t('preview.note')),
-    footer(),
-  )
+  // The bottom tabs: one area of the game on screen at a time (Kelbo asked, 26 November 2026).
+  const tabs = makeTabs(app, {
+    career: [head, ...(reminder ? [reminder] : []), loopPanel(help.element), career.element],
+    build: [buildPanel(store)],
+    test: [shopPanel(store, garage.shop)],
+    raid: [raidPanel(store, garage.raid, career.raid)],
+    more: [help.element, savesPanel(garage), settingsPanel(), roadbookStrip(), el('p', 'note', t('preview.note'))],
+  })
+  app.append(footer(), tabs.bar)
 }
 
 async function boot(): Promise<void> {

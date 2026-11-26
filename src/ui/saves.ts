@@ -22,7 +22,7 @@ import { hasProgress } from '../persist/save'
 import { clearSlotPhotos } from '../persist/album'
 import { deleteSlot, slotSummary, type SlotView } from '../persist/slots'
 import type { BuildStore } from './buildStore'
-import { el } from './dom'
+import { el, reveal } from './dom'
 import type { Garage, SaveStatus } from './garage'
 
 const className = (cls: ClassId) => t(CLASSES.find((c) => c.id === cls)!.name)
@@ -324,7 +324,7 @@ export function backupReminder(garage: Garage): HTMLElement | null {
   now.addEventListener('click', () => {
     bar.remove()
     const copy = document.getElementById('save-copy')
-    copy?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' })
+    if (copy) reveal(copy, { behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' })
     copy?.focus({ preventScroll: true })
   })
   const later = button(t('remind.later'), 'btn')
