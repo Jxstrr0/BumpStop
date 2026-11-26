@@ -29,7 +29,7 @@ use another slot to keep playing free.
     lets it go.
   - **Enter your own truck:** pick a driver; the fees, the sponsor's money,
     the prize money and anything stopping you are listed. **Enter the raid**
-    hands over to the Raids panel below, which runs it as usual. At the end
+    hands over to the Raids panel on the Raid tab, which runs it as usual. At the end
     (or if you retire), **Back to the garage** brings you back here to the
     results: prize money, repairs, spares and reputation.
   - **Sit this one out** (tap twice).

@@ -10,7 +10,7 @@ Part 7a is the sim and its tests. Part 7b adds the screens
 
 ## The screens
 
-The Raids panel sits under the shop and moves through the raid:
+The Raids panel sits on the Raid tab and moves through the raid:
 
 1. **Entry:** pick the raid and the driver. The truck is the one on the
    build screen and must pass the build rules; it says what spares are on

@@ -54,3 +54,27 @@ export function oneOpenAtATime(details: HTMLDetailsElement, group: string): void
     tappedAt = null
   })
 }
+
+/** Set by the bottom tabs (`tabs.ts`): brings up the tab a node lives in. Does nothing until they're made. */
+let showTabOf: (node: Element) => void = () => {}
+
+export function setTabFinder(finder: (node: Element) => void): void {
+  showTabOf = finder
+}
+
+/**
+ * Take the player to a node anywhere in the game: switch to the tab it lives
+ * in, then scroll it into view. Use it for jumps the player asked for (a
+ * button that goes to another area); a screen scrolling within its own area
+ * by itself keeps plain `scrollIntoView`, so a raid finishing in the
+ * background never pulls the player off the tab they're on.
+ */
+export function reveal(node: Element, options: ScrollIntoViewOptions = {}): void {
+  showTabOf(node)
+  node.scrollIntoView(options)
+}
+
+/** Bring up the tab a node lives in, without scrolling. */
+export function showTabFor(node: Element): void {
+  showTabOf(node)
+}

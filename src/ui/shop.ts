@@ -40,7 +40,7 @@ import { advanceShaker, shakerSteps, startShaker, type ShakerPoint, type ShakerR
 import { fromCelsius, msToKmh } from '../sim/units'
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, bandOf, ghostLegend, lineChart, shakerChart, type Band, type Series } from './charts'
-import { el, num } from './dom'
+import { el, num, reveal } from './dom'
 import { SHOP_EVENT, type ShopEvent } from './events'
 import { jumpTo, type Jump } from './fixes'
 import { distanceText, ghostRace, raceText, type GhostPick } from './ghostRace'
@@ -407,7 +407,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     // Bring the run into view: on a phone the start button sits low, so the 3D view
     // would start below the fold. The Fast, Skip and Stop buttons are pinned to the
     // bottom of the screen while the run is on (.controls in style.css).
-    live.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
+    reveal(live, { behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
     last = performance.now()
     raf = requestAnimationFrame(tick)
   }
@@ -675,7 +675,9 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     if (change === 'class' || change === 'bench') reset()
   })
 
-  box.append(testing, rigRow, rigText, lastLine, start, race.element, soundRow, live, reportHolder, rerun)
+  box.append(testing, rigRow, rigText, lastLine, start, race.element, soundRow, live, reportHolder)
+  // The re-run bar shows on the Build tab after a fix jump, while this panel's tab is hidden, so it lives on the page itself.
+  document.body.append(rerun)
   sync()
   return box
 }
