@@ -49,8 +49,10 @@ a reload in the middle of a stage drives it again from its morning.
    call: **Conserve**, **Steady** or **Push**.
 3. **Breakdowns stop the truck.** The crew fixes it at the roadside, then
    the driver eases off one pace call for the rest of the leg.
-4. **The bivouac.** Eight mechanic hours and the spares left on the truck.
-   Pick jobs; what's left worn carries into tomorrow.
+4. **The bivouac.** Eight mechanic hours, the spares left on the truck and
+   the money for parts. Pick jobs; what's left worn carries into tomorrow.
+   Shock oil, springs and bushings also tire over the raid and make the
+   next day's truck worse: `docs/BIVOUAC.md`.
 5. **Results.** Stage time and the class standings against the rivals.
 
 ## How a stage is driven

@@ -25,6 +25,8 @@ import { findPart, fitsClass, stockBuild, tidyBuild } from '../sim/build'
 import type { CareerJob, CareerState, Contract, LongOneStory, NewsItem } from '../sim/career'
 import { MOMENT_KINDS, newLog, tidyLogs, type TruckLog, type TruckMoment } from '../sim/logbook'
 import type { RaidState } from '../sim/raid'
+import { newCondition } from '../sim/condition'
+import { COND_PARTS } from '../data/condition'
 import { teamsForYear, type TeamGarage } from '../sim/teams'
 
 export interface GarageSave {
@@ -193,7 +195,27 @@ function readRaid(raw: unknown): RaidState {
     if (entry.hours <= 0) fail('raid hours are not positive')
   }
   if (raw.entry.field !== undefined) entry.field = arrayOf(raw.entry.field, 'raid field').map((r, i) => readRival(r, i, build.cls))
-  return { ...(raw as unknown as RaidState), entry }
+  if (raw.entry.budget !== undefined) {
+    entry.budget = finite(raw.entry.budget, 'raid parts money')
+    if (entry.budget < 0) fail('raid parts money is below zero')
+  }
+  // Bivouac breakdowns (after 1.2): a raid saved before them has no condition
+  // or parts money spent, so it carries on with fresh oil, springs and bushings.
+  const cond = newCondition()
+  if (raw.cond !== undefined) {
+    if (!isObj(raw.cond)) fail('raid condition is not a list')
+    const c = raw.cond
+    for (const part of COND_PARTS) {
+      cond[part] = arrayOf(c[part], `${part} condition`, 2).map((x) => {
+        const v = finite(x, `${part} condition`)
+        if (v < 0 || v > 1) fail(`${part} condition is out of range`)
+        return v
+      })
+    }
+  }
+  const spent = raw.spent === undefined ? 0 : finite(raw.spent, 'raid parts money spent')
+  if (spent < 0) fail('raid parts money spent is below zero')
+  return { ...(raw as unknown as RaidState), entry, cond, spent }
 }
 
 const TROUBLES = ['fade', 'bottoming', 'mount', 'axle', 'tire', 'stuck', 'lost']

@@ -14,8 +14,11 @@
  *    spare it's as good as new; without one it's a bodge that will go again
  *    sooner. A faded damper is left to cool, for as long as the physics says.
  *    After a stop the driver eases off one pace call for the rest of the leg.
- * 4. **The bivouac:** a set number of mechanic hours and the spares left.
- *    The player picks jobs; what's left worn carries into tomorrow.
+ * 4. **The bivouac:** a set number of mechanic hours, the spares left and
+ *    the money for parts. The player picks jobs; what's left worn carries
+ *    into tomorrow. Besides the parts that break, the truck tires slowly
+ *    (bivouac breakdowns, `condition.ts`): shock oil cooks, springs sag and
+ *    bushings crack, and each makes the next day's truck a little worse.
  * 5. **Results:** stage time, place in class and overall, against the
  *    rivals (`rivals.ts`).
  *
@@ -45,7 +48,10 @@ import {
 import type { TruckBuild } from '../data/kit'
 import { WEATHER } from '../data/weather'
 import { CORNERS, ICE_ROAD, type IceSheet } from '../data/winter'
+import { CLASS_MONEY } from '../data/career'
+import { CONDITION, FREE_PLAY_PARTS_MONEY, type CondPart } from '../data/condition'
 import { buildTruck, partIn, type BuiltTruck } from './build'
+import { axleOf, newCondition, tireCondition, wornTruck, type Condition } from './condition'
 import { detExp, detLog, detPow } from './det'
 import { clipRecorder, type Clip } from './highlight'
 import { iceReading, type IceBand } from './ice'
@@ -70,6 +76,12 @@ export interface RaidEntry {
   seed?: number
   field?: Rival[]
   hours?: number
+  /**
+   * Money for parts at the bivouacs (cr.): a career raid has the garage's
+   * money after the fees; free play leaves it out and gets `partsBudget`'s
+   * allowance.
+   */
+  budget?: number
 }
 
 /** A stop on a stage: what broke, where, and what the crew did. */
@@ -130,6 +142,10 @@ export interface RaidState {
   /** Spares left on the truck. */
   spares: Record<SpareId, number>
   results: StageRecord[]
+  /** Shock oil, springs and bushings, per axle (bivouac breakdowns; a raid saved before them starts fresh). */
+  cond: Condition
+  /** Money spent on parts at the bivouacs so far (cr.). */
+  spent: number
 }
 
 /** A leg of a stage: its ground, in metres. */
@@ -148,7 +164,12 @@ export type StageStatus = 'driving' | 'checkpoint' | 'finished'
 export interface StageRun {
   stage: number
   spec: RaidStage
+  /** The truck as it stands, with its tired oil, sag and bushings worked in (`wornTruck`). */
   truck: BuiltTruck
+  /** The same truck fresh, to work the condition in again after a new shock at the roadside. */
+  base: BuiltTruck
+  /** The condition, tiring as the stage goes on. */
+  cond: Condition
   airTemp: number
   legs: Leg[]
   /** The leg being driven (0 to 2), the piece of ground in it, and metres done on that piece. */
@@ -339,19 +360,30 @@ export function bivouacHours(state: RaidState): number {
   return (state.entry.hours ?? RAID.bivouacHours) * (isRestDay(state) ? RAID.restDayHours : 1)
 }
 
+/** Money for parts over the whole raid (cr.). */
+export function partsBudget(state: RaidState): number {
+  return state.entry.budget ?? FREE_PLAY_PARTS_MONEY * CLASS_MONEY[state.entry.build.cls]
+}
+
+/** Money left for parts tonight (cr.). */
+export function partsMoney(state: RaidState): number {
+  return Math.max(0, partsBudget(state) - state.spent)
+}
+
 /** Who else is entered in the player's class. */
 export function raidField(state: RaidState): readonly Rival[] {
   return state.entry.field ?? rivalsIn(state.entry.build.cls)
 }
 
-/** Career raids pass `extra`: the year's seed, the field and the crew's hours (see `RaidEntry`). */
-export function enterRaid(raid: RaidId, build: TruckBuild, driver: DriverId, extra?: Pick<RaidEntry, 'seed' | 'field' | 'hours'>): RaidState {
+/** Career raids pass `extra`: the year's seed, the field, the crew's hours and the money for parts (see `RaidEntry`). */
+export function enterRaid(raid: RaidId, build: TruckBuild, driver: DriverId, extra?: Pick<RaidEntry, 'seed' | 'field' | 'hours' | 'budget'>): RaidState {
   const b = structuredClone(build)
   const carries = partIn(b, 'spares').carries
   const entry: RaidEntry = { raid, build: b, driver }
   if (extra?.seed !== undefined) entry.seed = extra.seed
   if (extra?.field) entry.field = structuredClone(extra.field)
   if (extra?.hours !== undefined) entry.hours = extra.hours
+  if (extra?.budget !== undefined) entry.budget = Math.max(0, extra.budget)
   return {
     entry,
     stage: 0,
@@ -359,6 +391,8 @@ export function enterRaid(raid: RaidId, build: TruckBuild, driver: DriverId, ext
     wear: newWearState(),
     spares: { tire: carries.tire, shock: carries.shock, cv: carries.cv },
     results: [],
+    cond: newCondition(),
+    spent: 0,
   }
 }
 
@@ -374,8 +408,14 @@ export function raidTruck(state: RaidState, settings?: TruckBuild): BuiltTruck {
 
 // ── Driving a stage ──
 
-export function startStage(state: RaidState, truck: BuiltTruck, pace: PaceId): StageRun {
+/**
+ * Start the morning's stage. `truck` is the truck as built (`raidTruck`);
+ * the condition the raid has left it in is worked in here.
+ */
+export function startStage(state: RaidState, fresh: BuiltTruck, pace: PaceId): StageRun {
   if (state.phase !== 'morning') throw new Error(`Can't start a stage at ${state.phase}`)
+  const cond = structuredClone(state.cond)
+  const truck = wornTruck(fresh, cond)
   const raid = raidOf(state)
   const spec = raid.stages[state.stage]
   if (!spec) throw new RangeError(`No stage ${state.stage}`)
@@ -390,6 +430,8 @@ export function startStage(state: RaidState, truck: BuiltTruck, pace: PaceId): S
     stage: state.stage,
     spec,
     truck,
+    base: fresh,
+    cond,
     airTemp,
     legs,
     leg: 0,
@@ -497,6 +539,11 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     }
     run.oil = res.endTemp.slice()
     run.wear = res.wear!.state
+    // The slow wear: oil cooked by this piece's heat, springs and bushings by its hits and harsh kilometres.
+    tireCondition(run.cond, run.truck, {
+      damperEnergy: res.damperEnergy, peakTemp: res.peakTemp, bottomOuts: res.bottomOuts,
+      distance: driven, harsh: RAID.harshGround.includes(ground),
+    })
     // The shore track is longer than the ice road it stands in for.
     run.time += (driven / speed) * lineFactor(driver, ground) * (ground !== seg.ground ? ICE_ROAD.shoreLength : 1)
     run.at += driven
@@ -675,6 +722,7 @@ function roadsideFix(state: RaidState, run: StageRun, ev: BreakEvent): void {
     if (spare && run.spares[spare] > 0) {
       run.spares[spare]--
       setFatigue(run.wear, ev.kind, index, newFatigue())
+      if (spare === 'shock') freshShock(run, index)
       lost = r.withSpare * work
       fix = 'spare'
     } else {
@@ -691,6 +739,13 @@ function roadsideFix(state: RaidState, run: StageRun, ev: BreakEvent): void {
   run.trace.distance.push(run.at)
   run.trace.oil.push(Math.max(...run.oil))
   run.trace.wear.push(worstDamage(run.wear))
+}
+
+/** A new shock on one corner at the roadside: fresh oil in it, and the truck drives on with it. */
+function freshShock(run: StageRun, corner: number): void {
+  const axle = axleOf(corner)
+  run.cond.oil[axle] = (run.cond.oil[axle] as number) * CONDITION.oneShock
+  run.truck = wornTruck(run.base, run.cond)
 }
 
 /** The stage is over: keep its result and the truck's wear, and head for the bivouac. */
@@ -711,6 +766,7 @@ export function finishStage(state: RaidState, run: StageRun): StageRecord {
   state.wear = structuredClone(run.wear)
   state.wear.broken = null
   state.spares = { ...run.spares }
+  state.cond = structuredClone(run.cond)
   state.stage++
   state.phase = state.stage >= raidOf(state).stages.length ? 'done' : 'bivouac'
   return record
@@ -739,38 +795,59 @@ export function standings(state: RaidState, onlyStage?: number): Standing[] {
 
 export interface Job {
   kind: JobKind
-  part: JobPart
-  /** Corner (0 to 3), or frame zone (0 front, 1 centre, 2 rear). */
+  part: JobPart | CondPart
+  /** Corner (0 to 3), frame zone (0 front, 1 centre, 2 rear), or axle (0 front, 1 rear) for oil, bushings and springs. */
   index: number
   /** Mechanic hours. */
   hours: number
   spare: SpareId | null
-  /** Damage now, and after the job. */
+  /** Money for parts (cr.). */
+  cost: number
+  /** Damage (or how tired) now, and after the job. */
   damage: number
   after: number
 }
 
-const JOB_PARTS: readonly JobPart[] = ['tire', 'bottoming', 'axle', 'mount', 'frame']
+const JOB_PARTS: readonly (JobPart | CondPart)[] = ['tire', 'bottoming', 'axle', 'mount', 'frame', 'oil', 'bushing', 'spring']
+
+const COND_SET = new Set<string>(['oil', 'bushing', 'spring'])
+
+/** True for oil, bushings and springs: jobs on a whole axle. */
+export function isCondPart(part: JobPart | CondPart): part is CondPart {
+  return COND_SET.has(part)
+}
+
+/** How worn each of a part's corners (or zones, or axles) is now. */
+function levels(state: RaidState, part: JobPart | CondPart): number[] {
+  if (isCondPart(part)) return state.cond[part]
+  return (part === 'frame' ? state.wear.frame : state.wear[part]).map((f) => f.damage)
+}
 
 /** Every job the crew could do tonight, worst parts first. A part can have two (a new one or a patch). */
 export function bivouacJobs(state: RaidState): Job[] {
   const cls = state.entry.build.cls
   const out: Job[] = []
   for (const part of JOB_PARTS) {
-    const list = part === 'frame' ? state.wear.frame : state.wear[part]
-    list.forEach((f, index) => {
-      if (f.damage < RAID.jobFrom) return
+    levels(state, part).forEach((damage, index) => {
+      if (damage < RAID.jobFrom) return
       for (const kind of JOB_KINDS) {
         const spec = JOBS[kind]
         if (spec.part !== part) continue
-        out.push({ kind, part, index, hours: spec.hours * CLASS_WORK[cls], spare: spec.spare, damage: f.damage, after: f.damage * spec.keep })
+        out.push({
+          kind, part, index, hours: spec.hours * CLASS_WORK[cls], spare: spec.spare,
+          cost: Math.round(spec.cost * CLASS_MONEY[cls]), damage, after: damage * spec.keep,
+        })
       }
     })
   }
   return out.sort((a, b) => b.damage - a.damage)
 }
 
-export type JobProblem = { kind: 'hours'; over: number } | { kind: 'spare'; spare: SpareId } | { kind: 'twice'; part: JobPart; index: number }
+export type JobProblem =
+  | { kind: 'hours'; over: number }
+  | { kind: 'spare'; spare: SpareId }
+  | { kind: 'money'; over: number }
+  | { kind: 'twice'; part: JobPart | CondPart; index: number }
 
 /** What's wrong with a night's plan, or null if the crew can do it all. */
 export function checkJobs(state: RaidState, jobs: readonly Job[]): JobProblem | null {
@@ -786,6 +863,9 @@ export function checkJobs(state: RaidState, jobs: readonly Job[]): JobProblem | 
     if (j.spare) used[j.spare]++
   }
   for (const s of SPARE_IDS) if (used[s] > state.spares[s]) return { kind: 'spare', spare: s }
+  const cost = jobs.reduce((sum, j) => sum + j.cost, 0)
+  const money = partsMoney(state)
+  if (cost > money) return { kind: 'money', over: cost - money }
   return null
 }
 
@@ -796,9 +876,17 @@ export function doJobs(state: RaidState, jobs: readonly Job[]): void {
   if (problem) throw new Error(`Can't do those jobs: ${problem.kind}`)
   for (const j of jobs) {
     const spec = JOBS[j.kind]
-    if (spec.keep === 0) setFatigue(state.wear, j.part, j.index, newFatigue())
-    else fatigueOf(state.wear, j.part, j.index).damage *= spec.keep
+    if (isCondPart(j.part)) {
+      const list = state.cond[j.part]
+      list[j.index] = (list[j.index] as number) * spec.keep
+    } else {
+      if (spec.keep === 0) setFatigue(state.wear, j.part, j.index, newFatigue())
+      else fatigueOf(state.wear, j.part, j.index).damage *= spec.keep
+      // A new or rebuilt shock goes in with fresh oil.
+      if (j.part === 'bottoming') state.cond.oil[axleOf(j.index)] = (state.cond.oil[axleOf(j.index)] as number) * CONDITION.oneShock
+    }
     if (j.spare) state.spares[j.spare]--
+    state.spent += j.cost
   }
   state.phase = 'morning'
 }
