@@ -56,7 +56,7 @@ export interface Range {
 export interface ClassKit {
   /** Body, cab, cage, seats, crew of two and fuel: everything that isn't a part (kg). */
   baseMass: number
-  /** Money for the shop's test builds until the career brings real money (plan PR 9) (antlers). */
+  /** Money for the shop's test builds until the career brings real money (plan PR 9) (cr.). */
   budget: number
   /** Total wheel travel with the class's reference suspension, full droop to hard limit (m). */
   travel: number

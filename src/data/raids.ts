@@ -16,9 +16,10 @@
  *   so heat and wear come out of the physics, never a dice roll. Rival
  *   teams are the one exception: they're quick estimates (`rivals.ts`).
  *
- * Names: the raids' names are working names, like the money. Kelbo turned
- * down the first proposals, so they live only in `src/data/strings.ts`
- * (`raid.*.name`) and `docs/NAMES.md`, easy to swap.
+ * Names: Kelbo picked the raids' names on 26 November 2026 (Cold Start 300
+ * to The Whole Damn Country, `docs/NAMES.md`). The ids here stay the old
+ * working names (`summerSprint`, `longOne`...) so saves keep working; the
+ * names players see live only in `src/data/strings.ts` (`raid.*.name`).
  */
 import type { ClassId } from './classes'
 import type { GroundId } from './ground'
@@ -210,7 +211,7 @@ export interface RaidStage {
 
 export interface Raid {
   id: RaidId
-  /** Working name (see the top of this file). */
+  /** The name players see (see the top of this file). */
   name: StringKey
   text: StringKey
   season: Season

@@ -18,7 +18,7 @@ use another slot to keep playing free.
 - **The first-job guide** (plan PR 11b): on the career's first raid, a box
   at the top walks through the first job step by step. See `docs/HELP.md`.
 - **The status line:** the date, the money (red when broke), the
-  reputation, the sponsor, and any Long One wins.
+  reputation, the sponsor, and any wins at the Whole Damn Country.
 - **Next raid:** its date, stages and size, then the garage's job:
   - **Prep a privateer's truck:** three offers (the ones you haven't the
     reputation for are greyed out). Take one and the build screen locks to
@@ -72,34 +72,38 @@ garage does **one job**:
 3. **Sitting it out.** The raid happens without you.
 
 Then the career moves on by days to the next raid. After the last raid of
-the year (the Long One) a new year starts: new parts come out, and the
+the year (the Whole Damn Country) a new year starts: new parts come out, and the
 rival teams buy for it.
 
 ## The calendar
 
-| Day | Raid (working name) | Stages | Size |
-| --- | --- | --- | --- |
-| 40 | Winter Sprint | 3 | regional |
-| 75 | Winter Raid | 4 | regional |
-| 130 | Summer Sprint | 3 | regional |
-| 158 | Summer Raid | 5 | regional |
-| 186 | National Raid | 7 | national |
-| 216 | Midsummer Sprint | 3 | regional |
-| 244 | Autumn Raid | 5 | national |
-| 268 | The Long One | 14 | the long one |
+Names picked by Kelbo on 26 November 2026 (`docs/NAMES.md`). The code still
+uses the old working names as ids (`winterSprint` … `longOne`) so saves keep
+working; the finale's tier is still called `long` in the code.
 
-A raid takes a day a stage plus two days of travel (and the Long One's rest day). A career starts on day
-15 of 1985, so its first job is the three-stage Winter Sprint, as the plan
+| Day | Raid | Id | Stages | Size |
+| --- | --- | --- | --- | --- |
+| 40 | Cold Start 300 | `winterSprint` | 3 | regional |
+| 75 | Frozen Knuckle | `winterRaid` | 4 | regional |
+| 130 | Blackfly Classic | `summerSprint` | 3 | regional |
+| 158 | Washboard 800 | `summerRaid` | 5 | regional |
+| 186 | Dust Supper | `nationalRaid` | 7 | national |
+| 216 | Gravel Pit Derby | `midsummerSprint` | 3 | regional |
+| 244 | Polar Night Raid | `autumnRaid` | 5 | national |
+| 268 | The Whole Damn Country | `longOne` | 14 | the finale |
+
+A raid takes a day a stage plus two days of travel (and the finale's rest day). A career starts on day
+15 of 1985, so its first job is the three-stage Cold Start 300, as the plan
 has it. The two winter raids (plan PR 10) bring cold oil, studs, snowbanks
-and lake ice (`docs/WINTER.md`); rivals don't fade in winter. The National
-Raid, the Autumn Raid and the Long One share a set of long stages (logging
+and lake ice (`docs/WINTER.md`); rivals don't fade in winter. Dust
+Supper, the Polar Night Raid and the Whole Damn Country share a set of long stages (logging
 roads, eskers, rock country, haul roads, the old burn, the mine roads and
 long fast gravel), each on its own roads.
 
 ## Money
 
-Money is the game's money, still shown as antlers until a new name is
-picked (`docs/NAMES.md`). Part prices never change; the career gets harder
+Money is written "cr." after the number, "1,200 cr." (Kelbo's pick,
+`docs/NAMES.md`). Part prices never change; the career gets harder
 because the rivals' budgets grow and better parts come out.
 
 - **Your truck** costs its class's stock price to buy. Changing a part
@@ -124,8 +128,8 @@ because the rivals' budgets grow and better parts come out.
 
 Results earn reputation (half as much for a contract): a regional raid
 gives 1 to finish, 2 for a podium and 4 for a win; a national raid 2, 4 and
-7; the Long One 3, 8 and 15 (`TIERS`). A podium at every raid opens the
-Long One in the third or fourth season (plan PR 13 slowed it from the
+7; the Whole Damn Country 3, 8 and 15 (`TIERS`). A podium at every raid
+opens the Whole Damn Country in the third or fourth season (plan PR 13 slowed it from the
 second). It opens:
 
 | Reputation | What opens |
@@ -140,7 +144,7 @@ second). It opens:
 | 30 | A third mechanic |
 | 35 | A regional sponsor (4,000 a raid) |
 | 40 | A welding bay (cheaper repairs again) |
-| 60 | The Long One with your own truck |
+| 60 | The Whole Damn Country with your own truck |
 | 120 | A works deal: 8,000 a raid and a quarter off parts |
 
 Sponsors don't stack: the best one you qualify for is the one you have.
@@ -153,7 +157,7 @@ Four teams (working names, `docs/NAMES.md`), each with its own habits:
 | --- | --- | --- | --- |
 | Brannigan Brothers | light 4x4 (side-by-side from 2004) | power first | often (half the time, slot by slot) |
 | Highbank Racing | light 4x4 from 1990, heavy from 1994, side-by-side from 1998 | the newest parts | sometimes |
-| Hardpan Haulage Works | heavy (light 4x4 from 2000), every raid since plan PR 13 (was national raids and the Long One only) | the strongest parts | rarely |
+| Hardpan Haulage Works | heavy (light 4x4 from 2000), every raid since plan PR 13 (was national raids and the finale only) | the strongest parts | rarely |
 | Jackrabbit Sport | side-by-side (light 4x4 from 1996) | the lightest parts | sometimes |
 
 Plus three privateers per class on stock trucks. The heavy privateers are a
@@ -191,7 +195,7 @@ Money can go below zero after a repair bill. Then:
 There's no game over and no interest: one or two contracts get you going
 again.
 
-## The Long One: the finale (plan PR 13)
+## The Whole Damn Country: the finale (plan PR 13)
 
 The last raid of every year: fourteen stages across the whole country, with
 a **rest day** at halfway (after stage 7), so the trip takes two weeks and
@@ -218,17 +222,18 @@ roads and the contracts keep changing.
 
 ## What's not here yet
 
-- **Names** for the money, the raids, the sponsors, the drivers and the
-  privateers: all working names until Kelbo picks.
+- **Names** for the sponsors, the drivers, the rival teams and the
+  privateers: working names until Kelbo picks (the money and the raids are
+  picked).
 
 ## The tests
 
 `tests/career.test.ts`: the calendar, contracts (the same offers for the
 same career, the open first offer, a legal truck under every budget, the
 pay-out), your truck (buying, upgrading, selling, settings for free), entry
-rules, the pay-out and repair bill, retiring, the Long One, the years
+rules, the pay-out and repair bill, retiring, the finale, the years
 rolling to 2025 and past, the same career for the same seed, the teams
 (ratings, buying habits, copying, the field by tier, copying you), broke,
 the shop, the save (format 1 moving up, careers and career raids round
 trip, damaged team trucks, bad careers turned away), and the stock trucks
-getting home on the Autumn Raid and the Long One.
+getting home on the Polar Night Raid and the Whole Damn Country.

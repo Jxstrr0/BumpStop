@@ -3,13 +3,12 @@
  * lives here; `src/sim/career.ts` and `src/sim/teams.ts` use them. How it all
  * fits together: `docs/CAREER.md`.
  *
- * Money is in the game's money (still called antlers on screen until Kelbo
- * picks a new name, `docs/NAMES.md`). Prices of parts are in
+ * Money is in the game's money, written cr. (Kelbo's pick, `docs/NAMES.md`). Prices of parts are in
  * `src/data/parts.ts` and don't change with the years: the career gets
  * harder because the rivals' budgets grow and the parts get better.
  *
- * Names: raids, teams, drivers, sponsors and privateers are working names
- * that wait on Kelbo's picks; they live only in `src/data/strings.ts`.
+ * Names: the raids are Kelbo's picks; teams, drivers, sponsors and
+ * privateers are still working names. All live only in `src/data/strings.ts`.
  */
 import type { ClassId } from './classes'
 import { FIRST_YEAR, LAST_YEAR, type SlotId } from './parts'

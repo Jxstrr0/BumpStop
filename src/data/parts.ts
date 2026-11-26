@@ -6,7 +6,7 @@
  *
  * How to read a part:
  * - `mass` and `cost` are listed per class: kilograms for the whole truck
- *   (all four corners), and antlers. A part only exists in the classes it
+ *   (all four corners), and money (cr.). A part only exists in the classes it
  *   lists, so a heavy-truck-only part has just a `heavy` number.
  * - `year` is the first year it can be bought (the career runs 1985 to 2025).
  * - The other numbers are multipliers on the class's test mule
@@ -65,7 +65,7 @@ interface PartCommon {
   year: number
   /** Kilograms, whole truck. */
   mass: PerClass
-  /** Antlers. */
+  /** Money (cr.). */
   cost: PerClass
 }
 

@@ -8,7 +8,7 @@ build in `src/data/kit.ts`, and the builder in `src/sim/build.ts`.
 
 Frame, front suspension, rear suspension, dampers, bump stops, anti-roll
 bars, axles and CVs, wheels, tires, protection, engine and spares. Every
-part lists its mass (kg, whole truck) and cost (antlers) for each class it
+part lists its mass (kg, whole truck) and cost (cr., the game's money) for each class it
 comes in, and the year it can first be bought. A part with no number for a
 class doesn't come in that size: heavy trucks have no spaceframe, and
 side-by-sides have their own tube frames, arms and engines.
@@ -71,9 +71,9 @@ budget in the shop.
 
 | Class | Stock weight | Window | Stock cost | Test budget |
 | --- | --- | --- | --- | --- |
-| Light 4x4 | 1,950 kg | 1,800–2,100 kg | 25,100 antlers | 40,000 antlers |
-| Heavy truck | 9,200 kg | 8,500–10,000 kg | 87,200 antlers | 140,000 antlers |
-| Side-by-side | 1,000 kg | 900–1,100 kg | 14,350 antlers | 22,000 antlers |
+| Light 4x4 | 1,950 kg | 1,800–2,100 kg | 25,100 cr. | 40,000 cr. |
+| Heavy truck | 9,200 kg | 8,500–10,000 kg | 87,200 cr. | 140,000 cr. |
+| Side-by-side | 1,000 kg | 900–1,100 kg | 14,350 cr. | 22,000 cr. |
 
 ## What changed for the side-by-side
 

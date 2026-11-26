@@ -12,6 +12,12 @@ assets are used, and each one gets a line.
 | Overpass Mono (The Overpass Project Authors) | Numbers and readouts, via `@fontsource/overpass-mono` | SIL Open Font License 1.1 |
 | Space Grotesk (Florian Karsten) | Studio pieces only (credit line), via `@fontsource/space-grotesk` | SIL Open Font License 1.1 |
 
+## Code libraries
+
+| Library | Where | Licence |
+| --- | --- | --- |
+| three.js (the three.js authors) | The 3D views, via `three` from npm (loaded only when a 3D view comes on screen) | MIT |
+
 ## Studio pieces
 
 | File | Source |
@@ -28,6 +34,7 @@ Each copied file says where it came from in its first line
 | File | Source |
 | --- | --- |
 | `public/models/truck-*.glb` | Made for Bump Stop by `scripts/blender/make-trucks.py` (no outside assets) |
+| `public/icon.svg`, `icon-180.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | Made for Bump Stop (the PNGs are drawn from `icon.svg`) |
 
 Every sound (plan PR 6) is made live in the browser by the game's own code
 (`src/audio/`), so there are no third-party sound files. Any recordings

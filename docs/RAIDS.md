@@ -140,7 +140,7 @@ and gets the closing time plus two hours.
 ## The bivouac
 
 Eight mechanic hours a night (more with the career's crew), and twice that on the
-Long One's rest day at halfway (plan PR 13). Every part 5% worn or more gets jobs:
+finale's rest day at halfway (plan PR 13). Every part 5% worn or more gets jobs:
 
 | Job | Hours | Uses | Wear left |
 | --- | --- | --- | --- |
@@ -169,14 +169,17 @@ time on one leg. They're towed in after closing time like anyone. The same
 raid always gives the same rival results. The career (plan PR 9) gives them
 real trucks and habits that change.
 
-## The raids (working names)
+## The free-play raids
+
+Names picked by Kelbo on 26 November 2026 (`docs/NAMES.md`); the ids in the
+code are the old working names in brackets.
 
 | Raid | Stages | Length |
 | --- | --- | --- |
-| Summer Sprint | 3: logging roads, rock country, the old burn | about 100 km a day |
-| Summer Raid | 5: logging roads, eskers, rock country, hot haul roads, the old burn | 160 to 190 km a day |
-| Winter Sprint | 3: ice roads, frost heaves, the big lake | about 90 km a day |
-| Winter Raid | 4: ice roads, frost heaves, the big lake, the tundra | 140 to 170 km a day |
+| Blackfly Classic (`summerSprint`) | 3: logging roads, rock country, the old burn | about 100 km a day |
+| Washboard 800 (`summerRaid`) | 5: logging roads, eskers, rock country, hot haul roads, the old burn | 160 to 190 km a day |
+| Cold Start 300 (`winterSprint`) | 3: ice roads, frost heaves, the big lake | about 90 km a day |
+| Frozen Knuckle (`winterRaid`) | 4: ice roads, frost heaves, the big lake, the tundra | 140 to 170 km a day |
 
 The winter raids (plan PR 10b) bring cold oil, studs, corners you can slide
 off and lake ice that can crack under a heavy truck: `docs/WINTER.md`.
@@ -195,7 +198,7 @@ a test checks it.
 
 ## The raid balance bot
 
-`tests/raidBalance.test.ts` drives the Summer Sprint with each class's
+`tests/raidBalance.test.ts` drives the Blackfly Classic (`summerSprint`) with each class's
 stock truck, a light spares kit and the gravel ace, at each pace call, and
 checks:
 
@@ -209,7 +212,7 @@ checks:
 What the stock trucks did when the speeds were set (gravel ace, light
 kit, the most the bivouac could fix each night):
 
-| Summer Sprint | Conserve | Steady | Push |
+| Blackfly Classic | Conserve | Steady | Push |
 | --- | --- | --- | --- |
 | Light 4x4 | 5.1 h, 2nd | 4.4 h, 2nd | 5.6 h, 4th (two cut tires on day 2) |
 | Heavy truck | 5.4 h, 3rd | 4.8 h, 2nd | 4.2 h, 1st |
@@ -217,9 +220,9 @@ kit, the most the bivouac could fix each night):
 
 ## Career raids (plan PR 9)
 
-The career (`docs/CAREER.md`) adds four raids to the data: Midsummer
-Sprint (3 stages), the National Raid (7), the Autumn Raid (5) and the Long
-One (14). The free-play panel offers the two summer raids and the two winter
+The career (`docs/CAREER.md`) adds four raids to the data: the Gravel
+Pit Derby (3 stages), Dust Supper (7), the Polar Night Raid (5) and the
+finale, the Whole Damn Country (14). The free-play panel offers the two summer raids and the two winter
 raids (`FREE_RAID_IDS`). A career raid's entry also carries three things a
 free-play raid leaves out: `seed` (this year's roads, so the same raid is a
 new road each year), `field` (the rival teams with the trucks they have

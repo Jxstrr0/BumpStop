@@ -107,12 +107,12 @@ ice and takes the shore track (PR 10b).
 
 ## Winter raids (plan PR 10b)
 
-Two winter raids join the Raids panel, both with working names:
+Two winter raids join the Raids panel (names picked by Kelbo on 26 November 2026):
 
 | Raid | Stages | Air | Lake ice |
 | --- | --- | --- | --- |
-| Winter Sprint (early winter) | 3: ice roads over the lakes, frost-heaved forest roads, across the big lake; about 90 km a day | -18 to -28 °C | 44 and 46 cm |
-| Winter Raid (late winter) | 4: the same three, longer, then the wind-scoured tundra; 140 to 170 km a day | -15 to -30 °C | 45 to 65 cm |
+| Cold Start 300 (`winterSprint`, early winter) | 3: ice roads over the lakes, frost-heaved forest roads, across the big lake; about 90 km a day | -18 to -28 °C | 44 and 46 cm |
+| Frozen Knuckle (`winterRaid`, late winter) | 4: the same three, longer, then the wind-scoured tundra; 140 to 170 km a day | -15 to -30 °C | 45 to 65 cm |
 
 The rules are in `src/sim/raid.ts`, the numbers in `src/data/winter.ts`
 (`CORNERS`, `ICE_ROAD`) and `src/data/raids.ts`.
@@ -156,7 +156,7 @@ between 20% and 80% of the way along (the roadbook doesn't say where):
   minutes) and takes the shore track, packed snow 1.6 times as far, for the
   rest of that stretch, and the driver eases off one pace call.
 
-### What the stock trucks did (Winter Sprint, gravel ace, light spares kit)
+### What the stock trucks did (Cold Start 300, gravel ace, light spares kit)
 
 | | Plain tires, Steady | Plain, Push | Studs, Steady | Studs, Push |
 | --- | --- | --- | --- | --- |
@@ -193,5 +193,5 @@ trouble.
   Push does; a slide happens once a leg at most; the light classes never
   crack the ice; a heavy truck at Push cracks it and takes the shore track
   while Conserve holds (and creaks) and finishes sooner; no rival fades in
-  winter; and on the Winter Sprint, studs at Push are clean and quickest
+  winter; and on the Cold Start 300, studs at Push are clean and quickest
   while plain Push is slower than plain Steady.
