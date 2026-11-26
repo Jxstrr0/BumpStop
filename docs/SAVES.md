@@ -11,7 +11,8 @@ A **garage** is everything you'd be sad to lose:
 - the class on the bench and the year the parts list is set to,
 - the raid in progress, saved each morning, each night at the bivouac and at
   the end (a reload in the middle of a stage starts that stage again),
-- the last run on each rig, for the ghost line and Better/Same/Worse.
+- the last run on each rig, for the ghost line and Better/Same/Worse,
+- the career, if you've started one (format 2, plan PR 9: `docs/CAREER.md`).
 
 `src/persist/save.ts` says what a garage looks like (`GarageSave`) and
 checks a stored or pasted one before the game trusts it (`readSave`). A part
@@ -19,6 +20,11 @@ that no longer exists goes back to the stock part, and every setting is
 pulled back inside its range, so an old save never breaks the build screen.
 Each save carries a format number (`v`); when the format changes, the
 `migrate` step there moves old saves up, one version at a time.
+
+| Format | From | What changed |
+| --- | --- | --- |
+| 1 | PR 8a | The first garage format. |
+| 2 | PR 9a | The career (`career`, null in an older garage). A career raid also keeps its year's road seed, the rivals entered and the crew's bivouac hours. A rival team's truck that can't be read is bought again for its year rather than failing the save, and an own-raid job with no raid saved is dropped. |
 
 ## Three slots
 

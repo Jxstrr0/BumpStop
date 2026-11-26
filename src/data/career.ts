@@ -1,0 +1,271 @@
+/**
+ * The career, 1985 to 2025 (plan PR 9). Every tuning number for the career
+ * lives here; `src/sim/career.ts` and `src/sim/teams.ts` use them. How it all
+ * fits together: `docs/CAREER.md`.
+ *
+ * Money is in the game's money (still called antlers on screen until Kelbo
+ * picks a new name, `docs/NAMES.md`). Prices of parts are in
+ * `src/data/parts.ts` and don't change with the years: the career gets
+ * harder because the rivals' budgets grow and the parts get better.
+ *
+ * Names: raids, teams, drivers, sponsors and privateers are working names
+ * that wait on Kelbo's picks; they live only in `src/data/strings.ts`.
+ */
+import type { ClassId } from './classes'
+import { FIRST_YEAR, LAST_YEAR, type SlotId } from './parts'
+import type { DriverId, RaidId, RivalTrouble } from './raids'
+import type { StringKey } from './strings'
+
+// ── The calendar ──
+
+/** How big a raid is: it sets the entry fee, the prize money and who turns up. */
+export type Tier = 'regional' | 'national' | 'long'
+
+export interface CalendarEvent {
+  raid: RaidId
+  /** Day of the year the raid starts (1 is the first of January). */
+  day: number
+  tier: Tier
+}
+
+/**
+ * The raids each year, in order (plan: about six a year). All summer for
+ * now: winter raids join the calendar with plan PR 10, which is also when
+ * the career's first job becomes the plan's three-stage winter raid.
+ */
+export const CALENDAR: readonly CalendarEvent[] = [
+  { raid: 'summerSprint', day: 130, tier: 'regional' },
+  { raid: 'summerRaid', day: 158, tier: 'regional' },
+  { raid: 'nationalRaid', day: 186, tier: 'national' },
+  { raid: 'midsummerSprint', day: 216, tier: 'regional' },
+  { raid: 'autumnRaid', day: 244, tier: 'national' },
+  { raid: 'longOne', day: 268, tier: 'long' },
+]
+
+/** A raid takes one day a stage, plus this many days to get there and back. */
+export const TRAVEL_DAYS = 2
+
+// ── Money ──
+
+export const CAREER = {
+  firstYear: FIRST_YEAR,
+  lastYear: LAST_YEAR,
+  /** In the bank on day one: the garage, two people and not much else. */
+  startMoney: 8000,
+  /** The career starts on this day of 1985, a few weeks before the first raid. */
+  startDay: 100,
+  /** Selling a part (or the truck) back gets this share of its price. */
+  resale: 0.5,
+  /** After a raid, putting a worn part right costs this share of its price for each unit of damage (1 = broken). */
+  repairShare: 0.6,
+  /** Most news and results kept in the career's log. */
+  logLength: 40,
+} as const
+
+/** Money scales by class: a heavy truck's parts, fees and prizes are about 3.5 times a light 4x4's. */
+export const CLASS_MONEY: Readonly<Record<ClassId, number>> = { light4x4: 1, heavy: 3.5, sxs: 0.6 }
+
+export interface TierRules {
+  /** Entry fee for a light 4x4 (times `CLASS_MONEY`). */
+  entryFee: number
+  /** Prize money for a light 4x4 by finishing place, first to last paid place (times `CLASS_MONEY`). */
+  prizes: readonly number[]
+  /** Reputation it takes to enter your own truck. */
+  rep: number
+  /** A driver's fee is their `fee` times this. */
+  driverFee: number
+  /** Reputation for finishing, a podium and a win (own entry); contracts get half. */
+  repFor: { finish: number; podium: number; win: number }
+}
+
+export const TIERS: Readonly<Record<Tier, TierRules>> = {
+  regional: { entryFee: 1500, prizes: [6000, 3500, 2000], rep: 0, driverFee: 1,
+    repFor: { finish: 1, podium: 3, win: 5 } },
+  national: { entryFee: 4000, prizes: [15000, 9000, 5000, 2500], rep: 15, driverFee: 1.6,
+    repFor: { finish: 2, podium: 5, win: 9 } },
+  long: { entryFee: 9000, prizes: [40000, 22000, 12000, 6000, 3000], rep: 60, driverFee: 3,
+    repFor: { finish: 4, podium: 10, win: 20 } },
+}
+
+/** Each hired driver's fee for a regional raid in a light 4x4, and the reputation they want before they'll drive for you. */
+export const DRIVER_TERMS: Readonly<Record<DriverId, { fee: number; rep: number }>> = {
+  mechanic: { fee: 1200, rep: 0 },
+  veteran: { fee: 2000, rep: 0 },
+  charger: { fee: 2400, rep: 8 },
+  gravelAce: { fee: 3200, rep: 20 },
+}
+
+/**
+ * Spares used on a raid are bought again afterwards, at this price each for a
+ * light 4x4 (times `CLASS_MONEY`).
+ */
+export const SPARE_PRICE = { tire: 300, shock: 500, cv: 400 } as const
+
+// ── Sponsors and the works deal ──
+
+export interface Sponsor {
+  /** Reputation that brings them in. */
+  rep: number
+  /** Pays this for each raid you enter yourself (times `CLASS_MONEY`). */
+  pay: number
+  /** Parts cost this much less (0.25 = a quarter off): only the works deal does this. */
+  discount: number
+  name: StringKey
+}
+
+/** The best one you qualify for is the one you have (they don't stack). */
+export const SPONSORS: readonly Sponsor[] = [
+  { rep: 10, pay: 1500, discount: 0, name: 'sponsor.local' },
+  { rep: 35, pay: 4000, discount: 0, name: 'sponsor.regional' },
+  { rep: 80, pay: 8000, discount: 0.25, name: 'sponsor.works' },
+]
+
+// ── The shop ──
+
+export type UpgradeId = 'secondMechanic' | 'thirdMechanic' | 'press' | 'welder'
+
+export interface Upgrade {
+  id: UpgradeId
+  cost: number
+  /** Reputation it takes before it's offered. */
+  rep: number
+  /** Mechanic hours added at each bivouac. */
+  hours: number
+  /** Taken off `CAREER.repairShare` after a raid. */
+  repair: number
+  /** Needs this one first. */
+  needs: UpgradeId | null
+  name: StringKey
+  text: StringKey
+}
+
+/** The shop grows (plan): crew for more hours at the bivouac, tools for cheaper repairs. Still one garage. */
+export const UPGRADES: readonly Upgrade[] = [
+  { id: 'secondMechanic', cost: 9000, rep: 5, hours: 2, repair: 0, needs: null, name: 'upgrade.secondMechanic', text: 'upgrade.secondMechanicText' },
+  { id: 'press', cost: 7000, rep: 10, hours: 0, repair: 0.15, needs: null, name: 'upgrade.press', text: 'upgrade.pressText' },
+  { id: 'thirdMechanic', cost: 22000, rep: 30, hours: 2, repair: 0, needs: 'secondMechanic', name: 'upgrade.thirdMechanic', text: 'upgrade.thirdMechanicText' },
+  { id: 'welder', cost: 16000, rep: 40, hours: 0, repair: 0.15, needs: 'press', name: 'upgrade.welder', text: 'upgrade.welderText' },
+]
+
+// ── Prep contracts ──
+
+export const CONTRACTS = {
+  /** Offers at each raid. The first is always open to anyone, so a broke garage can get going again. */
+  perEvent: 3,
+  /** The privateer's budget, as a share of the class's test budget (`KITS`): the least and the most. */
+  budget: [0.62, 0.95] as const,
+  /** Your fee, paid when you hand the truck over, as a share of their budget. */
+  fee: 0.11,
+  /** Paid on top by result, as shares of the fee: finished without a tow, on the class podium, won the class. */
+  bonus: { finish: 0.3, podium: 0.8, win: 1.5 },
+  /** Money rounds to this. */
+  round: 250,
+  /** Reputation it takes before each class's privateers come to you. */
+  classRep: { light4x4: 0, sxs: 0, heavy: 12 } as Readonly<Record<ClassId, number>>,
+  /** A bigger raid pays more: fee and budget times this. */
+  tierScale: { regional: 1, national: 1.3, long: 1.7 } as Readonly<Record<Tier, number>>,
+} as const
+
+// ── Rival teams ──
+
+export type TeamId = 'brannigan' | 'highbank' | 'hardpan' | 'jackrabbit'
+export const TEAM_IDS: readonly TeamId[] = ['brannigan', 'highbank', 'hardpan', 'jackrabbit']
+
+/** How a team spends its money when it buys parts for a new year. */
+export type BuyHabit = 'newest' | 'strong' | 'light' | 'power'
+
+export interface TeamSpec {
+  id: TeamId
+  name: StringKey
+  habit: StringKey
+  /** The classes they race, from which year, and their race number there. */
+  classes: readonly { cls: ClassId; from: number; number: number }[]
+  /** The tiers they enter. */
+  tiers: readonly Tier[]
+  /** Their driver's pace before the truck counts (share of par). */
+  pace: number
+  /** How hard they drive: more trouble, as a multiplier on the chance of it. */
+  hardness: number
+  buy: BuyHabit
+  /** The slots they spend on first. */
+  priority: readonly SlotId[]
+  /** Budget as a share of the class's test budget (`KITS`), in their first year. */
+  budget: number
+  /** Chance, slot by slot, that they copy the class winner's part after a raid. */
+  copy: number
+  trouble: readonly RivalTrouble[]
+}
+
+export const TEAMS: Readonly<Record<TeamId, TeamSpec>> = {
+  brannigan: {
+    id: 'brannigan', name: 'team.brannigan', habit: 'habit.brannigan',
+    classes: [{ cls: 'light4x4', from: 1985, number: 7 }, { cls: 'sxs', from: 2004, number: 307 }],
+    tiers: ['regional', 'national', 'long'],
+    pace: 0.91, hardness: 1.5, buy: 'power',
+    priority: ['engine', 'dampers', 'tires', 'frontSusp', 'rearSusp', 'wheels'],
+    budget: 0.85, copy: 0.5, trouble: ['axle', 'tire', 'bottoming'],
+  },
+  highbank: {
+    id: 'highbank', name: 'team.highbank', habit: 'habit.highbank',
+    classes: [{ cls: 'light4x4', from: 1990, number: 11 }, { cls: 'heavy', from: 1994, number: 505 }, { cls: 'sxs', from: 1998, number: 305 }],
+    tiers: ['regional', 'national', 'long'],
+    pace: 0.94, hardness: 1.1, buy: 'newest',
+    priority: ['dampers', 'frontSusp', 'rearSusp', 'frame', 'bumpStops', 'axles', 'engine', 'wheels'],
+    budget: 1.1, copy: 0.25, trouble: ['fade', 'mount', 'lost'],
+  },
+  hardpan: {
+    id: 'hardpan', name: 'team.hardpan', habit: 'habit.hardpan',
+    classes: [{ cls: 'heavy', from: 1985, number: 501 }, { cls: 'light4x4', from: 2000, number: 21 }],
+    tiers: ['national', 'long'],
+    pace: 0.96, hardness: 0.6, buy: 'strong',
+    priority: ['frame', 'axles', 'tires', 'protection', 'bumpStops', 'spares', 'dampers'],
+    budget: 0.95, copy: 0.2, trouble: ['tire', 'stuck'],
+  },
+  jackrabbit: {
+    id: 'jackrabbit', name: 'team.jackrabbit', habit: 'habit.jackrabbit',
+    classes: [{ cls: 'sxs', from: 1985, number: 301 }, { cls: 'light4x4', from: 1996, number: 33 }],
+    tiers: ['regional', 'national', 'long'],
+    pace: 0.9, hardness: 1.3, buy: 'light',
+    priority: ['frame', 'wheels', 'frontSusp', 'rearSusp', 'dampers', 'engine'],
+    budget: 0.8, copy: 0.4, trouble: ['fade', 'fade', 'bottoming'],
+  },
+}
+
+export const TEAM_TUNING = {
+  /** Every team's budget grows by this share of its first year's each year, so newer, dearer parts come within reach. */
+  budgetGrowth: 0.04,
+  /**
+   * How a truck's parts change a rival's pace and trouble (see `teams.ts`).
+   * Pace: share of par taken off for each rating: times the log of the heat
+   * and power ratings (so doubling counts the same at any level), times the
+   * travel over 1.
+   */
+  paceFromHeat: 0.02,
+  paceFromTravel: 0.04,
+  paceFromPower: 0.15,
+  /** Trouble: chance times (strength rating) to the power of minus this, and (heat rating) too. */
+  riskFromStrength: 1.5,
+  riskFromHeat: 0.8,
+  /** A rival's pace and chance of trouble stay inside these. */
+  paceLimits: [0.8, 1.15] as const,
+  riskLimits: [0.03, 0.8] as const,
+  /** Base chance of trouble on an average 100 km stage, before hardness and the truck. */
+  risk: 0.12,
+  /** Each team's clean runs wander this much either way. */
+  spread: 0.025,
+  /** Hours lost to trouble: the least and the most. */
+  delay: [0.2, 1] as const,
+} as const
+
+/** Privateers in every raid, three per class, on stock trucks: known by race number. */
+export const PRIVATEERS: readonly { cls: ClassId; number: number; pace: number; risk: number; trouble: readonly RivalTrouble[] }[] = [
+  { cls: 'light4x4', number: 31, pace: 0.99, risk: 0.2, trouble: ['tire', 'stuck', 'fade'] },
+  { cls: 'light4x4', number: 47, pace: 1.03, risk: 0.25, trouble: ['tire', 'axle', 'lost'] },
+  { cls: 'light4x4', number: 58, pace: 1.07, risk: 0.3, trouble: ['fade', 'bottoming', 'stuck'] },
+  { cls: 'heavy', number: 512, pace: 1, risk: 0.2, trouble: ['tire', 'axle', 'stuck'] },
+  { cls: 'heavy', number: 518, pace: 1.04, risk: 0.25, trouble: ['tire', 'stuck', 'lost'] },
+  { cls: 'heavy', number: 527, pace: 1.08, risk: 0.3, trouble: ['axle', 'stuck', 'mount'] },
+  { cls: 'sxs', number: 318, pace: 0.99, risk: 0.2, trouble: ['tire', 'stuck', 'axle'] },
+  { cls: 'sxs', number: 322, pace: 1.03, risk: 0.25, trouble: ['tire', 'fade', 'lost'] },
+  { cls: 'sxs', number: 326, pace: 1.07, risk: 0.3, trouble: ['fade', 'tire', 'bottoming'] },
+]
