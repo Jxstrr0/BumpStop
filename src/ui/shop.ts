@@ -560,7 +560,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
 
   store.onChange((change) => {
     // A new class is a new truck: drop the run in progress. Part and setting changes wait for the next run.
-    if (change === 'class') reset()
+    if (change === 'class' || change === 'bench') reset()
   })
 
   box.append(testing, rigRow, rigText, lastLine, start, soundRow, live, reportHolder, rerun)

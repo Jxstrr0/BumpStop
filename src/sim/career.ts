@@ -192,7 +192,7 @@ export function offers(c: CareerState): Contract[] {
     const cls: ClassId = k === 0
       ? rng.pick(['light4x4', 'sxs'] as const)
       : rng.weighted(CLASSES.map((x) => ({ item: x.id, weight: x.id === 'light4x4' ? 2 : 1 })))
-    const rep = k === 0 ? 0 : CONTRACTS.classRep[cls] + rng.int(0, 4) * 5
+    const rep = k === 0 ? 0 : CONTRACTS.classRep[cls] + rng.int(0, 3) * 5
     const budget = round(KITS[cls].budget * rng.range(CONTRACTS.budget[0], CONTRACTS.budget[1]) * scale)
     const fee = round(budget * CONTRACTS.fee)
     const base = cls === 'heavy' ? 520 : cls === 'sxs' ? 330 : 20
