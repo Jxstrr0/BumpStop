@@ -23,6 +23,8 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
 - The 3D trucks: `scripts/blender/make-trucks.py` builds them (sizes,
   colours, bodies) into `public/models/`. Run it again after a change; how
   is at the top of the script and in `docs/3D.md`.
+- How it sounds (engine voices, gears, how loud each sound is, the buzz
+  patterns): `src/data/sound.ts`. In plain words: `docs/SOUND.md`.
 - Colours: the top of `src/style.css`.
 - The plan: `docs/BUMP-STOP-PLAN.md`. Where it's up to: `docs/STATUS.md`.
 - Names: `docs/NAMES.md`.

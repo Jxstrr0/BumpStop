@@ -13,6 +13,7 @@
  */
 import { RIG_HISTORY_STEP, type Rig, type RigPiece } from '../data/rigs'
 import { SIM, type AxleSetup, type RideSetup } from '../data/ride'
+import { FEEL } from '../data/sound'
 import type { WearSetup } from '../data/wear'
 import { buildProfile, type Profile } from './ground'
 import { emptyStats, enterSection, restingState, rideParams, stepRide, type RideParams, type RideState, type RideStats } from './ride'
@@ -54,6 +55,28 @@ export interface RunHistory {
   travel: number[]
   /** The most worn part's damage (0 to 1). */
   wear: number[]
+}
+
+/**
+ * What the truck felt since the sound last looked (plan PR 6): the hits and
+ * the damper work, for the clatter, the strikes and the buzz. The sound
+ * empties it every frame (`takeFeel`). Counting changes nothing in the run.
+ */
+export interface RunFeel {
+  /** Sim seconds since it was last emptied. */
+  time: number
+  /** Heat all four dampers made (J). */
+  work: number
+  /** Tires hitting hard (a rock, a landing): how many, and the hardest, as tire force over the corner's resting load. */
+  strikes: number
+  strikePeak: number
+  /** Metal-to-metal bottom-outs: how many, and the hardest, as the strut's push over the corner's resting load. */
+  bottomOuts: number
+  bottomPeak: number
+}
+
+export function emptyFeel(): RunFeel {
+  return { time: 0, work: 0, strikes: 0, strikePeak: 0, bottomOuts: 0, bottomPeak: 0 }
 }
 
 export interface LapRun {
@@ -100,6 +123,12 @@ export interface LapRunner {
   lapStart: number
   /** True once something broke or the last lap is done. */
   done: boolean
+  /** Hits since the sound last looked. */
+  feel: RunFeel
+  /** Each corner's resting tire load (N), whether its tire may count a new strike, and whether it was bottomed last step. */
+  restLoad: number[]
+  strikeArmed: boolean[]
+  wasBottomed: boolean[]
 }
 
 /** The loop's road, built once: the same every lap. */
@@ -184,6 +213,10 @@ export function startLaps(setup: RideSetup, wear: WearSetup, rig: Rig, seed: num
     travelPeak: 0,
     lapStart: 0,
     done: rig.maxLaps < 1,
+    feel: emptyFeel(),
+    restLoad: p.axle.map((ax, i) => ax.tireRate * (p.staticTire[i] as number)),
+    strikeArmed: [true, true, true, true],
+    wasBottomed: [false, false, false, false],
   }
   if (!r.done) {
     startLap(r, 1)
@@ -199,8 +232,10 @@ export function startLaps(setup: RideSetup, wear: WearSetup, rig: Rig, seed: num
  */
 export function advanceLaps(r: LapRunner, maxSteps: number): number {
   let taken = 0
-  const { s, p, run } = r
+  const { s, p, run, feel } = r
   const { w, wp, forces, readings, rec } = run
+  // The dampers' heat so far this lap, so the feel can add what this call makes.
+  let workMark = lapWork(r)
   while (!r.done && taken < maxSteps) {
     if (r.step >= r.steps) {
       // This piece is done: on to the next one, or the next lap.
@@ -208,6 +243,8 @@ export function advanceLaps(r: LapRunner, maxSteps: number): number {
         enterPiece(r, r.piece + 1)
       } else {
         endLap(r)
+        feel.work += lapWork(r) - workMark
+        workMark = 0
         if (r.lap >= r.rig.maxLaps) r.done = true
         else startLap(r, r.lap + 1)
       }
@@ -224,9 +261,11 @@ export function advanceLaps(r: LapRunner, maxSteps: number): number {
     }
     r.step++
     taken++
+    feel.time += DT
     for (let i = 0; i < 4; i++) {
       const use = (forces.compression[i] as number) / (p.axle[i] as AxleSetup).bumpTravel
       if (use > r.travelPeak) r.travelPeak = use
+      feelCorner(r, i)
     }
     if (w.distance >= r.nextSample) {
       sample(r)
@@ -238,7 +277,43 @@ export function advanceLaps(r: LapRunner, maxSteps: number): number {
       r.done = true
     }
   }
+  feel.work += lapWork(r) - workMark
   return taken
+}
+
+/** Heat the dampers have made this lap (J). */
+function lapWork(r: LapRunner): number {
+  const e = r.stats.damperEnergy
+  return (e[0] as number) + (e[1] as number) + (e[2] as number) + (e[3] as number)
+}
+
+/** Count a corner's hits for the sound: a tire hitting hard, or the wheel bottoming out. */
+function feelCorner(r: LapRunner, i: number): void {
+  const feel = r.feel
+  const forces = r.run.forces
+  const rest = r.restLoad[i] as number
+  const hit = (forces.tire[i] as number) / rest
+  if (r.strikeArmed[i] && hit >= FEEL.strikeAt) {
+    r.strikeArmed[i] = false
+    feel.strikes++
+  } else if (!r.strikeArmed[i] && hit < FEEL.strikeRearm) {
+    r.strikeArmed[i] = true
+  }
+  if (!r.strikeArmed[i] && hit > feel.strikePeak) feel.strikePeak = hit
+  const bottomed = r.s.bottomed[i] as boolean
+  if (bottomed) {
+    if (!r.wasBottomed[i]) feel.bottomOuts++
+    const push = (forces.strut[i] as number) / rest
+    if (push > feel.bottomPeak) feel.bottomPeak = push
+  }
+  r.wasBottomed[i] = bottomed
+}
+
+/** Hand over what the truck felt since last time, and start counting again. */
+export function takeFeel(r: LapRunner): RunFeel {
+  const out = r.feel
+  r.feel = emptyFeel()
+  return out
 }
 
 /** The run so far as a result: what broke, on which lap, and its trace. */
