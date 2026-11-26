@@ -8,6 +8,7 @@
  *   (`src/pwa/register.ts`).
  */
 import { TIERS, type GraphicsChoice } from '../data/graphics'
+import { RECORDINGS } from '../data/recordings'
 import { t, tf, type StringKey } from '../data/strings'
 import { offlineState } from '../pwa/register'
 import { currentTier, graphicsChoice, onTierChange, setGraphicsChoice, tierPinned } from '../render/tiers'
@@ -69,7 +70,17 @@ export function settingsPanel(): HTMLElement {
   // Credits (plan PR 13): who made it and what it's made with. The full list is CREDITS.md.
   const cHead = el('h3', '', t('credits.title'))
   const credits = el('ul', 'small credit-list')
-  for (const key of ['credits.made', 'credits.fonts', 'credits.code', 'credits.sound'] as const) credits.append(el('li', '', t(key)))
+  for (const key of ['credits.made', 'credits.fonts', 'credits.code'] as const) credits.append(el('li', '', t(key)))
+  // The sound: made in code, plus a credit for every real recording (src/data/recordings.ts).
+  if (RECORDINGS.length === 0) {
+    credits.append(el('li', '', t('credits.sound')))
+  } else {
+    const sound = el('li', '', t('credits.soundMixed'))
+    const list = el('ul')
+    for (const rec of RECORDINGS) list.append(el('li', '', tf('credits.recording', { title: rec.title, author: rec.author, licence: rec.licence, source: rec.source })))
+    sound.append(list)
+    credits.append(sound)
+  }
   box.append(gHead, gLead, row, now, reloadNote, tiers, oHead, oLine, cHead, credits)
   return box
 }

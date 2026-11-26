@@ -3,14 +3,13 @@
 How Bump Stop sounds (plan PR 6). The code is in `src/audio/`; every number
 is in `src/data/sound.ts`.
 
-## No recordings (yet)
+## Made sounds, and recordings on top
 
 Every sound is made live in the browser from numbers and from what the sim
-is doing. There are no sound files, so nothing to download and nothing to
-credit. The plan pictured openly licensed recordings; none of the sound
-libraries could be reached from the cloud machine that built this, and made
-sounds can follow every hit and every degree of oil exactly. Recordings can
-still be layered in later, each with a line in `CREDITS.md`.
+is doing, so the game never needs a sound file to make noise. Real
+recordings can stand in for the short sounds and the hot-shock hiss; see
+"Recordings" below. The engine always stays made in code, because it
+follows every engine part's firing pattern and speed exactly.
 
 ## What you hear
 
@@ -84,6 +83,55 @@ the game too.
 Browsers only allow sound after a tap, so the sound wakes up when you tap
 to start a run. It pauses when the tab is hidden.
 
+## Recordings
+
+A real recording can take the place of any short sound (the rattles, tire
+strikes, bottom-outs and the six break sounds) or of the hot-shock hiss.
+They're listed in `src/data/recordings.ts`; the files live in
+`public/sounds/`, and each one gets a line in `CREDITS.md`.
+
+- The game loads them in the background when the sound first wakes up.
+  Until a file arrives, or if it's missing, can't be read or the phone was
+  offline, the made sound plays. A recording can never leave the game silent.
+- Each one is tidied as it loads (`src/audio/recordings.ts`): mixed down to
+  one channel, its loudest moment brought to the same level as every other
+  recording, and cut with a fade if it runs long (1.2 s for rattles and
+  hits, 3.5 s for breaks, 6 s for the hiss loop, whose end is blended into
+  its start so it goes round without a click). Its `gain` then turns it up
+  or down against the made sound.
+- Two or more recordings for the same sound take turns, and the cues still
+  vary their pitch a little, so repeats don't all sound alike.
+- Only CC0 and CC BY recordings (CLAUDE.md, Content rules). The Settings
+  panel's Credits lists every recording with its author, licence and page.
+- Add `?sound=made` to the address to hear the made sounds only, for a
+  side-by-side.
+
+### Adding one
+
+1. Put the file in `public/sounds/`, named for the sound it replaces
+   (`clunk-1.mp3`, `clunk-2.mp3`, `hiss-loop.ogg`...). MP3 or OGG, under
+   300 KB.
+2. Add its line to `RECORDINGS` in `src/data/recordings.ts`: which sound,
+   the file, its title, author, licence and page, and a gain of 1 to start.
+3. Add its line to `CREDITS.md` under "Sound and art".
+
+`tests/recordings.test.ts` turns red if a listed file is missing or too
+big, isn't credited, or if a file sits in `public/sounds/` without a line.
+
+| Sound | What a good recording sounds like |
+| --- | --- |
+| `tick`, `knock` | Small metal rattles and knocks: a loose bracket, chain links, a spanner tapped on a frame |
+| `strike` | A dull thump: a tire hitting a pothole edge, a heavy bag dropped on a floor |
+| `rockStrike` | A sharp clack: a rock hitting steel, a stone on a skid plate |
+| `clunk` | A heavy metal clunk with a short ring: suspension bottoming out, a hammer on an anvil, a car door slammed hard |
+| `hissOut` | A long hiss that sputters out: air or steam escaping |
+| `clang` | A big steel clang |
+| `crack` | A crack and a rattle: metal snapping, a branch breaking |
+| `bang` | A loud bang and clatter: something mechanical letting go |
+| `pop` | A tire burst and the air rushing out |
+| `groan` | Steel groaning or creaking under load, then a snap |
+| `hissLoop` | A steady hiss with no start or end: steam, a leaking air line |
+
 ## Tests
 
 `tests/sound.test.ts`: every engine part has a sound; the straight-six only
@@ -94,3 +142,9 @@ gap, clacks only for big strikes in the rocks, rattles capped, the hiss from
 the warm line, a sound and buzz for every failure); every short sound is
 finite, never clips and is the same every time; the hit counter finds more
 strikes in the rock garden than on the graded road and its time adds up.
+
+`tests/recordings.test.ts`: every short sound can have a recording; every
+listed file is there, under 300 KB, CC0 or CC BY and credited in
+`CREDITS.md`; every file in `public/sounds/` is listed; the tidy-up mixes
+to one channel, evens out the loudness, cuts and fades long recordings,
+blends a loop's ends and leaves silence silent.
