@@ -11,6 +11,7 @@
  * WebGL, the view hides itself and the stage plays on in 2D (the traces).
  */
 import { t, tf, type StringKey } from '../data/strings'
+import type { WeatherId } from '../data/weather'
 import type { BuiltTruck } from '../sim/build'
 import type { Clip } from '../sim/highlight'
 import type { Pose } from '../sim/poses'
@@ -26,8 +27,8 @@ export interface RaidView {
   element: HTMLElement
   /** Get ready for a leg's clips (loads the truck and lays their road). */
   setLeg(truck: BuiltTruck, clips: readonly Clip[]): Promise<void>
-  /** Play clip `i` of the leg: true speed, or slow motion closing in on a break. */
-  show(i: number): void
+  /** Play clip `i` of the leg: true speed, or slow motion closing in on a break; `weather` sets the sky if it had turned there. */
+  show(i: number, weather?: WeatherId | null): void
   stop(): void
   /** False once the phone turned out not to do WebGL. */
   works(): boolean
@@ -87,10 +88,11 @@ export function raidView(): RaidView {
         fail(err)
       }
     },
-    show(i) {
+    show(i, weather) {
       const c = clips[i]
       const p = poses[i]
       if (!view || !ready || !c || !p || p.length < 2) return
+      view.setWeather(weather ?? 'clear')
       const b = c.broken
       if (b) {
         const what = t(`fail.${b.kind}` as StringKey).toLowerCase()
@@ -99,7 +101,7 @@ export function raidView(): RaidView {
           : tf('raidUi.viewBreakFrame', { what, zone: t(`zone.${b.zone ?? 'centre'}` as StringKey) })
         view.play(p, { rate: BREAK_RATE, loop: false, focus: { corner: b.corner, kind: b.kind } })
       } else {
-        caption.textContent = t('raidUi.viewLive')
+        caption.textContent = weather ? tf('raidUi.viewWeather', { kind: t(`weather.${weather}` as StringKey) }) : t('raidUi.viewLive')
         view.play(p, { rate: 1, loop: false })
       }
       photo.ready(true)

@@ -30,6 +30,7 @@
  */
 import { GROUND, type GroundId } from '../data/ground'
 import { LONG_STAGE, type RideSetup } from '../data/ride'
+import type { GroundMod } from '../data/weather'
 import { FRAME_ZONES, type FailureKind, type WearSetup } from '../data/wear'
 import { detExp, detPow } from './det'
 import { buildProfile } from './ground'
@@ -45,6 +46,8 @@ export interface StageSegment {
   length: number
   /** m/s */
   speed: number
+  /** Weather's change to the ground (a raid stage after the weather turns), or none. */
+  mod?: GroundMod
 }
 
 export interface StageSpec {
@@ -197,7 +200,7 @@ export function runStage(
       const rng = root.fork(`chunk-${chunkIndex}`)
       // Full mode drives the whole chunk; sampled mode drives the first bit of it.
       const driveLen = mode === 'full' ? chunkLen : Math.min(chunkLen, GROUND[seg.ground].sampleLength)
-      const profile = buildProfile(seg.ground, driveLen + wheelbase, rng)
+      const profile = buildProfile(seg.ground, driveLen + wheelbase, rng, seg.mod)
       const sampleStart = s.oilTemp.slice()
       const damageBefore = run ? damages(run) : []
       let stats: RideStats

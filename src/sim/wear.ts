@@ -280,7 +280,7 @@ export function stepWear(
       spin += ((1 - spin) * DT) / ax.spinUpTime
       torque = ax.driveTorque * (1 - spin)
     } else {
-      const grip = (aw.tire.studded ? ground.studGrip : ground.grip) * tire * ax.wheelRadius
+      const grip = (aw.tire.studded ? ground.studGrip : ground.grip) * (profile.grip ?? 1) * tire * ax.wheelRadius
       if (spin > 0) {
         // Landing on a spinning wheel: the tire grabs, and the faster the wheel was spinning, the more of
         // the grip goes through the joint (a slipping tire grips harder the more it slips), until the spin stops.

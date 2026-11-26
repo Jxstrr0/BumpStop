@@ -24,6 +24,12 @@
  * drives to the thinnest place, and if the ice can't hold it at that speed
  * it cracks: the crew backs off and takes the shore track (`ICE_ROAD`).
  *
+ * Weather (Kelbo, 26 November 2026): some stages have a thaw, a whiteout or
+ * a dust storm in the forecast, which comes in partway through or holds off
+ * (`weather.ts`). From where it turns, the ground it changes is driven
+ * slower and rougher, in a different air, and in a whiteout the tightest
+ * corner comes up unseen. The rivals slow down by the same amount.
+ *
  * Everything in `RaidState` is plain numbers and strings, so saves (plan PR
  * 8) can keep a raid in progress. A `StageRun` (a stage being driven) is
  * not saved: a stage is short, so a reload starts it again.
@@ -37,6 +43,7 @@ import {
   type DriverId, type JobKind, type JobPart, type PaceId, type Raid, type RaidGround, type RaidId, type RaidStage, type Rival,
 } from '../data/raids'
 import type { TruckBuild } from '../data/kit'
+import { WEATHER } from '../data/weather'
 import { CORNERS, ICE_ROAD, type IceSheet } from '../data/winter'
 import { buildTruck, partIn, type BuiltTruck } from './build'
 import { detExp, detLog, detPow } from './det'
@@ -47,6 +54,7 @@ import { hashString, Rng } from './rng'
 import { runStage } from './stage'
 import { fromCelsius } from './units'
 import { newFatigue, newWearState, worstDamage, type BreakEvent, type Fatigue, type WearState } from './wear'
+import { groundMod, stageWeather, weatherOn, weatherShare, weatherSpeed, type StageWeather } from './weather'
 
 /** What the player entered: the truck (parts locked for the raid) and the driver. */
 export interface RaidEntry {
@@ -106,6 +114,8 @@ export interface StageRecord {
   rivals: RivalStage[]
   /** Where the ice creaked (winter; missing in saves from before PR 10). */
   iceNotes?: IceNote[]
+  /** The day's weather: the forecast and whether it came (null for a clear day; missing in older saves). */
+  weather?: StageWeather | null
 }
 
 export type RaidPhase = 'morning' | 'bivouac' | 'done'
@@ -170,6 +180,8 @@ export interface StageRun {
   rivals: RivalStage[]
   status: StageStatus
   late: boolean
+  /** The day's weather (null for a clear day). */
+  weather: StageWeather | null
 }
 
 // ── Speeds and times ──
@@ -279,6 +291,33 @@ export function iceAtPace(stage: RaidStage, truck: BuiltTruck, driver: DriverId,
   return iceReading(truck.mass, groundSpeed(truck, driver, 'ice', pace), sheet)
 }
 
+/** The weather for a stage of this raid: the morning's forecast, and whether it comes (null for a clear day). */
+export function raidWeather(state: RaidState, stage = state.stage): StageWeather | null {
+  const raid = raidOf(state)
+  const spec = raid.stages[stage]
+  return spec ? stageWeather(raidSeed(state), stage, spec, raid.season, stageKm(spec)) : null
+}
+
+/**
+ * The legs' par times in the day's weather: the ground it changes, past the
+ * turn, takes as much longer as the weather slows the driver. It sets the
+ * closing time and the rivals' pace, so the weather slows everyone alike.
+ */
+export function weatherLegs(cls: ClassId, legs: readonly Leg[], w: StageWeather | null): Leg[] {
+  if (!w?.comes) return legs.slice()
+  return legs.map((leg) => {
+    let at = leg.from
+    let par = 0
+    for (const s of leg.segments) {
+      const clear = s.length / (STEADY_KMH[cls][s.ground] * KMH)
+      const slow = 1 / weatherSpeed(w.kind, cls, s.ground)
+      par += clear * (1 + weatherShare(w, at, s.length) * (slow - 1))
+      at += s.length
+    }
+    return { ...leg, par }
+  })
+}
+
 // ── Entering ──
 
 export function raidOf(state: RaidState): Raid {
@@ -341,8 +380,12 @@ export function startStage(state: RaidState, truck: BuiltTruck, pace: PaceId): S
   const spec = raid.stages[state.stage]
   if (!spec) throw new RangeError(`No stage ${state.stage}`)
   const cls = truck.build.cls
-  const legs = stageLegs(cls, spec)
+  const weather = raidWeather(state)
+  const legs = weatherLegs(cls, stageLegs(cls, spec), weather)
   const airTemp = fromCelsius(spec.airC)
+  // The rivals get into more trouble the more of the stage the weather covers.
+  const covered = weather?.comes ? 1 - weather.at / (stageKm(spec) * 1000) : 0
+  const harsh = harshShare(spec) * (1 + covered * ((weather ? WEATHER[weather.kind].rivalRisk : 1) - 1))
   return {
     stage: state.stage,
     spec,
@@ -367,9 +410,10 @@ export function startStage(state: RaidState, truck: BuiltTruck, pace: PaceId): S
     stops: [],
     trace: { distance: [0], oil: [airTemp], wear: [worstDamage(state.wear)] },
     clips: [],
-    rivals: rivalStages(cls, legs.map((l) => l.par), stageKm(spec), harshShare(spec), raidSeed(state) * 100 + state.stage, raidField(state), raid.season === 'winter'),
+    rivals: rivalStages(cls, legs.map((l) => l.par), stageKm(spec), harsh, raidSeed(state) * 100 + state.stage, raidField(state), raid.season === 'winter'),
     status: 'driving',
     late: false,
+    weather,
   }
 }
 
@@ -406,31 +450,40 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     // If not, drive only as far as the first of them.
     let ground = seg.ground
     if (ground === 'ice' && run.shore) ground = ICE_ROAD.shoreGround
-    const speed = groundSpeed(run.truck, driver, ground, currentPace(run))
+    // Weather: once it has turned, this ground may be slower and rougher. If it turns partway along, drive up to there first.
+    const w = run.weather
+    const wet = weatherOn(w, run.at)
     let length = remaining
+    if (w?.comes && !wet && w.at < run.at + remaining) length = w.at - run.at
+    const speed = groundSpeed(run.truck, driver, ground, currentPace(run)) * (wet ? weatherSpeed(w!.kind, run.truck.build.cls, ground) : 1)
+    const blind = wet ? WEATHER[w!.kind].corner : 1
     let hazard: 'ice' | 'slide' | null = null
     const sheet = iceSheet(run.spec)
     if (ground === 'ice' && sheet) {
       const reading = iceReading(run.truck.mass, speed, sheet)
       const thin = placeOn(state, run, 'ice', ICE_ROAD.thinFrom, ICE_ROAD.thinTo) * seg.length
       if (reading.band === 'cracks' && run.segDone < thin) {
-        length = thin - run.segDone
-        hazard = 'ice'
-      } else if (reading.band === 'creaking' && run.segDone <= thin && !run.iceNotes.some((n) => n.leg === run.leg && n.seg === run.seg)) {
+        if (thin - run.segDone <= length) {
+          length = thin - run.segDone
+          hazard = 'ice'
+        }
+      } else if (reading.band === 'creaking' && run.segDone <= thin && thin - run.segDone <= length && !run.iceNotes.some((n) => n.leg === run.leg && n.seg === run.seg)) {
         run.iceNotes.push({ leg: run.leg, seg: run.seg, at: run.at + (thin - run.segDone), use: reading.use })
       }
     }
-    if (speed > cornerSpeed(run.truck, ground)) {
+    if (speed > cornerSpeed(run.truck, ground) * blind) {
       const corner = placeOn(state, run, 'corner', CORNERS.from, CORNERS.to) * seg.length
       if (run.segDone < corner && corner - run.segDone < length) {
         length = corner - run.segDone
         hazard = 'slide'
       }
     }
-    const seed = hashString(`${raidSeed(state)}:${run.stage}:${run.leg}:${run.seg}:${run.restarts}`)
+    // In the weather the road past the turn is a new stretch, so it gets its own seed.
+    const seed = hashString(`${raidSeed(state)}:${run.stage}:${run.leg}:${run.seg}:${run.restarts}${wet ? ':w' : ''}`)
+    const mod = wet ? groundMod(w!.kind, ground) : undefined
     const res = runStage(
       run.truck.ride,
-      { airTemp: run.airTemp, oilTemp: run.oil, segments: [{ ground, length, speed }] },
+      { airTemp: airNow(run), oilTemp: run.oil, segments: [{ ground, length, speed, ...(mod ? { mod } : {}) }] },
       seed,
       'sampled',
       run.truck.wear,
@@ -554,11 +607,18 @@ export function driveStage(state: RaidState, run: StageRun, paces: readonly Pace
 /** Let the oil cool while the truck stands (or crawls) for `seconds`. */
 function coolFor(run: StageRun, seconds: number): void {
   const ride = run.truck.ride
+  const air = airNow(run)
   for (let i = 0; i < 4; i++) {
     const d = (i < 2 ? ride.front : ride.rear).damper
     const decay = detExp((-d.coolStill * seconds) / d.heatCapacity)
-    run.oil[i] = run.airTemp + ((run.oil[i] as number) - run.airTemp) * decay
+    run.oil[i] = air + ((run.oil[i] as number) - air) * decay
   }
+}
+
+/** The air where the truck is now (K): the morning's, or the weather's once it has turned. */
+export function airNow(run: StageRun): number {
+  const w = run.weather
+  return weatherOn(w, run.at) ? run.airTemp + WEATHER[w!.kind].airK : run.airTemp
 }
 
 /** How long a faded damper takes to cool to its warm line, standing still (s). */
@@ -567,8 +627,9 @@ export function coolingTime(run: StageRun): number {
   let longest = 0
   for (let i = 0; i < 4; i++) {
     const d = (i < 2 ? ride.front : ride.rear).damper
-    const hot = (run.oil[i] as number) - run.airTemp
-    const warm = d.warmFrom - run.airTemp
+    const air = airNow(run)
+    const hot = (run.oil[i] as number) - air
+    const warm = d.warmFrom - air
     if (hot > warm && warm > 0) longest = Math.max(longest, (d.heatCapacity / d.coolStill) * detLog(hot / warm))
   }
   return Math.max(RAID.coolMin, longest)
@@ -644,6 +705,7 @@ export function finishStage(state: RaidState, run: StageRun): StageRecord {
     limped: run.limped,
     rivals: run.rivals,
     iceNotes: run.iceNotes.slice(),
+    weather: run.weather ? { ...run.weather } : null,
   }
   state.results.push(record)
   state.wear = structuredClone(run.wear)

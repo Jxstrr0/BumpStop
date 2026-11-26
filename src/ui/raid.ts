@@ -22,14 +22,16 @@ import { CLASSES } from '../data/classes'
 import { SPARE_IDS, type SpareId } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, FREE_RAID_IDS, JOBS, PACES, RAID, RAIDS, RIVALS, type DriverId, type PaceId, type RaidId, type Rival } from '../data/raids'
 import { t, tf, type StringKey } from '../data/strings'
+import type { WeatherId } from '../data/weather'
 import { checkBuild, partIn } from '../sim/build'
 import { driverName } from '../sim/career'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
   advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isRestDay, leaveCheckpoint,
-  parTime, raidOf, raidTruck, stageKm, standings, startStage, 
+  parTime, raidOf, raidTruck, raidWeather, stageKm, standings, startStage,
   type IceNote, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
 } from '../sim/raid'
+import { forecastWord, weatherOn, type StageWeather } from '../sim/weather'
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, bandOf, lineChart, type LineChart } from './charts'
 import { el, num } from './dom'
@@ -117,6 +119,25 @@ function stopText(st: Stop): string {
 /** One line about the ice creaking but holding. */
 function iceNoteText(n: IceNote): string {
   return tf('raidUi.iceCreak', { km: num(n.at / 1000, 1), pct: num(n.use * 100) })
+}
+
+/** The weather's name: "Thaw", or "thaw" in the middle of a sentence. */
+function weatherName(kind: WeatherId, lower = false): string {
+  const name = t(`weather.${kind}` as StringKey)
+  return lower ? name.toLowerCase() : name
+}
+
+/** What the weather does when it turns, in a few words. */
+function weatherTurn(kind: WeatherId): string {
+  return t(`weather.${kind}Turn` as StringKey)
+}
+
+/** The forecast's words: "Thaw likely (60% chance), coming in somewhere between km 40 and km 60." */
+function forecastText(w: StageWeather): string {
+  return tf('raidUi.forecast', {
+    kind: weatherName(w.kind), word: t(`forecast.${forecastWord(w.chance)}` as StringKey), pct: num(w.chance * 100),
+    from: num(w.from / 1000), to: num(w.to / 1000),
+  })
 }
 
 /** The ice band in the trace rule's colours: quiet is normal, creaking is warm, cracking is over the limit. */
@@ -330,14 +351,34 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       li.append(dist, el('p', 'rb-note', text))
       book.append(li)
     }
-    for (const seg of spec.segments) {
-      while (cp < cps.length && (cps[cp] as number) <= km) {
-        row(cps[cp] as number, tf('raidUi.checkpoint', { n: String(cp + 1) }), 'rb-cp')
-        cp++
+    // The weather's window, if there's a forecast, as a pencil note in the roadbook.
+    const forecast = raidWeather(s)
+    let noted = !forecast
+    const note = () => {
+      noted = true
+      row(Math.round(forecast!.from / 1000), tf('raidUi.bookWeather', {
+        kind: weatherName(forecast!.kind, true), word: t(`forecast.${forecastWord(forecast!.chance)}` as StringKey), to: num(forecast!.to / 1000),
+      }), 'warm-text')
+    }
+    /** The checkpoints and the forecast note that come before km `k`, in order. */
+    const marksBefore = (k: number) => {
+      for (;;) {
+        const cpAt = cp < cps.length && (cps[cp] as number) <= k ? (cps[cp] as number) : Infinity
+        const noteAt = !noted && forecast!.from / 1000 < k ? forecast!.from / 1000 : Infinity
+        if (cpAt === Infinity && noteAt === Infinity) return
+        if (noteAt < cpAt) note()
+        else {
+          row(cpAt, tf('raidUi.checkpoint', { n: String(cp + 1) }), 'rb-cp')
+          cp++
+        }
       }
+    }
+    for (const seg of spec.segments) {
+      marksBefore(km)
       row(km, tf('raidUi.segment', { ground: t(`ground.${seg.ground}` as StringKey), km: num(seg.km) }))
       km += seg.km
     }
+    marksBefore(total)
     row(total, t('raidUi.finish'), 'rb-cp')
 
     // Lake ice: how it reads for this truck at each pace call.
@@ -353,6 +394,19 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
         el('p', 'small', tf('raidUi.iceFacts', { cm: num(spec.ice.cm), t: num(truck.mass / 1000, 1) })),
         list,
         el('p', 'small', t('raidUi.iceNote')),
+      )
+    }
+
+    // The weather: the forecast for the day, and what it would do.
+    const weather = forecast
+    const weatherBox = el('div')
+    weatherBox.append(el('h4', 'raid-sub', t('raidUi.weatherHead')))
+    if (!weather) weatherBox.append(el('p', 'small', t('raidUi.clearDay')))
+    else {
+      weatherBox.append(
+        el('p', 'readout-line', forecastText(weather)),
+        el('p', 'small', t(`weather.${weather.kind}Text` as StringKey)),
+        el('p', 'small', t('raidUi.forecastNote')),
       )
     }
 
@@ -372,7 +426,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     })
     show(
       head, facts,
-      el('h4', 'raid-sub', t('raidUi.roadbook')), book, iceBox,
+      el('h4', 'raid-sub', t('raidUi.roadbook')), book, weatherBox, iceBox,
       el('h4', 'raid-sub', t('raidUi.condition')), conditionList(s),
       el('p', 'small', tf('raidUi.sparesLine', { list: sparesList(s.spares) })), settings,
       el('h4', 'raid-sub', t('raidUi.paceCall')), paceRow, paceText, start, retireButton(),
@@ -416,6 +470,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     let shownTo = 0
     let logged = 0
     let creaks = 0
+    let turned = false
 
     /** Draw the trace up to `upTo` metres (rebuilt when the sim adds to it). */
     function draw(upTo: number): void {
@@ -450,6 +505,12 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       while (logged < r.stops.length && (r.stops[logged] as Stop).at <= upTo + 1) addStop(r.stops[logged++] as Stop)
       while (creaks < r.iceNotes.length && (r.iceNotes[creaks] as IceNote).at <= upTo + 1) {
         log.append(el('li', 'warm-text', iceNoteText(r.iceNotes[creaks++] as IceNote)))
+      }
+      // The weather turning, as the highlight passes the place.
+      const w = r.weather
+      if (!turned && w && weatherOn(w, r.at) && w.at <= upTo + 1) {
+        turned = true
+        log.append(el('li', 'warm-text', tf('raidUi.weatherTurn', { km: num(w.at / 1000, 1), kind: weatherName(w.kind), what: weatherTurn(w.kind) })))
       }
     }
 
@@ -499,7 +560,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
           endLeg()
           return
         }
-        view3d.show(i)
+        view3d.show(i, r.weather && weatherOn(r.weather, c.at) ? r.weather.kind : null)
         const span = c.poses[c.poses.length - 1]!.t - c.poses[0]!.t
         duration = c.broken ? span / BREAK_RATE + BREAK_HOLD : span
         clipStart = performance.now()
@@ -565,6 +626,17 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       })
       const notes = el('div')
       if (r.limped && r.stops.filter((st) => st.leg === r.leg).length >= RAID.maxStopsPerLeg) notes.append(el('p', 'small hot-text', t('raidUi.limped')))
+      // The weather so far: on since the turn, still to come, or held off.
+      const w = r.weather
+      if (w && weatherOn(w, r.at)) {
+        notes.append(el('p', 'small warm-text', tf('raidUi.cpWeatherOn', { kind: weatherName(w.kind), km: num(w.at / 1000), what: weatherTurn(w.kind) })))
+      } else if (w && r.at < w.to) {
+        notes.append(el('p', 'small', tf('raidUi.cpWeatherDue', {
+          kind: weatherName(w.kind, true), word: t(`forecast.${forecastWord(w.chance)}` as StringKey), from: num(w.from / 1000), to: num(w.to / 1000),
+        })))
+      } else if (w) {
+        notes.append(el('p', 'small', tf('raidUi.cpWeatherHeld', { kind: weatherName(w.kind, true) })))
+      }
       card.replaceChildren(
         h,
         el('p', 'readout-line', tf('raidUi.cpTime', { time: clock(mine), place: tf('raidUi.cpPlace', { pos: ordinal(pos), n: String(field.length) }) })),
@@ -615,6 +687,9 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       lines.append(stops)
     }
     for (const n of rec.iceNotes ?? []) lines.append(el('p', 'small warm-text', iceNoteText(n)))
+    const w = rec.weather
+    if (w?.comes) lines.append(el('p', 'small warm-text', tf('raidUi.resWeather', { kind: weatherName(w.kind), km: num(w.at / 1000) })))
+    else if (w) lines.append(el('p', 'small', tf('raidUi.cpWeatherHeld', { kind: weatherName(w.kind, true) })))
     if (rec.limped) lines.append(el('p', 'small hot-text', t('raidUi.limped')))
     const next = button(t(s.phase === 'done' ? 'raidUi.toFinal' : 'raidUi.toBivouac'), 'btn start-btn')
     next.addEventListener('click', () => (s.phase === 'done' ? finalScreen() : bivouacScreen()))

@@ -19,6 +19,7 @@ import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
 import { PHOTO_LIFT } from '../data/graphics'
 import type { FailureKind } from '../data/wear'
+import { WEATHER_LOOK, type WeatherId } from '../data/weather'
 import type { Profile } from '../sim/ground'
 import type { Pose } from '../sim/poses'
 import { addLights, applyLook, applyTier, cssColour, isDark, makeRenderer, onLookChange } from './look'
@@ -79,6 +80,8 @@ export interface TrackView {
   photoStart(): PhotoControls | null
   photoSet(c: PhotoControls): void
   photoEnd(): void
+  /** The sky for a raid's weather (the fog closes in and changes colour); 'clear' for a clear day. */
+  setWeather(kind: WeatherId | 'clear'): void
   /** The view as it stands, drawn with its longer side `longSide` pixels and copied onto a plain canvas. */
   snapshot(longSide: number): HTMLCanvasElement | null
   dispose(): void
@@ -175,13 +178,20 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   let waiting: { clip: readonly Pose[]; o: ClipOptions } | 'stop' | null = null
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
 
+  // The raid's weather, if any: it sets the sky colour and how near the fog closes in.
+  let weather: WeatherId | 'clear' = 'clear'
+
   function look(): void {
     applyLook(scene, lights)
     const dark = isDark()
-    // A pale northern sky by day; a deep blue one for night stages.
-    const sky = new THREE.Color(dark ? 0x151922 : 0xdfe4e3)
+    // A pale northern sky by day; a deep blue one for night stages. Weather greys it, whitens it or browns it.
+    const w = WEATHER_LOOK[weather]
+    const sky = new THREE.Color(dark ? w.dark : w.light)
     scene.background = sky
-    ;(scene.fog as THREE.Fog).color.copy(sky)
+    const fog = scene.fog as THREE.Fog
+    fog.color.copy(sky)
+    fog.near = w.near
+    fog.far = w.far
     shopFloorMat.color.copy(cssColour('--panel-2', '#ece8dc'))
     dust.setColour(dark ? 0x6b6457 : 0xc8b89a)
     smoke.setColour(dark ? 0x9a9a9a : 0xeeeeee)
@@ -481,6 +491,11 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   resize()
 
   return {
+    setWeather(kind) {
+      if (kind === weather) return
+      weather = kind
+      look()
+    },
     async setRun(next) {
       const mine = ++ticket
       if (truck?.cls !== next.cls) {
