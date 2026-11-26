@@ -25,5 +25,8 @@ Each copied file says where it came from in its first line
 
 ## Sound and art
 
-None yet. The truck models (plan PR 5) are made in Blender by script and
-the sounds (plan PR 6) are openly licensed recordings, each with a line here.
+| File | Source |
+| --- | --- |
+| `public/models/truck-*.glb` | Made for Bump Stop by `scripts/blender/make-trucks.py` (no outside assets) |
+
+The sounds (plan PR 6) will be openly licensed recordings, each with a line here.
