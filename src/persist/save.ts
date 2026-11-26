@@ -4,7 +4,7 @@
  *
  * A save is plain JSON: the build for each class, the class on the bench,
  * the year, the raid in progress (if any), the last run on each rig (the
- * ghosts) and the career (format 2, plan PR 9). Save codes leave the ghosts out (`leanSave`) because they're big
+ * ghosts) and the career (format 2, plan PR 9; format 3 has six raids a year). Save codes leave the ghosts out (`leanSave`) because they're big
  * and only there for comparing runs.
  *
  * `readSave` takes anything (a slot from storage, an unpacked save code)
@@ -309,8 +309,25 @@ function readCareer(raw: unknown): CareerState {
 }
 
 /**
+ * A format 2 career's next raid, moved onto the six-raid calendar: the same
+ * raid if it's still there, otherwise the next one that is. A job already
+ * under way at a raid that left the calendar carries on and is settled at
+ * that next raid, so nobody loses a truck, a fee or a raid in progress.
+ */
+function nextOnNewCalendar(oldNext: unknown): unknown {
+  if (typeof oldNext !== 'number' || !Number.isInteger(oldNext) || oldNext < 0 || oldNext >= SAVE.calendarV2.length) return oldNext
+  for (let k = oldNext; k < SAVE.calendarV2.length; k++) {
+    const at = CALENDAR.findIndex((e) => e.raid === SAVE.calendarV2[k])
+    if (at >= 0) return at
+  }
+  return CALENDAR.length - 1
+}
+
+/**
  * Move a save made by an older format up one step at a time.
  * - 1 → 2 (plan PR 9): the career arrives; an old garage has none.
+ * - 2 → 3 (26 November 2026): six raids a year instead of eight, so the
+ *   career's `next` moves onto the new calendar (`nextOnNewCalendar`).
  */
 function migrate(input: Record<string, unknown>): Record<string, unknown> {
   let raw = input
@@ -318,6 +335,7 @@ function migrate(input: Record<string, unknown>): Record<string, unknown> {
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 1) fail('save has no format number')
   if (v > SAVE.version) throw new SaveFormatError('future', 'save is from a newer Bump Stop')
   if (raw.v === 1) raw = { ...raw, v: 2, career: null }
+  if (raw.v === 2) raw = { ...raw, v: 3, career: isObj(raw.career) ? { ...raw.career, next: nextOnNewCalendar(raw.career.next) } : raw.career }
   // The next change: `if (raw.v === 2) raw = { ...raw, v: 3, newThing: ... }`, and so on.
   return raw
 }

@@ -3,7 +3,13 @@
  */
 export const SAVE = {
   /** The newest save format. Older ones are moved up by `src/persist/save.ts`. */
-  version: 2,
+  version: 3,
+  /**
+   * The career's calendar in save format 2, in order: `next` in those saves
+   * points into this list. Format 3 (26 November 2026) cut the year to six
+   * raids, so a format 2 save's `next` is moved onto the new `CALENDAR`.
+   */
+  calendarV2: ['winterSprint', 'winterRaid', 'summerSprint', 'summerRaid', 'nationalRaid', 'midsummerSprint', 'autumnRaid', 'longOne'] as const,
   /** Wait this long after the last change before writing the slot (ms), so a slider drag is one write. */
   autosaveDelayMs: 1200,
   /** Remind the player to make a backup after this many days without one. */

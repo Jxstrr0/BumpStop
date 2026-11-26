@@ -56,7 +56,7 @@ This goes through the build store's bench (`setBench` in
 ## The shape of it
 
 You start on day 15 of 1985: a two-person garage with 8,000 in the bank
-and no truck. Every year has eight raids, two of them in winter (`CALENDAR`), and at each one the
+and no truck. Every year has six raids, two of them in winter (`CALENDAR`), and at each one the
 garage does **one job**:
 
 1. **A prep contract.** A privateer brings a class, a budget and a driver.
@@ -85,10 +85,8 @@ working; the finale's tier is still called `long` in the code.
 | --- | --- | --- | --- | --- |
 | 40 | Cold Start 300 | `winterSprint` | 3 | regional |
 | 75 | Frozen Knuckle | `winterRaid` | 4 | regional |
-| 130 | Blackfly Classic | `summerSprint` | 3 | regional |
 | 158 | Washboard 800 | `summerRaid` | 5 | regional |
 | 186 | Dust Supper | `nationalRaid` | 7 | national |
-| 216 | Gravel Pit Derby | `midsummerSprint` | 3 | regional |
 | 244 | Polar Night Raid | `autumnRaid` | 5 | national |
 | 268 | The Whole Damn Country | `longOne` | 14 | the finale |
 
@@ -127,7 +125,7 @@ because the rivals' budgets grow and better parts come out.
 ## Reputation
 
 Results earn reputation (half as much for a contract): a regional raid
-gives 1 to finish, 2 for a podium and 4 for a win; a national raid 2, 4 and
+gives 1 to finish, 3 for a podium and 5 for a win; a national raid 2, 4 and
 7; the Whole Damn Country 3, 8 and 15 (`TIERS`). A podium at every raid
 opens the Whole Damn Country in the third or fourth season (plan PR 13 slowed it from the
 second). It opens:

@@ -61,8 +61,9 @@ describe('starting a career', () => {
     expect(Object.keys(c.teams.highbank)).toEqual([])
   })
 
-  it('has eight raids a year, in order: the Winter Sprint first and the Long One last', () => {
-    expect(CALENDAR.length).toBe(8)
+  it('has six raids a year, in order: the Cold Start 300 first and the finale last', () => {
+    expect(CALENDAR.length).toBe(6)
+    expect(CALENDAR.map((e) => e.raid)).toEqual(['winterSprint', 'winterRaid', 'summerRaid', 'nationalRaid', 'autumnRaid', 'longOne'])
     expect(CALENDAR[0]!.raid).toBe('winterSprint')
     expect(RAIDS.winterSprint.stages.length).toBe(3)
     expect(CALENDAR.filter((e) => RAIDS[e.raid].season === 'winter').map((e) => e.raid)).toEqual(['winterSprint', 'winterRaid'])
@@ -411,12 +412,27 @@ describe('the shop', () => {
 
 describe('the career in the save (format 2)', () => {
   it('moves a format 1 save up with no career', () => {
-    expect(SAVE.version).toBe(2)
+    expect(SAVE.version).toBe(3)
     const old = { ...newSave(), v: 1 } as Record<string, unknown>
     delete old.career
     const read = readSave(old)
-    expect(read.v).toBe(2)
+    expect(read.v).toBe(3)
     expect(read.career).toBeNull()
+  })
+
+  it('moves a format 2 career from the eight-raid calendar onto the six-raid one', () => {
+    const old = (next: number) => {
+      const save = { ...newSave(), v: 2, career: { ...newCareer(5), next } } as Record<string, unknown>
+      return readSave(JSON.parse(JSON.stringify(save))).career!
+    }
+    const raidAt = (next: number) => CALENDAR[old(next).next]!.raid
+    // The same raid where it's still on the calendar...
+    expect(SAVE.calendarV2.map((_, k) => raidAt(k))).toEqual(
+      ['winterSprint', 'winterRaid', 'summerRaid', 'summerRaid', 'nationalRaid', 'autumnRaid', 'autumnRaid', 'longOne'])
+    // ...and a raid that left it moves on to the next one that's still there.
+    expect(old(2).next).toBe(CALENDAR.findIndex((e) => e.raid === 'summerRaid'))
+    expect(old(5).next).toBe(CALENDAR.findIndex((e) => e.raid === 'autumnRaid'))
+    expect(() => readSave({ ...newSave(), v: 2, career: { ...newCareer(5), next: 8 } })).toThrow()
   })
 
   it('keeps a career, a contract on the bench and a career raid through a save', () => {
