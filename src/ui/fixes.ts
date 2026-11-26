@@ -12,6 +12,7 @@ import type { FixTarget } from '../data/failures'
 import type { AxleSettings, TruckBuild } from '../data/kit'
 import type { DamperPart, SlotId } from '../data/parts'
 import { partIn, partsFor } from '../sim/build'
+import { reveal } from './dom'
 
 export type End = 'front' | 'rear'
 
@@ -129,7 +130,7 @@ export function jumpTo(jump: Jump, root: ParentNode = document): boolean {
     details.open = true
     // The slot's heading, not the middle of its (long) list of choices.
     const summary = details.querySelector<HTMLElement>('summary') ?? details
-    summary.scrollIntoView({ behavior: smooth(), block: 'center' })
+    reveal(summary, { behavior: smooth(), block: 'center' })
     const checked = details.querySelector<HTMLInputElement>('input:checked') ?? details.querySelector<HTMLElement>('summary')
     checked?.focus({ preventScroll: true })
     flash(details)
@@ -140,7 +141,7 @@ export function jumpTo(jump: Jump, root: ParentNode = document): boolean {
   if (!details || !input) return false
   details.open = true
   const row = input.closest<HTMLElement>('.setting') ?? input
-  row.scrollIntoView({ behavior: smooth(), block: 'center' })
+  reveal(row, { behavior: smooth(), block: 'center' })
   input.focus({ preventScroll: true })
   flash(row)
   return true

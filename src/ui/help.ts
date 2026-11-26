@@ -24,7 +24,7 @@ import { factorySetup, runLesson, type LessonClip, type LessonSetup } from '../s
 import { dampingMultiplier } from '../sim/ride'
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, lineChart, type Band } from './charts'
-import { el, num, oneOpenAtATime, svg } from './dom'
+import { el, num, oneOpenAtATime, reveal, svg } from './dom'
 import { fixJump, jumpTo } from './fixes'
 
 const C0 = 273.15
@@ -239,7 +239,7 @@ export function helpPanel(store: BuildStore): HelpPanel {
     if (focus) {
       const h = lessonBody.querySelector<HTMLElement>('h3')
       h?.focus({ preventScroll: true })
-      lessonsBox.scrollIntoView({ behavior: smooth(), block: 'start' })
+      reveal(lessonsBox, { behavior: smooth(), block: 'start' })
     }
   }
 
@@ -498,7 +498,7 @@ export function helpPanel(store: BuildStore): HelpPanel {
         search.value = ''
         filter()
       }
-      row.dt.scrollIntoView({ behavior: smooth(), block: 'center' })
+      reveal(row.dt, { behavior: smooth(), block: 'center' })
       row.dt.focus({ preventScroll: true })
       flash(row.dd)
     },

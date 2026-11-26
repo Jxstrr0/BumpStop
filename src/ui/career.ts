@@ -7,7 +7,7 @@
  *   contract, enter your own truck, or sit it out. A contract truck is built
  *   on the build screen under the privateer's budget, then handed over: the
  *   privateer races it here, a stage at a time, and the results card shows
- *   what it paid. Your own entry hands over to the Raids panel below, which
+ *   what it paid. Your own entry hands over to the Raids panel (the Raid tab), which
  *   comes back here when the raid ends.
  * - **Your truck:** buy one, sell it, and (when broke) sell its parts down.
  *   Upgrades happen on the build screen, with "Buy these parts".
@@ -45,7 +45,7 @@ import { setAlbumHook } from './album'
 import { hallBlock, type HallBlock } from './hall'
 import type { GlossaryId } from '../data/glossary'
 import type { BuildStore } from './buildStore'
-import { el, num } from './dom'
+import { el, num, reveal } from './dom'
 import { ordinal, raidTable, type RaidCareer } from './raid'
 import { farewellText, logbookBlock, oldTrucksBlock } from './logbook'
 import { firstJobGuide } from './tutorial'
@@ -408,7 +408,10 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     if (job?.kind === 'contract') jobHolder.append(contractCard(career, job.contract))
     else if (job?.kind === 'own') {
       const go = button(t('career.toRaid'))
-      go.addEventListener('click', () => document.getElementById('raid')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+      go.addEventListener('click', () => {
+        const raid = document.getElementById('raid')
+        if (raid) reveal(raid, { behavior: 'smooth', block: 'start' })
+      })
       jobHolder.append(el('p', 'small', t('career.raidOn')), go)
     } else {
       jobHolder.append(offersBlock(career), ownEntryBlock(career), skipBlock(career))
@@ -442,7 +445,8 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
         save()
         syncBench()
         render()
-        document.querySelector('.panel.build')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        const build = document.querySelector('.panel.build')
+        if (build) reveal(build, { behavior: 'smooth', block: 'start' })
       })
       li.append(b)
       list.append(li)
@@ -567,7 +571,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     save()
     syncBench()
     render()
-    box.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    reveal(box, { behavior: 'smooth', block: 'start' })
   }
 
   function resultsCard(s: Settlement, table: HTMLElement | null): HTMLElement {

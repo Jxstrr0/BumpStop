@@ -254,7 +254,7 @@ const STRINGS = {
 
   'build.title': 'Build',
   'build.lead':
-    'Pick a part for every slot and tune each axle, inside the class weight and your budget. The rigs in the shop below test this truck.',
+    'Pick a part for every slot and tune each axle, inside the class weight and your budget. The rigs under the Test tab try this truck out.',
   'build.year': 'Year',
   'view3d.alt': 'The test track in 3D: your truck driving the rig, its suspension moving as the sim says.',
   'view3d.altShaker': 'The shaker rig in 3D: your truck on four posts, its suspension moving as the sim says.',
@@ -873,6 +873,13 @@ const STRINGS = {
   'buildCode.notValid': 'That code unpacked, but it isn\'t a truck build.',
 
   'footer.studio': 'Longlight Interactive',
+  // The bottom tabs (Kelbo asked, 26 November 2026).
+  'tabs.label': 'Parts of the game',
+  'tabs.career': 'Career',
+  'tabs.build': 'Build',
+  'tabs.test': 'Test',
+  'tabs.raid': 'Raid',
+  'tabs.more': 'More',
   // The career screens (plan PR 9b). Money is written cr. (Kelbo, 26 November 2026).
   'career.title': 'The career',
   'career.lead': 'Run a two-person garage from 1985 to 2025. Prep privateers’ trucks for money, then race your own, win sponsors and a works deal, and one day win the Whole Damn Country.',
@@ -908,7 +915,7 @@ const STRINGS = {
   'career.benchContract': 'Building privateer #{n}’s {cls}, budget {budget}.',
   'career.benchOwn': 'Your own {cls}. Settings are free; parts cost money.',
   'career.benchShop': 'No truck yet: you can look at parts, but there’s nothing to build.',
-  'career.buildIt': 'Build it on the build screen below until it’s legal under their budget:',
+  'career.buildIt': 'Build it on the Build tab until it’s legal under their budget:',
   'career.readyToHand': 'Legal and under budget: ready to hand over.',
   'career.handOver': 'Hand it over',
   'career.giveBack': 'Give the contract back',
@@ -923,7 +930,7 @@ const STRINGS = {
   'career.prizes': 'Prize money, first place down: {list}.',
   'career.enter': 'Enter the raid',
   'career.toRaid': 'Go to the raid',
-  'career.raidOn': 'Your truck is in this raid: it runs in the Raids panel below.',
+  'career.raidOn': 'Your truck is in this raid: it runs on the Raid tab.',
   'career.skip': 'Sit this one out',
   'career.skipSure': 'Tap again to sit it out',
   'career.why.busy': 'The garage already has a job for this raid.',
@@ -1009,7 +1016,7 @@ const STRINGS = {
   'help.lead': 'New to suspension? Four short lessons on what dampers do, and what every word in the game means.',
   'help.lessons': 'Damper lessons',
   'help.glossary': 'Glossary',
-  'help.pointer': 'New to suspension? Lessons and a glossary are in Help.',
+  'help.pointer': 'New to suspension? Lessons and a glossary are in Help, under More.',
   'help.toHelp': 'Open the help',
   'help.lessonOf': 'Lesson {n} of {total}',
   'help.back': 'Back',
@@ -1178,7 +1185,7 @@ const STRINGS = {
   'guide.handText': 'Once the truck is legal (inside their budget and the class weight), tap Hand it over below. Privateer #{n} races it, a stage a day.',
   'guide.results': 'Read the results',
   'guide.resultsText': 'Your fee, any bonus for how they did, and the reputation it earned. Then Onward to the next raid.',
-  'guide.finished': 'First job done. That’s the loop: build it, break it, tune it, prove it. Next come more contracts, then a truck of your own. The Help panel at the bottom has damper lessons and a glossary whenever you want them.',
+  'guide.finished': 'First job done. That’s the loop: build it, break it, tune it, prove it. Next come more contracts, then a truck of your own. Help, under the More tab, has damper lessons and a glossary whenever you want them.',
   'boot.failed': 'Bump Stop could not start. Reload to try again.',
 
   'settings.title': 'Settings',

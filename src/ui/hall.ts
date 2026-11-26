@@ -25,7 +25,7 @@ import type { SlotNo } from '../persist/slots'
 import { driverName, type CareerState } from '../sim/career'
 import { recap, type HallRecap, type SeasonLine } from '../sim/hall'
 import { favouriteTruck, type TruckLog } from '../sim/logbook'
-import { el, num } from './dom'
+import { el, num, reveal } from './dom'
 import { momentText } from './logbook'
 import { ordinal } from './raid'
 
@@ -186,7 +186,7 @@ export function hallBlock(c: CareerState, opts: HallOptions = {}): HallBlock {
     open() {
       box.open = true
       draw()
-      box.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      reveal(box, { behavior: 'smooth', block: 'start' })
     },
   }
 }

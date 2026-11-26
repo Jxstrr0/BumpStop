@@ -38,7 +38,7 @@ import {
 import { forecastAt, forecastWord, weatherOn, type StageWeather } from '../sim/weather'
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, bandOf, lineChart, type LineChart } from './charts'
-import { el, num } from './dom'
+import { el, num, showTabFor } from './dom'
 import { paceCheckBlock } from './paceCheck'
 import { BREAK_RATE, raidView } from './raidView'
 
@@ -863,6 +863,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
   })
 
   career?.register((next) => {
+    // Started from the career panel: bring the Raid tab up.
+    showTabFor(box)
     stopTimers()
     run = null
     state = next
