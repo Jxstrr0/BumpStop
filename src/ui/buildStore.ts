@@ -8,6 +8,7 @@ import { CLASSES, type ClassId } from '../data/classes'
 import type { TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR } from '../data/parts'
 import { buildTruck, shopRules, stockBuild, tidyBuild, type BuildRules, type BuiltTruck } from '../sim/build'
+import type { TruckLog } from '../sim/logbook'
 
 /** What changed: the class (or year) means redraw everything; a part or setting just the numbers. */
 export type Change = 'class' | 'year' | 'part' | 'setting' | 'bench'
@@ -29,6 +30,8 @@ export interface Bench {
   reset?(): TruckBuild
   /** A note and maybe a button under the money line (e.g. "Buy these parts"), checked after every change. */
   note?(b: TruckBuild): { text: string; button?: { text: string; run(): void } } | null
+  /** The logbook of the truck on the bench (the garage's own truck), for the truck card. */
+  log?(): TruckLog | null
 }
 
 export interface BuildStore {
