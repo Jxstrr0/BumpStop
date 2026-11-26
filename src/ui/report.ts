@@ -14,6 +14,7 @@
  */
 import { CLASSES, type ClassId } from '../data/classes'
 import { FAILURES, WARM_SHARE, type CornerChannel, type FixTarget, type FrameChannel } from '../data/failures'
+import { PACE_CHECK } from '../data/paceCheck'
 import { RIG_VIEW, type ShopRigId } from '../data/rigs'
 import { t, tf, type StringKey } from '../data/strings'
 import type { BuiltTruck } from '../sim/build'
@@ -25,6 +26,7 @@ import type { BreakEvent } from '../sim/wear'
 import { BAND_WORD, ghostLegend, lineChart, type Band, type Series } from './charts'
 import { el, num } from './dom'
 import { endOf, fixJump, fixUseful, type End, type Jump } from './fixes'
+import { paceCheckBlock } from './paceCheck'
 
 const C0 = 273.15
 
@@ -382,6 +384,10 @@ export function lapReport(run: LapRun, stopped: boolean, ghost: LapGhost | null,
     box.append(crewNote(stopped ? tf('crew.stopped', { lap: String(lapNo) }) : tf('crew.lasted', { laps: String(run.laps.length) })))
     const cmp = compareLine(run, stopped, ghost)
     if (cmp) box.append(cmp)
+  }
+  // What the rig means on a raid (playtest, 26 November 2026: "the rigs don't predict the raids").
+  if (ctx.rig !== 'shaker') {
+    box.append(paceCheckBlock(ctx.truck, null, PACE_CHECK.rigGround[ctx.rig], PACE_CHECK.shopAirC, 'paceCheck.leadRig'))
   }
   box.append(runAgainButton(ctx))
   return box

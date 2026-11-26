@@ -57,6 +57,14 @@ export const CONDITION = {
   },
   /** A new or rebuilt shock on one corner: the axle's oil is left this share as tired (the other shock is still old). */
   oneShock: 0.5,
+  /**
+   * Harsh kilometres age the springs and bushings this many times as fast at
+   * each pace call (playtest, 26 November 2026: "Push is always right").
+   * Bottom-outs and the oil's heat already follow the speed through the
+   * physics; this is the pounding in between. So Push gains time today and
+   * leaves the crew more to put right tonight, and on a long raid it adds up.
+   */
+  paceLoad: { conserve: 0.6, steady: 1, push: 1.7 },
 } as const
 
 /**

@@ -242,6 +242,40 @@ roll: `src/sim/weather.ts`; driving it: `advanceStage` in `src/sim/raid.ts`.
 - **Saves:** each stage result keeps the day's weather (`StageRecord.weather`);
   saves from before have none and load as they are.
 
+## The pace check and what Push costs
+
+Playtest, 26 November 2026: "Push is always right, and the rigs don't
+predict the raids." Two changes:
+
+- **The pace check** (`src/sim/paceCheck.ts`, numbers in
+  `src/data/paceCheck.ts`, on screen `src/ui/paceCheck.ts`). Each morning,
+  above the pace call, the ride sim drives 5 km of each kind of rough
+  ground on the day's stage (graded gravel and lake ice are left out) at
+  Conserve, Steady and Push, with the truck as it stands that morning (its
+  tired oil, sagged springs and cracked bushings included), the hired
+  driver and the stage's air. One line per pace call: the hottest the
+  shocks get and where, and the worst part's wear per 10 km and where, each
+  with its word (Normal, Warm, Over the limit) and the line in the worse
+  one's colour. It's the stage's own physics (`runStage`, sampled) on its
+  own seeded road, worked out a ground per frame so the screen doesn't
+  freeze. It can't know the weather or how warm the oil starts, so it
+  says it's a guide.
+- **Push ages the truck.** Harsh kilometres (rough, whoops, rocks, jumps,
+  frost heaves) wear the springs and bushings 1.7 times as fast at Push,
+  0.6 times at Conserve (`CONDITION.paceLoad`); the oil's heat and the
+  bottom-outs already followed the speed. So Push gains time today and
+  leaves more for the crew to put right tonight, and over a long raid it
+  adds up (`docs/BIVOUAC.md`).
+
+What the sim says about Push (light 4x4, the veteran, four seeds,
+`scripts/harness/push.harness.ts`): on the Washboard 800 Push was no
+quicker than Steady for a stock truck or one with 1986's best dampers and
+tires (its extra cut tires and fades ate the gain), and cost a fifth to a
+third more in repairs; on Dust Supper the better truck was about 10%
+quicker on Push for about 30% more repairs; on the Cold Start 300 Push on
+plain tires was slower (it slid into the snowbanks). So Push pays when the
+truck is built for it, and the pace check is how to tell.
+
 ## Highlights for the 3D
 
 A long stage drives a full-detail sample of each 5 km chunk and works out

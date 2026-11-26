@@ -147,7 +147,8 @@ export function playCareer(o: BotOptions): BotResult {
       const pick = open[0]
       if (pick) {
         takeContract(c, pick)
-        // The privateer's stock truck, or the cheapest legal one when that's over their budget.
+        // The privateer's truck put back to the factory's settings (undoing their own changes), or the cheapest legal one when that's over their budget.
+        setContractBuild(c, stockBuild(pick.cls))
         if (contractProblems(c).length && c.job?.kind === 'contract') setContractBuild(c, cheapestBuild(c.job.build, c.year))
         const state = contractRaid(c)
         driveAuto(state)

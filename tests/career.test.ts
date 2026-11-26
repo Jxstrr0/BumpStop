@@ -4,7 +4,7 @@
  * One, and the career's place in the save (format 2).
  */
 import { describe, expect, it } from 'vitest'
-import { CALENDAR, CAREER, CLASS_MONEY, TEAMS, TIERS, UPGRADES } from '../src/data/career'
+import { CALENDAR, CAREER, CLASS_MONEY, DRIVER_TERMS, QUIRKS, TEAMS, TIERS, UPGRADES } from '../src/data/career'
 import { CLASSES } from '../src/data/classes'
 import type { TruckBuild } from '../src/data/kit'
 import { SLOTS } from '../src/data/parts'
@@ -105,6 +105,31 @@ describe('prep contracts', () => {
     }
   })
 
+  it('come with the privateer’s own changes, which the bench starts from (not the first job)', () => {
+    const first = newCareer(3)
+    expect(offers(first)[0]!.quirks).toEqual([])
+    let seen = 0
+    for (let seed = 1; seed <= 20; seed++) {
+      const c = newCareer(seed)
+      settle(c, null)
+      for (const o of offers(c)) {
+        expect(o.quirks!.length).toBeGreaterThanOrEqual(1)
+        expect(o.quirks!.length).toBeLessThanOrEqual(2)
+        for (const q of o.quirks!) expect(QUIRKS[q].hurts[RAIDS[nextEvent(c).raid].season]).toContain(o.cls)
+        const d = newCareer(seed)
+        settle(d, null)
+        d.rep = 100
+        takeContract(d, o)
+        const b = (d.job as { build: TruckBuild }).build
+        const stock = stockBuild(o.cls)
+        expect(b.parts).toEqual(stock.parts)
+        expect(b).not.toEqual(stock)
+        seen++
+      }
+    }
+    expect(seen).toBe(60)
+  })
+
   it('pay a fee and a bonus by result once the privateer has raced the truck', () => {
     const c = newCareer(7)
     const o = offers(c)[0]!
@@ -160,11 +185,28 @@ describe('your own truck', () => {
     // A part that isn't out yet can't be fitted, and a truck can't change class.
     expect(() => fitOwn(c, { ...c.own!, parts: { ...c.own!.parts, dampers: 'electronic' } })).toThrow()
     expect(() => fitOwn(c, stockBuild('sxs'))).toThrow()
-    const value = truckValue(c.own!)
+    const value = truckValue(c)
     const money = c.money
     sellTruck(c)
     expect(c.own).toBeNull()
     expect(c.money).toBe(money + value)
+  })
+
+  it('a truck that has not raced sells back for most of its price, less for each raid, never under half', () => {
+    const c = newCareer(1)
+    c.money = 100_000
+    buyTruck(c, 'light4x4')
+    const cost = massAndCost(c.own!).cost
+    expect(truckValue(c)).toBe(Math.round(cost * CAREER.truckResale.new))
+    const log = c.trucks.at(-1)!
+    log.raids = 2
+    expect(truckValue(c)).toBe(Math.round(cost * (CAREER.truckResale.new - 2 * CAREER.truckResale.perRaid)))
+    log.raids = 40
+    expect(truckValue(c)).toBe(Math.round(cost * CAREER.resale))
+    // With the works deal's discount, selling never pays back more than buying cost.
+    log.raids = 0
+    c.rep = 1000
+    expect(truckValue(c)).toBeLessThanOrEqual(truckPrice(c, 'light4x4'))
   })
 
   it('pays only for changed parts under the build rules, with money back for parts sold', () => {
@@ -204,9 +246,12 @@ describe('your own truck', () => {
     buyUpgrade(c, 'secondMechanic')
     const money = c.money
     const state = enterOwn(c, 'veteran')
-    const fees = TIERS.regional.entryFee * CLASS_MONEY.sxs + 2000 * CLASS_MONEY.sxs - 1500 * CLASS_MONEY.sxs
+    const fees = (TIERS.regional.entryFee + DRIVER_TERMS.veteran.fee * TIERS.regional.driverFee - 1500) * CLASS_MONEY.sxs
     expect(c.money).toBeCloseTo(money - fees, 6)
-    expect(c.job).toEqual({ kind: 'own', driver: 'veteran' })
+    expect(c.job).toMatchObject({ kind: 'own', driver: 'veteran' })
+    const paid = (c.job as { paid: { entry: number; sponsor: number } }).paid
+    expect(paid.entry - paid.sponsor).toBeCloseTo(fees, 6)
+    expect(paid.sponsor).toBeCloseTo(1500 * CLASS_MONEY.sxs, 6)
     expect(state.entry.hours).toBe(RAID.bivouacHours + 2)
     expect(crewHours(c)).toBe(RAID.bivouacHours + 2)
     expect(state.entry.seed).toBe(eventSeed(c))
@@ -228,9 +273,36 @@ describe('your own truck', () => {
     // A wrecked tire: a quarter of the tire set's price, times the repair share.
     expect(s.repairs).toBe(Math.round((partIn(state.entry.build, 'tires').cost.light4x4! / 4) * CAREER.repairShare))
     expect(c.money).toBe(money + s.prize - s.repairs - s.spares)
+    // All told counts the fees paid at entry too (playtest, 26 November 2026).
+    expect(s.entry).toBe(TIERS.regional.entryFee + DRIVER_TERMS.veteran.fee * TIERS.regional.driverFee)
+    expect(s.sponsor).toBe(0)
+    expect(s.money).toBe(s.prize - s.repairs - s.spares - s.bivouac - s.entry)
     expect(c.rep).toBe(TIERS.regional.repFor.win)
     expect(c.stats).toMatchObject({ raids: 1, wins: 1, podiums: 1 })
     expect(s.winners.light4x4).toBe('you')
+  })
+
+  it('says all told what the bank lost or gained, fees and sponsor included', () => {
+    const c = newCareer(5)
+    c.money = 40_000
+    buyTruck(c, 'light4x4')
+    c.rep = 12
+    const bank = c.money
+    const state = enterOwn(c, 'mechanic')
+    fakeDone(state, 300, () => 200)
+    const s = settle(c, state)
+    expect(s.sponsor).toBeGreaterThan(0)
+    expect(s.money).toBeCloseTo(c.money - bank, 6)
+  })
+
+  it('a stock truck on the podium about pays its way; a win pays well', () => {
+    for (const tier of ['regional', 'national', 'long'] as const) {
+      const r = TIERS[tier]
+      const fees = r.entryFee + DRIVER_TERMS.veteran.fee * r.driverFee
+      // Third place covers the fees and a fair repair bill (a quarter of the entry money); a win is several times the fees.
+      expect(r.prizes[2]!, tier).toBeGreaterThan(fees * 1.25)
+      expect(r.prizes[0]!, tier).toBeGreaterThan(fees * 3)
+    }
   })
 
   it('retiring earns nothing and the rivals take the places', () => {
@@ -401,6 +473,7 @@ describe('the shop', () => {
     const c = newCareer(1)
     expect(upgradeProblem(c, 'secondMechanic')).toBe('rep')
     c.rep = 100
+    c.money = 5000
     expect(upgradeProblem(c, 'secondMechanic')).toBe('money')
     c.money = 1_000_000
     expect(upgradeProblem(c, 'thirdMechanic')).toBe('needs')

@@ -111,3 +111,88 @@ stock, 1985 to 1992):
 | Light 4x4 | 15 in 40 | fourth season | fourth season (1988) |
 | Heavy truck | 12 in 35 | fourth season | fifth season (1989) |
 | Side-by-side | 19 in 42 | third season | eighth season (1992), second three times before |
+
+## Money and Push after the playtest (26 November 2026)
+
+Kelbo's playtest found four money and balance problems. What was measured
+and what changed (`scripts/harness/money.harness.ts`, `quirks.harness.ts`
+and `push.harness.ts`; five seeds unless it says otherwise, the veteran
+driving, Steady):
+
+**Your own truck lost money even on a podium.** Before, a stock light 4x4
+at a regional raid paid 3,500 in fees (1,500 entry, 2,000 for the veteran)
+for a third place worth 2,000, then the repair bill: places 3, 2, 1, 2, 5 at
+the Cold Start 300 still averaged −1,500, and the Washboard 800 −4,900.
+Now the fees are lower and the prizes bigger, and repairs cost 45% of a
+part's price per unit of wear (it was 60%):
+
+| Raid size | Entry | Driver × | Prizes (light 4x4) |
+| --- | --- | --- | --- |
+| Regional | 1,500 → 1,000 | 1 → 0.6 | 6,000 / 3,500 / 2,000 → 10,000 / 7,000 / 5,000 |
+| National | 4,000 → 3,000 | 1.6 → 1 | 15,000 / 9,000 / 5,000 / 2,500 → 20,000 / 13,000 / 8,500 / 4,500 |
+| The finale | 9,000 → 7,000 | 3 → 2 | 40,000 / 22,000 / 12,000 / 6,000 / 3,000 → 50,000 / 30,000 / 18,000 / 9,000 / 4,500 |
+
+So a stock truck's third place about pays its way on a five-stage raid
+(light 4x4 at the Washboard 800: 5,000 against 2,200 in fees and a bill of
+about 2,750) and does better on short ones; a win pays well; fourth and
+below still cost money. The garage starts with 10,000 (was 8,000), because
+contracts pay less (below). `tests/career.test.ts` keeps third place above
+the fees and a fair bill at every size of raid.
+
+**"All told" left out the fees.** It now counts the entry and driver
+fees and the sponsor's money, so it's the change in the bank.
+
+**Untouched stock contract trucks finished on the podium for full pay.**
+A stock contract truck handed over untouched paid 5,000 to 7,000 at a
+regional raid, more than your own truck's podium. Two changes:
+
+- **Privateers bring their truck as they last ran it**, with up to two of
+  their own changes that hurt it in that season (`QUIRKS`), named on the
+  offer. The sweep (four seeds, stock trucks, each change at its extreme):
+
+  | Change | Light 4x4 summer / winter | Heavy summer / winter | Side-by-side summer / winter |
+  | --- | --- | --- | --- |
+  | Tires let right down | 1.78 (6 tows) / 1.21 | 1.12 / no change | 1.49 / 1.21 |
+  | Tires pumped hard | 1.27 (35 stops) / no change | 1.13 / no change | 1.20 / no change |
+  | Shortest bump stops | 1.60 (4 tows) / no change | 1.27 / no change | 1.75 (6 tows) / no change |
+  | Softest springs, no preload | 1.33 / 1.27 | 1.96 (9 tows) / 1.50 | no change |
+
+  (Time against par for the whole raid; factory settings were 1.22 and
+  1.04 for the light 4x4, 1.08 and 1.03 heavy, 1.14 and 1.04 side-by-side,
+  on the Washboard 800 and the Cold Start 300.) With two changes at Dust
+  Supper, the untouched light 4x4 and side-by-side came last in class in
+  all five runs (the heavy truck 4th or 5th); put back to the factory
+  settings they were mostly 2nd or 3rd. The first job comes as the
+  factory set it, so the guide is unchanged.
+- **Smaller pay:** the fee is 8% of the privateer's budget (was 11%), and
+  the bonus 25%, 60% or 100% of it (was 30%, 80%, 150%).
+
+**Buying a truck** takes two taps now, and a truck sells back for 90% of
+its parts' price until its first raid, 8% less after each, down to half.
+
+**Push was always right.** The sim mostly agrees for a good truck on long
+summer raids: on Dust Supper a light 4x4 with 1986's best dampers and
+tires was about 10% quicker on Push. But on the Washboard 800 Push was no
+quicker (its cut tires and fades ate the gain), and on the Cold Start 300
+Push on plain tires was slower (snowbanks). What was missing was a way to
+tell and a cost that lasts, so: harsh kilometres now age the springs and
+bushings 1.7 times as fast at Push (0.6 at Conserve), and a **pace check**
+before each stage, and under the ladder's and torture loop's reports,
+says what each pace call does to this truck (`docs/RAIDS.md`). With the
+new repair share, Push cost about 30% more in repairs and bivouac parts on
+Dust Supper (2,490 against 1,910).
+
+The career bot afterwards (one career a class, Push once the dampers are
+better than stock, 1985 to 1992), against the same bot on 1.8.2.0:
+
+| Class | Wins | Finale open | Finale won | Bank at the end |
+| --- | --- | --- | --- | --- |
+| Light 4x4 | 13 in 40 (13 before) | fourth season (same) | eighth season (same) | 293,659 (55,006) |
+| Heavy truck | 12 in 34 | fifth season | fifth season | 1,230,557 |
+| Side-by-side | 14 in 42 (15 in 41) | third season (fourth) | not in eight (same) | 119,310 (16,275) |
+
+Winning is about where it was; the money isn't. The garage now ends the
+eighth season well off, where before it was scraping by, because own
+entries pay. The bot spends on every part it can, so the spare money is
+what the parts can't use. On the finale the bot on Steady came 2nd to 4th
+every year and never won; on Push it won once (light 4x4).

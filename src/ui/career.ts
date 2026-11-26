@@ -24,7 +24,7 @@
  * only shows them and calls it. The build screen is locked to the career's
  * truck and year through the build store's bench (`setBench`).
  */
-import { CALENDAR, CAREER, CLASS_MONEY, SPONSORS, TEAMS, TIERS, UPGRADES, type Tier } from '../data/career'
+import { CALENDAR, CAREER, CLASS_MONEY, QUIRKS, SPONSORS, TEAMS, TIERS, UPGRADES, type Tier } from '../data/career'
 import { CLASSES, type ClassId } from '../data/classes'
 import type { TruckBuild } from '../data/kit'
 import { SLOTS, SPARE_IDS } from '../data/parts'
@@ -419,10 +419,13 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
   }
 
   function contractLine(o: Contract): string {
-    return tf('career.offer', {
+    const line = tf('career.offer', {
       n: String(o.number), cls: className(o.cls).toLowerCase(), budget: money(o.budget), fee: money(o.fee),
       driver: c ? t(driverName(c, o.driver)) : t(DRIVERS[o.driver].name), win: money(o.bonus.win), podium: money(o.bonus.podium), finish: money(o.bonus.finish),
     })
+    // What the privateer changed on their truck themselves: putting it right is part of the job.
+    const quirks = (o.quirks ?? []).map((q) => t(QUIRKS[q].text))
+    return quirks.length ? `${line} ${tf('career.quirks', { list: quirks.join(t('career.quirksAnd')) })}` : line
   }
 
   function offersBlock(career: CareerState): HTMLElement {
@@ -587,6 +590,8 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
       add('career.paid.fee', s.fee)
       add('career.paid.bonus', s.bonus)
       add('career.paid.prize', s.prize)
+      add('career.paid.sponsor', s.sponsor)
+      add('career.paid.entry', s.entry)
       add('career.paid.repairs', s.repairs)
       add('career.paid.spares', s.spares)
       add('career.paid.bivouac', s.bivouac)
@@ -656,21 +661,24 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
       const row = el('div', 'btn-row')
       for (const cls of CLASSES) {
         const price = truckPrice(career, cls.id)
-        const b = button(tf('career.buyTruck', { cls: t(cls.name), price: money(price) }))
-        b.disabled = career.money < price || career.job?.kind === 'own'
-        b.addEventListener('click', () => {
+        // Two taps, like selling: a truck is the biggest thing the garage buys (playtest, 26 November 2026).
+        const b = sureButton(tf('career.buyTruck', { cls: t(cls.name), price: money(price) }), t('career.buyTruckSure'), () => {
           buyTruck(career, cls.id)
           save()
           syncBench()
           render()
-        })
+        }, 'btn')
+        b.disabled = career.money < price || career.job?.kind === 'own'
         row.append(b)
       }
-      wrap.append(row)
+      const share = (n: number) => String(Math.round(n * 100))
+      wrap.append(row, el('p', 'small', tf('career.resaleNote', {
+        fresh: share(CAREER.truckResale.new), drop: share(CAREER.truckResale.perRaid), least: share(CAREER.resale),
+      })))
       if (old) wrap.append(old)
       return wrap
     }
-    wrap.append(el('p', 'small', tf('career.truckLine', { cls: className(own.cls), value: money(truckValue(own)) })))
+    wrap.append(el('p', 'small', tf('career.truckLine', { cls: className(own.cls), value: money(truckValue(career)) })))
     const log = logbookBlock(career)
     if (log) wrap.append(log)
     if (old) wrap.append(old)
@@ -689,7 +697,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
         wrap.append(b)
       }
     }
-    wrap.append(sureButton(tf('career.sellTruck', { n: money(truckValue(own)) }), t('career.sellTruckSure'), () => {
+    wrap.append(sureButton(tf('career.sellTruck', { n: money(truckValue(career)) }), t('career.sellTruckSure'), () => {
       const sold = ownLog(career)
       sellTruck(career)
       if (sold) farewell = farewellText(sold)

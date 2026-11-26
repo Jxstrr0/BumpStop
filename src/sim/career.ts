@@ -29,12 +29,12 @@
  */
 import { CLASSES, type ClassId } from '../data/classes'
 import {
-  CALENDAR, CAREER, CLASS_MONEY, CONTRACTS, DRIVER_TERMS, PRIVATEERS, SPARE_PRICE, SPONSORS, TEAMS, TIERS, TRAVEL_DAYS, UPGRADES,
-  type CalendarEvent, type Sponsor, type TeamId, type Tier, type UpgradeId,
+  CALENDAR, CAREER, CLASS_MONEY, CONTRACTS, DRIVER_TERMS, PRIVATEERS, QUIRK_IDS, QUIRKS, SPARE_PRICE, SPONSORS, TEAMS, TIERS, TRAVEL_DAYS,
+  UPGRADES, type CalendarEvent, type QuirkId, type Sponsor, type TeamId, type Tier, type UpgradeId,
 } from '../data/career'
-import { KITS, type TruckBuild } from '../data/kit'
+import { KITS, type AxleSettings, type TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR, PARTS, SLOTS, SPARE_IDS, type SlotId } from '../data/parts'
-import { DRIVER_IDS, DRIVERS, JOBS, RAID, RAIDS, type DriverId, type PaceId, type RaidId } from '../data/raids'
+import { DRIVER_IDS, DRIVERS, JOBS, RAID, RAIDS, type DriverId, type PaceId, type RaidId, type Season } from '../data/raids'
 import type { StringKey } from '../data/strings'
 import {
   changeCost, checkBuild, massAndCost, partIn, partsFor, stockBuild, tidyBuild, type BuildProblem, type BuildRules,
@@ -43,7 +43,7 @@ import {
   bivouacJobs, checkJobs, doJobs, driveStage, enterRaid, finishStage, harshShare, raidTruck, stageKm, stageLegs, standings,
   startStage, type Job as NightJob, type RaidState,
 } from './raid'
-import { logBought, logParts, logRaid, logSold, type TruckLog } from './logbook'
+import { logBought, logParts, logRaid, logSold, ownLog, type TruckLog } from './logbook'
 import { rivalStages } from './rivals'
 import { hashString, Rng } from './rng'
 import { markEnd, newHall, recordResult, recordSkip, type CareerHall } from './hall'
@@ -65,12 +65,19 @@ export interface Contract {
   bonus: { finish: number; podium: number; win: number }
   /** Reputation it takes before they'll bring it to you. */
   rep: number
+  /** Their own changes to the truck, which hurt it (`QUIRKS`). Missing in older saves and on the first job: as the factory set it. */
+  quirks?: QuirkId[]
 }
 
 /** The garage's job at the next raid. */
 export type CareerJob =
   /** Entered with its own truck: the raid itself lives in the garage save's `raid`. */
-  | { kind: 'own'; driver: DriverId }
+  | {
+    kind: 'own'
+    driver: DriverId
+    /** The entry and driver fees paid, and the sponsor's money, when it entered: for the results card. Missing in older saves. */
+    paid?: { entry: number; sponsor: number }
+  }
   /** Prepping a privateer's truck: the build on the bench for them. */
   | { kind: 'contract'; contract: Contract; build: TruckBuild }
 
@@ -266,8 +273,11 @@ export function offers(c: CareerState): Contract[] {
     let number = base + rng.int(0, 69)
     while (taken.has(number) || RESERVED_NUMBERS.has(number)) number++
     taken.add(number)
+    // On their own dice, so the rest of the offers stay as they were before quirks.
+    const quirks = firstJob ? [] : pickQuirks(cls, RAIDS[e.raid].season, new Rng(hashString(`${c.seed}:${c.season}:${c.next}:${k}:quirks`)))
     out.push({
       id: `${c.season}:${c.next}:${k}`,
+      quirks,
       cls,
       number,
       driver: rng.pick(DRIVER_IDS),
@@ -286,11 +296,51 @@ const RESERVED_NUMBERS = new Set<number>([
   ...PRIVATEERS.map((p) => p.number),
 ])
 
+/** The privateer's own changes: up to `CONTRACTS.quirks` of the ones that hurt this class in this season. */
+function pickQuirks(cls: ClassId, season: Season, rng: Rng): QuirkId[] {
+  const pool = QUIRK_IDS.filter((q) => QUIRKS[q].hurts[season].includes(cls))
+  const out: QuirkId[] = []
+  while (out.length < CONTRACTS.quirks && pool.length) {
+    const q = pool.splice(rng.int(0, pool.length - 1), 1)[0]!
+    // Soft and hard tires can't both be true.
+    if (q === 'softTires' || q === 'hardTires') pool.splice(0, pool.length, ...pool.filter((x) => x !== 'softTires' && x !== 'hardTires'))
+    out.push(q)
+  }
+  return out
+}
+
+/** One axle with the privateer's changes on it. */
+function quirkAxle(b: TruckBuild, a: AxleSettings, quirks: readonly QuirkId[]): AxleSettings {
+  const r = KITS[b.cls].ranges
+  const out = { ...a }
+  for (const id of quirks) {
+    const q = QUIRKS[id]
+    if (!q) continue
+    if (q.pressure) {
+      const end = q.pressure < 0 ? r.tirePressure.min : r.tirePressure.max
+      out.tirePressure = a.tirePressure + (end - a.tirePressure) * Math.abs(q.pressure)
+    }
+    if (q.shortStops) out.bumpStop = r.bumpStop.min
+    if (q.softSprings) {
+      out.springRate = r.springRate.min
+      out.preload = 0
+    }
+  }
+  return out
+}
+
+/** The privateer's truck as they bring it: their class's stock parts, with their own changes (`QUIRKS`) to the settings. */
+export function privateerBuild(contract: Contract): TruckBuild {
+  const b = stockBuild(contract.cls)
+  const quirks = contract.quirks ?? []
+  return tidyBuild({ ...b, front: quirkAxle(b, b.front, quirks), rear: quirkAxle(b, b.rear, quirks) })
+}
+
 export function takeContract(c: CareerState, contract: Contract): void {
   if (c.job) throw new Error('The garage already has a job for this raid')
   if (c.rep < contract.rep) throw new Error('Not enough reputation for that contract')
-  // The privateer's own truck: a stock build for its class.
-  c.job = { kind: 'contract', contract: structuredClone(contract), build: stockBuild(contract.cls) }
+  // The privateer's own truck: stock parts, set up their way.
+  c.job = { kind: 'contract', contract: structuredClone(contract), build: privateerBuild(contract) }
 }
 
 /** Give a contract back before the raid (no money changes hands). */
@@ -341,9 +391,17 @@ export function truckPrice(c: CareerState, cls: ClassId): number {
   return massAndCost(stockBuild(cls)).cost * (1 - discountOf(c))
 }
 
-/** What your truck sells for. */
-export function truckValue(b: TruckBuild): number {
-  return massAndCost(b).cost * CAREER.resale
+/**
+ * What your truck sells for: most of its price while it's fresh, less for
+ * each raid it has run (`CAREER.truckResale`), never under `CAREER.resale`.
+ * Never more than a sponsor's discount let you pay, so buying and selling
+ * can't make money.
+ */
+export function truckValue(c: CareerState): number {
+  if (!c.own) return 0
+  const raids = ownLog(c)?.raids ?? 0
+  const share = Math.max(CAREER.resale, CAREER.truckResale.new - CAREER.truckResale.perRaid * raids)
+  return Math.round(massAndCost(c.own).cost * Math.min(share, 1 - discountOf(c)))
 }
 
 export function buyTruck(c: CareerState, cls: ClassId): void {
@@ -358,7 +416,7 @@ export function buyTruck(c: CareerState, cls: ClassId): void {
 export function sellTruck(c: CareerState): void {
   if (!c.own) return
   if (c.job?.kind === 'own') throw new Error("Can't sell the truck in the middle of a raid")
-  c.money += truckValue(c.own)
+  c.money += truckValue(c)
   logSold(c)
   c.own = null
 }
@@ -476,8 +534,9 @@ export function enterOwn(c: CareerState, driver: DriverId, bench?: TruckBuild): 
   const own = c.own!
   const e = nextEvent(c)
   const cls = own.cls
-  c.money -= entryFee(c, cls) + driverFee(c, driver, cls) - sponsorPay(c, cls)
-  c.job = { kind: 'own', driver }
+  const paid = { entry: entryFee(c, cls) + driverFee(c, driver, cls), sponsor: sponsorPay(c, cls) }
+  c.money -= paid.entry - paid.sponsor
+  c.job = { kind: 'own', driver, paid }
   // The bench's settings (same parts) go on the raid.
   const b = bench ? { ...own, front: bench.front, rear: bench.rear } : own
   // Parts at the bivouacs come out of the garage's own money (none when broke), and are settled after the raid.
@@ -528,7 +587,15 @@ export interface Settlement {
   spares: number
   /** Parts and oil bought at the bivouacs (bivouac breakdowns). */
   bivouac: number
-  /** Money in and out, all told (fees paid at entry aren't in here). */
+  /** Your own entry: the entry fee and the driver's fee, paid when you entered. */
+  entry: number
+  /** Your own entry: what the sponsor paid when you entered. */
+  sponsor: number
+  /**
+   * Money in and out, all told: the fees paid at entry and the sponsor's
+   * money count too (playtest, 26 November 2026), so this is how much the
+   * bank went up or down because of the raid.
+   */
   money: number
   rep: number
   /** The winner of each class: 'you', a rival's id. */
@@ -612,7 +679,7 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
   const repBefore = c.rep
   const out: Settlement = {
     raid: e.raid, job: state ? job!.kind : null, pos: null, of: 0, finished: false,
-    prize: 0, fee: 0, bonus: 0, repairs: 0, spares: 0, bivouac: 0, money: 0, rep: 0,
+    prize: 0, fee: 0, bonus: 0, repairs: 0, spares: 0, bivouac: 0, entry: 0, sponsor: 0, money: 0, rep: 0,
     winners: {} as Record<ClassId, string>, copies: [], wonLongOne: false, story: null, careerEnd: false,
   }
   const rng = new Rng(hashString(`${c.seed}:${c.season}:${c.next}:settle`))
@@ -641,6 +708,9 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
       out.repairs = bill.repairs
       out.spares = bill.spares
       out.bivouac = state.spent
+      // Paid at entry (`enterOwn`). A raid saved before that was kept works it out again: same raid, year and reputation.
+      out.entry = job.paid?.entry ?? entryFee(c, cls) + driverFee(c, job.driver, cls)
+      out.sponsor = job.paid?.sponsor ?? sponsorPay(c, cls)
       out.rep = earned ? tier.repFor[earned] : 0
       c.stats.raids++
       if (pos === 1) c.stats.wins++
@@ -663,8 +733,10 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
       out.rep = earned ? Math.round(tier.repFor[earned] / 2) : 0
       c.stats.contracts++
     }
-    out.money = out.prize + out.fee + out.bonus - out.repairs - out.spares - out.bivouac
-    c.money += out.money
+    // The entry money changed hands when the raid started, so only the rest moves now.
+    const now = out.prize + out.fee + out.bonus - out.repairs - out.spares - out.bivouac
+    out.money = now - out.entry + out.sponsor
+    c.money += now
     c.rep += out.rep
     recordResult(c, {
       raid: e.raid, cls, job: job.kind, pos: out.pos, of: out.of, money: out.money, rep: out.rep, wonLongOne: out.wonLongOne,
