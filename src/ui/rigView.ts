@@ -8,6 +8,9 @@
  * replays the last seconds in slow motion, closing in on the part that let
  * go, over and over until the next run.
  *
+ * With a ghost truck (your best run or a friend's) its own pose log, kept
+ * step for step with yours, is handed over beside each clip.
+ *
  * three.js loads the first time a run starts. If the phone can't do WebGL,
  * the view hides itself and the rigs carry on in 2D.
  */
@@ -17,7 +20,7 @@ import type { BuiltTruck } from '../sim/build'
 import type { Profile } from '../sim/ground'
 import { lastPoses, posesHeld, POSES_PER_SECOND, type PoseLog } from '../sim/poses'
 import type { BreakEvent } from '../sim/wear'
-import type { TrackView } from '../render/trackView'
+import type { BreakFocus, TrackView } from '../render/trackView'
 import { el } from './dom'
 import { photoMode } from './photoMode'
 import { stanceOf } from './truckView'
@@ -29,6 +32,15 @@ export interface RigRun {
   log: PoseLog
   /** The shaker's beat now (Hz), so it can be slowed to something you can see. */
   beat?: () => number
+  /** A ghost truck driving the same loop step for step, or null. */
+  ghost?: { truck: BuiltTruck; log: PoseLog; broken: () => BreakEvent | null } | null
+}
+
+/** The ghost's clip covering the same moments (a second spare, in case it stopped a little before). */
+function ghostClip(r: RigRun, seconds: number): { ghost: ReturnType<typeof lastPoses> | null; ghostBroken: BreakFocus | null } {
+  if (!r.ghost || posesHeld(r.ghost.log) < 2) return { ghost: null, ghostBroken: null }
+  const b = r.ghost.broken()
+  return { ghost: lastPoses(r.ghost.log, seconds + 1), ghostBroken: b ? { corner: b.corner, kind: b.kind } : null }
 }
 
 export interface RigView {
@@ -87,7 +99,7 @@ export function rigView(): RigView {
     }
     lastShown = end.t
     const rate = r.beat ? Math.min(1, VIEW_3D.shakerShownHz / Math.max(0.1, r.beat())) : 1
-    view.play(clip, { rate, loop: false, onEnd: next })
+    view.play(clip, { rate, loop: false, onEnd: next, ...ghostClip(r, VIEW_3D.clipSeconds) })
     photo.ready(true)
   }
 
@@ -105,13 +117,14 @@ export function rigView(): RigView {
       void load().then(async (v) => {
         if (!v || current !== run) return
         try {
-          await v.setRun({ cls: run.truck.build.cls, stance: stanceOf(run.truck), parts: run.truck.build.parts, road: run.road, wheelbase: setup.cgToFront + setup.cgToRear })
+          const ghost = run.ghost ? { stance: stanceOf(run.ghost.truck), parts: run.ghost.truck.build.parts } : null
+          await v.setRun({ cls: run.truck.build.cls, stance: stanceOf(run.truck), parts: run.truck.build.parts, road: run.road, wheelbase: setup.cgToFront + setup.cgToRear, ghost })
         } catch (err) {
           fail(err)
           return
         }
         if (current !== run) return
-        caption.textContent = t(run.road ? 'view3d.live' : 'view3d.liveShaker')
+        caption.textContent = t(run.road ? (run.ghost ? 'view3d.liveGhost' : 'view3d.live') : 'view3d.liveShaker')
         next()
       })
     },
@@ -128,12 +141,12 @@ export function rigView(): RigView {
           caption.textContent = broken.corner >= 0
             ? tf('view3d.replay', { what, where: t(`cornerName.${broken.corner}` as StringKey).toLowerCase() })
             : tf('view3d.replayFrame', { what, zone: t(`zone.${broken.zone ?? 'centre'}` as StringKey) })
-          v.play(lastPoses(r.log, VIEW_3D.replaySeconds), { rate: VIEW_3D.slowMotion, loop: true, focus: { corner: broken.corner, kind: broken.kind } })
+          v.play(lastPoses(r.log, VIEW_3D.replaySeconds), { rate: VIEW_3D.slowMotion, loop: true, focus: { corner: broken.corner, kind: broken.kind }, ...ghostClip(r, VIEW_3D.replaySeconds) })
           photo.ready(true)
         } else {
           if (r.road) caption.textContent = t('view3d.lasted')
           const rate = r.beat ? Math.min(1, VIEW_3D.shakerShownHz / Math.max(0.1, r.beat())) : 1
-          v.play(lastPoses(r.log, VIEW_3D.clipSeconds), { rate, loop: false })
+          v.play(lastPoses(r.log, VIEW_3D.clipSeconds), { rate, loop: false, ...ghostClip(r, VIEW_3D.clipSeconds) })
           photo.ready(true)
         }
       })

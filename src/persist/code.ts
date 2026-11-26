@@ -5,6 +5,7 @@
  *
  *   BMP1:<payload>.<checksum>     a garage (no rig ghosts)
  *   BMPT1:<payload>.<checksum>    one truck build, to share a setup
+ *   BMPG1:<payload>.<checksum>    one ghost truck (a build and its best run on a loop)
  *
  * - payload: "z" + base64url (no padding) of the raw-deflated JSON. The
  *   browser's own CompressionStream does the squashing, so there's nothing
@@ -25,10 +26,13 @@
 import type { TruckBuild } from '../data/kit'
 import { SAVE } from '../data/save'
 import type { StringKey } from '../data/strings'
+import type { GhostRun } from '../sim/ghost'
+import { readGhostRun } from './ghost'
 import { leanSave, readBuild, readSave, SaveFormatError, type GarageSave } from './save'
 
 export const SAVE_CODE_PREFIX = 'BMP1:'
 export const BUILD_CODE_PREFIX = 'BMPT1:'
+export const GHOST_CODE_PREFIX = 'BMPG1:'
 const CHECKSUM_LEN = 7
 
 export class SaveCodeError extends Error {
@@ -241,3 +245,31 @@ export async function decodeBuildCode(code: string): Promise<TruckBuild> {
   }
 }
 
+
+// ── ghost codes ──
+
+const GHOST_KIND: Kind = {
+  prefix: GHOST_CODE_PREFIX,
+  other: BUILD_CODE_PREFIX,
+  maxChars: SAVE.maxBuildCodeChars,
+  errors: { empty: 'ghostCode.empty', long: 'ghostCode.tooLong', notCode: 'ghostCode.notGhost', otherKind: 'ghostCode.isBuild' },
+}
+
+/**
+ * A ghost as a code a friend can paste: the build and what its run did.
+ * No recording: the friend's phone drives the same run again (`src/sim/ghost.ts`).
+ */
+export function encodeGhostCode(ghost: GhostRun): Promise<string> {
+  return encode(GHOST_CODE_PREFIX, { v: 1, ghost })
+}
+
+/** A pasted ghost code back into a ghost. Throws SaveCodeError with a message to show. */
+export async function decodeGhostCode(code: string): Promise<GhostRun> {
+  const raw = await decode(code, GHOST_KIND)
+  const box = raw as { v?: unknown; ghost?: unknown }
+  if (typeof box.v !== 'number') throw new SaveCodeError('ghostCode.notValid')
+  if (box.v > 1) throw new SaveCodeError('ghostCode.future')
+  const ghost = readGhostRun(box.ghost)
+  if (!ghost) throw new SaveCodeError('ghostCode.notValid')
+  return ghost
+}

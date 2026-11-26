@@ -158,6 +158,8 @@ export class TruckModel {
   private fits: { node: THREE.Object3D; slot: string; parts: string[] }[] = []
   /** Corners whose wheel has been made to look broken, and how. */
   private broken = new Map<number, 'flat' | 'flop' | 'mount'>()
+  /** Materials this copy made for itself (a ghost truck's), freed with it. */
+  private owned: THREE.Material[] = []
 
   static async load(cls: ClassId): Promise<TruckModel> {
     return new TruckModel(cls, await loadScene(cls))
@@ -332,8 +334,44 @@ export class TruckModel {
     }
   }
 
+  /**
+   * Make this copy a see-through ghost truck: its own tinted, half-clear
+   * materials (the real truck keeps its look) and no shadows. It's drawn
+   * last and on top of everything, like an X-ray, because most of the time
+   * it sits almost exactly where the real truck is and would be hidden
+   * inside it otherwise.
+   */
+  ghostly(tint: THREE.Color, opacity: number, mix: number): void {
+    const made = new Map<THREE.Material, THREE.Material>()
+    const own = (m: THREE.Material): THREE.Material => {
+      let c = made.get(m)
+      if (!c) {
+        c = m.clone()
+        c.transparent = true
+        c.opacity = opacity
+        c.depthWrite = false
+        c.depthTest = false
+        const coloured = c as THREE.Material & { color?: THREE.Color }
+        if (coloured.color instanceof THREE.Color) coloured.color.lerp(tint, mix)
+        made.set(m, c)
+        this.owned.push(c)
+      }
+      return c
+    }
+    this.root.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!mesh.isMesh) return
+      mesh.castShadow = false
+      mesh.receiveShadow = false
+      mesh.renderOrder = 10
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(own) : own(mesh.material)
+    })
+  }
+
   dispose(): void {
-    // Geometry and materials are shared with the cached original, so only detach.
+    // Geometry and materials are shared with the cached original, so only detach (and free a ghost's own materials).
     this.root.removeFromParent()
+    for (const m of this.owned) m.dispose()
+    this.owned = []
   }
 }
