@@ -65,6 +65,34 @@ electronic dampers (about 40% less on the light 4x4, 15% on the heavy truck)
 and go a lap further on both. Firmer at the ends means the tires take more of a big
 landing, so the run usually ends on a tire instead (`tests/lateParts.test.ts`).
 
+## Bypass dampers (1996 on)
+
+The bypass (1996) and internal bypass (2008) dampers have tubes, or holes in
+an inner sleeve, that let oil slip past the piston through the middle of the
+stroke. Going outwards the piston slides past each tube's last hole in turn,
+that tube shuts, and the damping steps up (`bypassScale`, numbers in
+`BYPASS_TUBES` in `src/data/parts.ts`):
+
+| | Middle | Steps (share of the travel from ride height: times the setting) |
+| --- | --- | --- |
+| Bypass, three outside tubes | 0.85 | 45%: 1.2, 66%: 1.55, 85%: 2.1 |
+| Internal bypass, two rows of holes | 0.9 | 62%: 1.2, 85%: 1.6 |
+
+Each step eases in over 6% of the travel (the width of a hole), so the force
+has no corner for the wheel to bounce off. Like the spool valves, compression
+steps up towards full bump and rebound towards full droop, and the other way
+stays soft so the wheel can always get back to the middle.
+
+They are kept clearly apart from the spool valves: they start firming much
+earlier (from 45% instead of 65%), hold flat between steps instead of
+climbing smoothly, top out well short of 3.5 times, and their oil fades with
+heat like any shim-stack damper. On the torture loop with stock settings the
+tubes cut bottom-outs by about a quarter on the light 4x4 and a fifth on the
+heavy truck against the same shocks without them, and the light 4x4 goes a
+lap further; the spool valves still bottom out least
+(`tests/bypass.test.ts`). Rival teams don't run the ride sim, so their pace from bypass
+dampers is unchanged (`src/sim/teams.ts`).
+
 ## Long stages
 
 A 300 km stage at 500 steps a second would be millions of steps. So

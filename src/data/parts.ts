@@ -20,7 +20,7 @@
  * No part makers are named yet: names wait on Kelbo's OK (`docs/NAMES.md`).
  */
 import type { ClassId } from './classes'
-import type { PositionDamping } from './ride'
+import type { BypassZones, PositionDamping } from './ride'
 import type { StringKey } from './strings'
 
 /** The part slots, in the order the build screen shows them. */
@@ -110,6 +110,13 @@ export interface DamperPart extends PartCommon {
    * of a normal damper's). Missing on every other damper.
    */
   spool?: { position: PositionDamping; oilSense: number }
+  /**
+   * Bypass tubes (bypass and internal bypass): damping that firms up in steps
+   * towards each end of the travel (see `BypassZones` in `src/data/ride.ts`).
+   * The oil still fades with heat like any shim-stack damper. Missing on every
+   * other damper.
+   */
+  bypass?: BypassZones
 }
 
 export interface BumpStopPart extends PartCommon {
@@ -196,6 +203,21 @@ export type PartIn<S extends SlotId> = Extract<Part, { slot: S }> | (S extends '
 
 const kW = 1000
 
+/**
+ * The bypass dampers' tubes (see `BypassZones` in `src/data/ride.ts`). Each
+ * `from` is a share of the travel from ride height to full bump (or full
+ * droop); each `scale` the damping from there on, as a share of the setting.
+ * Kept clearly apart from the Zed-Two spool valves: these firm up earlier, in
+ * flat steps, and top out lower (the spool climbs smoothly to 3.5 times in the
+ * last 35%), and their oil fades with heat like any other.
+ */
+export const BYPASS_TUBES = {
+  // Three outside tubes: 0.85 through the middle, then 1.2, 1.55 and 2.1 times as each tube closes.
+  external: { mid: 0.85, steps: [{ from: 0.45, scale: 1.2 }, { from: 0.66, scale: 1.55 }, { from: 0.85, scale: 2.1 }], port: 0.06 },
+  // Holes in an inner sleeve: 0.9 through the middle, then 1.2 and 1.6 times, starting later.
+  internal: { mid: 0.9, steps: [{ from: 0.62, scale: 1.2 }, { from: 0.85, scale: 1.6 }], port: 0.06 },
+} as const satisfies Record<string, BypassZones>
+
 export const PARTS: readonly Part[] = [
   // ── Frame ──
   { slot: 'frame', id: 'ladder', name: 'part.ladder', text: 'part.ladderText', year: 1985,
@@ -253,13 +275,17 @@ export const PARTS: readonly Part[] = [
   { slot: 'dampers', id: 'remoteReservoir', name: 'part.remoteReservoir', text: 'part.remoteReservoirText', year: 1990,
     mass: { light4x4: 18, heavy: 90, sxs: 10 }, cost: { light4x4: 5500, heavy: 16000, sxs: 4000 },
     heat: 1.6, cool: 1.25, tempLimit: 10, clicks: { compLow: 3, compHigh: 0, rebound: 3 } },
-  // A real bypass shock also damps by position (soft mid-stroke, firm near the end); that arrives with the rigs' tuning.
+  // Bypass (1996): three outside tubes, so three steps towards each end. Soft through the middle with every tube open,
+  // then firmer as the piston passes each tube's last port (BYPASS_TUBES, below).
   { slot: 'dampers', id: 'bypass', name: 'part.bypass', text: 'part.bypassText', year: 1996,
     mass: { light4x4: 26, heavy: 130, sxs: 15 }, cost: { light4x4: 9500, heavy: 28000, sxs: 7000 },
-    heat: 2.2, cool: 1.5, tempLimit: 10, clicks: { compLow: 4, compHigh: 4, rebound: 4 } },
+    heat: 2.2, cool: 1.5, tempLimit: 10, clicks: { compLow: 4, compHigh: 4, rebound: 4 },
+    bypass: BYPASS_TUBES.external },
+  // Internal bypass (2008): holes in an inner sleeve instead of outside tubes, so two gentler steps.
   { slot: 'dampers', id: 'internalBypass', name: 'part.internalBypass', text: 'part.internalBypassText', year: 2008,
     mass: { light4x4: 20, heavy: 100, sxs: 11 }, cost: { light4x4: 11000, heavy: 32000, sxs: 8000 },
-    heat: 1.8, cool: 1.35, tempLimit: 15, clicks: { compLow: 4, compHigh: 4, rebound: 4 } },
+    heat: 1.8, cool: 1.35, tempLimit: 15, clicks: { compLow: 4, compHigh: 4, rebound: 4 },
+    bypass: BYPASS_TUBES.internal },
   { slot: 'dampers', id: 'electronic', name: 'part.electronic', text: 'part.electronicText', year: 2016,
     mass: { light4x4: 22, heavy: 110, sxs: 12 }, cost: { light4x4: 18000, heavy: 50000, sxs: 13000 },
     heat: 1.9, cool: 1.4, tempLimit: 20, clicks: { compLow: 4, compHigh: 4, rebound: 4 } },

@@ -18,7 +18,7 @@
  * wheel has moved up towards the body from ride height (negative = droop).
  * Positions are measured from where the truck sits at rest on flat ground.
  */
-import { DAMPER_OIL, SIM, type AxleSetup, type DamperSetup, type RideSetup } from '../data/ride'
+import { DAMPER_OIL, SIM, type AxleSetup, type BypassZones, type DamperSetup, type PositionDamping, type RideSetup } from '../data/ride'
 import { detExp } from './det'
 import { heightAt, type Profile } from './ground'
 
@@ -225,29 +225,52 @@ export function damperForce(speed: number, d: DamperSetup): number {
 }
 
 /**
- * Position-sensitive damping (spool-valve dampers, `DamperSetup.position`):
- * how hard the damper damps at this point in the travel, as a share of its
- * setting. `c` is compression from ride height (m, + is up), `v` the shaft
- * speed (+ is compression). 1 for a damper without it.
+ * Position-sensitive damping: how hard the damper damps at this point in the
+ * travel, as a share of its setting. `c` is compression from ride height (m,
+ * + is up), `v` the shaft speed (+ is compression). 1 for a damper that damps
+ * the same all the way through.
  *
- * Compression firms up near the bump end and rebound near the droop end,
- * each on a smooth curve (the square of how far into the zone the wheel is),
- * so there is no sudden step for the wheel to bounce off.
+ * Two kinds, both firming compression near the bump end and rebound near the
+ * droop end:
+ * - spool valves (`DamperSetup.position`): a smooth climb (the square of how
+ *   far into the end zone the wheel is), so there is no sudden step for the
+ *   wheel to bounce off;
+ * - bypass tubes (`DamperSetup.zones`): flat steps, one per tube, each with a
+ *   short ramp as the piston slides over the tube's last port (`bypassScale`).
  */
 export function positionScale(c: number, v: number, d: DamperSetup, bumpTravel: number, droopTravel: number): number {
   const pd = d.position
-  if (!pd) return 1
-  let into = 0
-  if (v > 0) {
-    const span = bumpTravel * pd.zone
-    into = span > 0 ? (c - (bumpTravel - span)) / span : 0
-  } else if (v < 0) {
-    const span = droopTravel * pd.zone
-    into = span > 0 ? (-c - (droopTravel - span)) / span : 0
-  }
-  if (into <= 0) return pd.mid
+  const z = d.zones
+  if (!pd && !z) return 1
+  // How far out the wheel is, as a share of the travel on the side that firms up for this stroke.
+  let out = 0
+  if (v > 0) out = bumpTravel > 0 ? c / bumpTravel : 0
+  else if (v < 0) out = droopTravel > 0 ? -c / droopTravel : 0
+  if (z) return bypassScale(out, z)
+  // Spool valve (pd is set here).
+  const p = pd as PositionDamping
+  if (p.zone <= 0) return p.mid
+  let into = (out - (1 - p.zone)) / p.zone
+  if (into <= 0) return p.mid
   if (into > 1) into = 1
-  return pd.mid + (pd.end - pd.mid) * into * into
+  return p.mid + (p.end - p.mid) * into * into
+}
+
+/**
+ * Bypass damping at `out`, the share of the travel from ride height (0) to the
+ * end (1, and beyond on the bump stop). Starts at `mid`; each tube's step eases
+ * in over `port` (smoothstep, so the force has no corner) and then holds.
+ */
+export function bypassScale(out: number, z: BypassZones): number {
+  let k = z.mid
+  for (const step of z.steps) {
+    let t = z.port > 0 ? (out - step.from) / z.port : out >= step.from ? 1 : 0
+    if (t <= 0) break
+    if (t > 1) t = 1
+    k += (step.scale - k) * t * t * (3 - 2 * t)
+    if (t < 1) break
+  }
+  return k
 }
 
 /** Heat each damper sheds per kelvin above the air at this road speed (W/K). */
@@ -347,8 +370,9 @@ export function stepRide(
     // Damper: force from shaft speed, scaled by how thin the oil is right now.
     const temp = s.oilTemp[i] as number
     const mult = dampingMultiplier(temp, dm)
-    // Spool-valve dampers also damp by where the wheel is in its travel.
-    const damp = damperForce(v, dm) * mult * (dm.position ? positionScale(c, v, dm, ax.bumpTravel, ax.droopTravel) : 1)
+    // Spool-valve and bypass dampers also damp by where the wheel is in its travel.
+    const damp =
+      damperForce(v, dm) * mult * (dm.position || dm.zones ? positionScale(c, v, dm, ax.bumpTravel, ax.droopTravel) : 1)
     const power = damp * v // always >= 0: a damper only ever turns motion into heat
 
     const strut = load + bar + damp // pushes the body up and the wheel down
