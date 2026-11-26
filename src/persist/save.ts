@@ -20,6 +20,7 @@ import { FIRST_YEAR, LAST_YEAR, SLOTS } from '../data/parts'
 import { DRIVER_IDS, RAIDS, type DriverId, type RaidId, type Rival } from '../data/raids'
 import { SAVE } from '../data/save'
 import { FAILURE_KINDS, type FailureKind } from '../data/wear'
+import { WEATHER_IDS } from '../data/weather'
 import { findPart, fitsClass, stockBuild, tidyBuild } from '../sim/build'
 import type { CareerJob, CareerState, Contract, LongOneStory, NewsItem } from '../sim/career'
 import type { CareerHall, DriverTally, RivalTally, SeasonLine } from '../sim/hall'
@@ -165,6 +166,13 @@ function readRaid(raw: unknown): RaidState {
     arrayOf(r.paces, `stage ${n + 1} paces`)
     arrayOf(r.stops, `stage ${n + 1} stops`)
     arrayOf(r.rivals, `stage ${n + 1} rivals`)
+    // The day's weather (missing in saves from before it came in).
+    if (r.weather !== undefined && r.weather !== null) {
+      const w = isObj(r.weather) ? r.weather : fail(`stage ${n + 1} weather is not weather`)
+      if (!WEATHER_IDS.includes(w.kind as never)) fail(`stage ${n + 1} weather is unknown`)
+      for (const k of ['chance', 'from', 'to', 'at'] as const) finite(w[k], `stage ${n + 1} weather ${k}`)
+      if (typeof w.comes !== 'boolean') fail(`stage ${n + 1} weather has no answer`)
+    }
   }
   const w = isObj(raw.wear) ? raw.wear : fail('raid wear is missing')
   for (const part of ['bottoming', 'mount', 'axle', 'tire'] as const) {

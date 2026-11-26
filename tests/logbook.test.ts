@@ -124,7 +124,8 @@ describe('a truck’s logbook', () => {
     expect(ownLog(c)!.raids).toBe(LOGBOOK.moments + 4)
   })
 
-  it('leaves contract trucks out: they belong to the privateers', () => {
+  // It drives a whole raid, about 3 s here and slower on the CI machine, so it gets the raid tests' time.
+  it('leaves contract trucks out: they belong to the privateers', { timeout: 60_000 }, () => {
     const c = richCareer()
     buyTruck(c, 'light4x4')
     takeContract(c, offers(c)[0]!)
