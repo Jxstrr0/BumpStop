@@ -50,6 +50,12 @@ The sliders keep photo mode usable without dragging. Limits are in
 (the controls), `photoStart`/`photoSet`/`photoEnd`/`snapshot` in
 `src/render/trackView.ts`.
 
+## Keep for the album
+
+In a career, photo mode also has **Keep for the album**: a smaller copy of
+the shot goes in the career's album, which the hall of fame shows at the
+end. See `docs/CAREER.md`, "After 2025: the hall of fame".
+
 ## Why the share is made without waiting
 
 Phones only open the share sheet straight after a tap. Turning a canvas into

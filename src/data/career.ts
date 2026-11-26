@@ -283,3 +283,16 @@ export const PRIVATEERS: readonly { cls: ClassId; number: number; pace: number; 
   { cls: 'sxs', number: 322, pace: 1.03, risk: 0.25, trouble: ['tire', 'fade', 'lost'] },
   { cls: 'sxs', number: 326, pace: 1.07, risk: 0.3, trouble: ['fade', 'tire', 'bottoming'] },
 ]
+
+// ── The hall of fame (end of the career) ──
+
+export const HALL = {
+  /** How many seasons the recap lists as the best. */
+  bestSeasons: 3,
+  /** Most photos kept in a career's album. */
+  albumMax: 24,
+  /** An album photo's longer side (pixels): big enough for a phone screen, small enough to keep two dozen. */
+  albumSize: 1280,
+  /** JPEG quality for album photos (0 to 1). */
+  albumQuality: 0.85,
+} as const

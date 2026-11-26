@@ -25,8 +25,11 @@ export const SLOT_NUMBERS: readonly SlotNo[] = [1, 2, 3]
 export const isSlotNo = (v: unknown): v is SlotNo => v === 1 || v === 2 || v === 3
 
 const DB_NAME = 'bumpstop'
-const DB_VERSION = 1
+/** 2 adds the career photo album's store (`album.ts`). */
+const DB_VERSION = 2
 const STORE = 'slots'
+/** The career photo albums (`album.ts`): one record a photo, numbered by the database. */
+export const ALBUM_STORE = 'album'
 const LOCAL_SLOT = (n: SlotNo) => `bumpstop.slot.${n}`
 const ACTIVE_KEY = 'bumpstop.activeSlot'
 
@@ -62,7 +65,7 @@ function warn(what: string, err: unknown): void {
 }
 
 /** IndexedDB as a promise. */
-function request<T>(req: IDBRequest<T>): Promise<T> {
+export function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
@@ -71,12 +74,14 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
-function openDb(): Promise<IDBDatabase> {
+/** The game's own database (also used by the photo album). Rejects if IndexedDB won't open. */
+export function openDb(): Promise<IDBDatabase> {
   if (!dbPromise) {
     const opening = new Promise<IDBDatabase>((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION)
       req.onupgradeneeded = () => {
         if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE, { keyPath: 'slot' })
+        if (!req.result.objectStoreNames.contains(ALBUM_STORE)) req.result.createObjectStore(ALBUM_STORE, { keyPath: 'id', autoIncrement: true })
       }
       req.onsuccess = () => {
         const db = req.result

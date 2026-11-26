@@ -46,7 +46,7 @@ export function raidView(): RaidView {
 
   let view: TrackView | null = null
   // Photo mode (plan PR 12): freeze the highlight and frame a shot.
-  const photo = photoMode(box, canvas, () => view)
+  const photo = photoMode(box, canvas, () => view, 'raid')
   caption.after(photo.button)
   let loading: Promise<TrackView | null> | null = null
   let failed = false

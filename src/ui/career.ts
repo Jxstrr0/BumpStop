@@ -16,6 +16,9 @@
  *
  * - **The first-job guide** (plan PR 11b, `src/ui/tutorial.ts`): on the
  *   career's first raid, a list of steps at the top walks through the job.
+ * - **The hall of fame** (after 1.2, `src/ui/hall.ts`): "The career so far"
+ *   at the foot of the panel, the Hall of fame once 2025 is done. This
+ *   panel also tells photo mode where the career's album is (`album.ts`).
  *
  * The career's numbers and rules are all in `src/sim/career.ts`; this file
  * only shows them and calls it. The build screen is locked to the career's
@@ -36,6 +39,10 @@ import {
 } from '../sim/career'
 import { ownLog } from '../sim/logbook'
 import { raidOf, standings, type RaidState } from '../sim/raid'
+import { keepPhoto } from '../persist/album'
+import type { SlotNo } from '../persist/slots'
+import { setAlbumHook } from './album'
+import { hallBlock, type HallBlock } from './hall'
 import type { GlossaryId } from '../data/glossary'
 import type { BuildStore } from './buildStore'
 import { el, num } from './dom'
@@ -47,6 +54,8 @@ import { firstJobGuide } from './tutorial'
 export interface CareerSaves {
   career: CareerState | null
   onCareer(career: CareerState | null): void
+  /** The slot the career is in: its photo album is kept under it. */
+  slot?: SlotNo
 }
 
 // ── Words for the career ──
@@ -207,6 +216,22 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
   let farewell = ''
 
   const save = () => saves?.onCareer(c ? structuredClone(c) : null)
+  /** The hall of fame at the foot of the panel, drawn again with the rest. */
+  let hall: HallBlock | null = null
+
+  // Photo mode keeps shots in this career's album (`album.ts`), when there's a career and a slot to keep them under.
+  const slot = saves?.slot
+  setAlbumHook(slot === undefined ? null : {
+    caption(where) {
+      if (!c) return null
+      const place = where === 'raid' && c.job?.kind === 'own' ? t(RAIDS[nextEvent(c).raid].name) : t(where === 'raid' ? 'album.raid' : 'album.track')
+      return tf('album.caption', { where: place, year: String(c.year) })
+    },
+    keep(picture, caption) {
+      if (!c) return Promise.resolve('failed')
+      return keepPhoto({ slot, career: c.seed, year: c.year, caption, takenAt: Date.now(), picture })
+    },
+  })
 
   // ── The bench: the build screen follows the career's job ──
 
@@ -540,6 +565,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     const card = el('div', 'raid-card career-results')
     const head = el('h3', 'raid-sub', tf('career.resultsHead', { raid: t(RAIDS[s.raid].name) }))
     card.append(head)
+    if (s.careerEnd) card.append(endBlock())
     if (s.story) card.append(finaleBlock(s.story))
     else if (s.wonLongOne) card.append(el('p', 'career-win', t('career.wonLongOne')))
     if (s.job) {
@@ -577,6 +603,16 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     })
     card.append(next)
     return card
+  }
+
+  /** The end of 2025: the career is over, and the hall of fame opens. */
+  function endBlock(): HTMLElement {
+    const wrap = el('section', 'career-finale career-end')
+    wrap.setAttribute('aria-label', t('hall.endHead'))
+    const go = button(t('hall.open'), 'btn start-btn')
+    go.addEventListener('click', () => hall?.open())
+    wrap.append(el('p', 'career-win', t('hall.endHead')), el('p', '', t('hall.endText')), go)
+    return wrap
   }
 
   /** The finale (plan PR 13): the garage's first Long One win, and how it got there. */
@@ -718,7 +754,11 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
       return
     }
     renderJob()
-    body.replaceChildren(statusBlock(c), jobHolder, calendarBlock(c), truckBlock(c), shopBlock(c), newsBlock(c))
+    const wasOpen = hall?.element.open ?? false
+    hall = hallBlock(c, { slot })
+    body.replaceChildren(statusBlock(c), jobHolder, calendarBlock(c), truckBlock(c), shopBlock(c), newsBlock(c), hall.element)
+    // Keep it open if it was (opening it draws it).
+    if (wasOpen) hall.element.open = true
   }
 
   syncBench()

@@ -123,6 +123,7 @@ export async function openGarage(): Promise<Garage> {
     },
     career: {
       career: start.career,
+      slot,
       onCareer(next) {
         career = next
         changed()

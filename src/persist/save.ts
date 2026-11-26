@@ -23,6 +23,7 @@ import { FAILURE_KINDS, type FailureKind } from '../data/wear'
 import { WEATHER_IDS } from '../data/weather'
 import { findPart, fitsClass, stockBuild, tidyBuild } from '../sim/build'
 import type { CareerJob, CareerState, Contract, LongOneStory, NewsItem } from '../sim/career'
+import type { CareerHall, DriverTally, RivalTally, SeasonLine } from '../sim/hall'
 import { MOMENT_KINDS, newLog, tidyLogs, type TruckLog, type TruckMoment } from '../sim/logbook'
 import type { RaidState } from '../sim/raid'
 import { newCondition } from '../sim/condition'
@@ -305,6 +306,66 @@ function readStory(raw: unknown): { firstLongOne?: LongOneStory } {
   }
 }
 
+/** A count in the hall of fame: a whole number, never below zero. */
+function hallCount(v: unknown, what: string): number {
+  const n = finite(v, what)
+  if (!Number.isInteger(n) || n < 0) fail(`${what} is not a count`)
+  return n
+}
+
+function readSeasonLine(raw: unknown): SeasonLine | null {
+  try {
+    if (!isObj(raw)) return null
+    let best: SeasonLine['best'] = null
+    if (isObj(raw.best)) {
+      const b = raw.best
+      if (RAIDS[b.raid as RaidId] && CLASS_IDS.includes(b.cls as ClassId) && (b.job === 'own' || b.job === 'contract')) {
+        best = { raid: b.raid as RaidId, cls: b.cls as ClassId, job: b.job, pos: hallCount(b.pos, 'best place'), of: hallCount(b.of, 'best of') }
+      }
+    }
+    return {
+      season: hallCount(raw.season, 'season'), year: hallCount(raw.year, 'season year'),
+      raids: hallCount(raw.raids, 'season raids'), wins: hallCount(raw.wins, 'season wins'), podiums: hallCount(raw.podiums, 'season podiums'),
+      contracts: hallCount(raw.contracts, 'season contracts'), rep: finite(raw.rep, 'season rep'), money: finite(raw.money, 'season money'),
+      longOne: raw.longOne === true, best,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The hall of fame's record (after 1.2). Only for looking back: a line
+ * that doesn't add up is dropped, and a record that can't be read at all
+ * starts again from the season the career is in, never failing the save.
+ */
+function readHall(raw: unknown, season: number): { hall?: CareerHall } {
+  if (!isObj(raw)) return {}
+  try {
+    const from = hallCount(raw.from, 'hall start')
+    const seasons = arrayOf(raw.seasons, 'hall seasons').map(readSeasonLine).filter((x): x is SeasonLine => x !== null && x.season <= season)
+    const rivals: CareerHall['rivals'] = {}
+    if (isObj(raw.rivals)) {
+      for (const id of TEAM_IDS) {
+        const r = raw.rivals[id]
+        if (isObj(r)) rivals[id] = { met: hallCount(r.met, 'rival met'), ahead: hallCount(r.ahead, 'rival ahead'), behind: hallCount(r.behind, 'rival behind') } satisfies RivalTally
+      }
+    }
+    const drivers: CareerHall['drivers'] = {}
+    if (isObj(raw.drivers)) {
+      for (const id of DRIVER_IDS) {
+        const d = raw.drivers[id]
+        if (isObj(d)) drivers[id] = { raids: hallCount(d.raids, 'driver raids'), wins: hallCount(d.wins, 'driver wins'), podiums: hallCount(d.podiums, 'driver podiums'), first: hallCount(d.first, 'driver first year') } satisfies DriverTally
+      }
+    }
+    const hall: CareerHall = { from: Math.min(from, season), seasons, rivals, drivers }
+    if (raw.ended !== undefined) hall.ended = Math.min(hallCount(raw.ended, 'hall end'), season)
+    return { hall }
+  } catch {
+    return {}
+  }
+}
+
 /** A whole number of at least 0, or 0 if it isn't one. */
 function count(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0
@@ -375,6 +436,7 @@ function readCareer(raw: unknown): CareerState {
     news,
     longOne,
     ...(raw.firstLongOne === undefined ? {} : readStory(raw.firstLongOne)),
+    ...readHall(raw.hall, season),
     stats: { raids: stats.raids as number, wins: stats.wins as number, podiums: stats.podiums as number, contracts: stats.contracts as number },
     trucks: readTrucks(raw.trucks),
   }

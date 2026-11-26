@@ -46,6 +46,7 @@ import {
 import { logBought, logParts, logRaid, logSold, type TruckLog } from './logbook'
 import { rivalStages } from './rivals'
 import { hashString, Rng } from './rng'
+import { markEnd, newHall, recordResult, recordSkip, type CareerHall } from './hall'
 import { careerField, copyWinner, teamsForYear, type TeamGarage } from './teams'
 
 /** A privateer who wants a truck prepped for the next raid. */
@@ -130,6 +131,8 @@ export interface CareerState {
   /** The first Long One win, for the finale (plan PR 13). */
   firstLongOne?: LongOneStory
   stats: CareerStats
+  /** The hall of fame's record: seasons, rivals, drivers (`hall.ts`). Missing in saves from before it, and started then. */
+  hall?: CareerHall
   /** Every truck the garage has owned, oldest first, each with its logbook (`logbook.ts`). The last unsold one is `own`. */
   trucks: TruckLog[]
 }
@@ -152,6 +155,7 @@ export function newCareer(seed: number): CareerState {
     news: [],
     longOne: [],
     stats: { raids: 0, wins: 0, podiums: 0, contracts: 0 },
+    hall: newHall(0),
     trucks: [],
   }
 }
@@ -533,6 +537,8 @@ export interface Settlement {
   wonLongOne: boolean
   /** Set when this was the garage's first Long One win: the finale (plan PR 13). */
   story: LongOneStory | null
+  /** This raid finished the last season of 2025: the career's end, and the hall of fame. Only ever once. */
+  careerEnd: boolean
 }
 
 /** What putting a raid's wear right costs, and the spares used. */
@@ -607,7 +613,7 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
   const out: Settlement = {
     raid: e.raid, job: state ? job!.kind : null, pos: null, of: 0, finished: false,
     prize: 0, fee: 0, bonus: 0, repairs: 0, spares: 0, bivouac: 0, money: 0, rep: 0,
-    winners: {} as Record<ClassId, string>, copies: [], wonLongOne: false, story: null,
+    winners: {} as Record<ClassId, string>, copies: [], wonLongOne: false, story: null, careerEnd: false,
   }
   const rng = new Rng(hashString(`${c.seed}:${c.season}:${c.next}:settle`))
   let mineCls: ClassId | null = null
@@ -660,10 +666,15 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
     out.money = out.prize + out.fee + out.bonus - out.repairs - out.spares - out.bivouac
     c.money += out.money
     c.rep += out.rep
+    recordResult(c, {
+      raid: e.raid, cls, job: job.kind, pos: out.pos, of: out.of, money: out.money, rep: out.rep, wonLongOne: out.wonLongOne,
+      driver: job.kind === 'own' ? job.driver : undefined, table,
+    })
     addNews(c, { kind: 'result', year: c.year, raid: e.raid, cls, job: job.kind, pos: out.pos, of: out.of, money: out.money, rep: out.rep })
     if (out.wonLongOne) addNews(c, { kind: 'longOne', year: c.year })
   } else {
     addNews(c, { kind: 'skipped', year: c.year, raid: e.raid })
+    recordSkip(c)
   }
 
   // Every class has a winner, and the teams copy what won.
@@ -696,7 +707,11 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
   c.day = e.day + eventDays(e)
   c.job = null
   c.next++
-  if (c.next >= CALENDAR.length) newSeason(c)
+  if (c.next >= CALENDAR.length) {
+    // The last raid of 2025 ends the career (the seasons carry on after, for anyone who wants more).
+    if (c.year === LAST_YEAR) out.careerEnd = markEnd(c)
+    newSeason(c)
+  }
   return out
 }
 
