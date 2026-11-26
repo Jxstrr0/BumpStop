@@ -23,7 +23,7 @@ import type { Pose } from '../sim/poses'
 import { addLights, applyLook, cssColour, isDark, makeRenderer, onLookChange } from './look'
 import { Puffs } from './particles'
 import { Forest, placePieces, stripGeometry } from './terrain'
-import { TruckModel, type Stance, type TruckPose } from './truckModel'
+import { TruckModel, type FittedParts, type Stance, type TruckPose } from './truckModel'
 
 export interface BreakFocus {
   corner: number
@@ -44,6 +44,8 @@ export interface ClipOptions {
 export interface RunSetup {
   cls: ClassId
   stance: Stance
+  /** The build's parts, so the truck on the track is the one you built. */
+  parts: FittedParts
   /** The loop's road, one profile per piece; null for the shaker rig. */
   road: readonly Profile[] | null
   /** Front axle to rear axle (m). */
@@ -407,6 +409,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       }
       run = next
       truck.stance = next.stance
+      truck.fit(next.parts)
       truck.breakCorner(null)
       clip = []
       dust.clear()

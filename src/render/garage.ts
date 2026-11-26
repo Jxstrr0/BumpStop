@@ -12,11 +12,11 @@
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
 import { addLights, applyLook, cssColour, makeRenderer, onLookChange } from './look'
-import { REST_POSE, TruckModel, type Stance } from './truckModel'
+import { REST_POSE, TruckModel, type FittedParts, type Stance } from './truckModel'
 
 export interface Garage {
-  /** Show this class's truck at this stance. Resolves once the model is in. */
-  show(cls: ClassId, stance: Stance): Promise<void>
+  /** Show this class's truck at this stance, with these parts bolted on. Resolves once the model is in. */
+  show(cls: ClassId, stance: Stance, parts: FittedParts): Promise<void>
   dispose(): void
 }
 
@@ -140,7 +140,7 @@ export function createGarage(canvas: HTMLCanvasElement): Garage {
   resize()
 
   return {
-    async show(cls, stance) {
+    async show(cls, stance, parts) {
       const ticket = ++wanted
       if (truck?.cls !== cls) {
         const next = await TruckModel.load(cls)
@@ -156,6 +156,7 @@ export function createGarage(canvas: HTMLCanvasElement): Garage {
         cam.updateProjectionMatrix()
       }
       truck.stance = stance
+      truck.fit(parts)
       truck.pose(REST_POSE)
       draw()
       loop()
