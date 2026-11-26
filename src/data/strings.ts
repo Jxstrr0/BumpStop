@@ -6,7 +6,7 @@ const STRINGS = {
   'game.name': 'Bump Stop',
   'game.tagline': 'Build a rally truck, find the speed where it breaks, then go racing.',
   'preview.kicker': 'A rally-raid truck builder',
-  'preview.note': 'This is a preview. The build screen, the 3D trucks, the three rigs and the report are in; the 3D test track comes next.',
+  'preview.note': 'This is a preview. The build screen, the 3D trucks, the three rigs with the 3D test track, the report and the sound are in; raids come next.',
 
   'loop.title': 'The loop',
   'loop.build': 'Build it',
@@ -235,6 +235,14 @@ const STRINGS = {
   'build.lead':
     'Pick a part for every slot and tune each axle, inside the class weight and your budget. The rigs in the shop below test this truck.',
   'build.year': 'Year',
+  'view3d.alt': 'The test track in 3D: your truck driving the rig, its suspension moving as the sim says.',
+  'view3d.altShaker': 'The shaker rig in 3D: your truck on four posts, its suspension moving as the sim says.',
+  'view3d.live': 'Live from the track: short clips at true speed.',
+  'view3d.liveShaker': 'Live from the shaker, slowed down so you can see the beat.',
+  'view3d.replay': 'Slow motion: {what}, {where}.',
+  'view3d.replayFrame': 'Slow motion: {what} at the {zone}.',
+  'view3d.lasted': 'It lasted. The last clip of the run.',
+  'view3d.loading': 'Loading the 3D track…',
   'view.label': 'Your truck in 3D',
   'view.alt': 'The {cls} in 3D, sitting on the shop floor. {stance}',
   'view.stanceStock': 'It sits at the stock ride height.',

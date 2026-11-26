@@ -25,7 +25,7 @@ import { heatShare } from '../audio/cues'
 import { makeSound } from '../audio/sound'
 import { CLASSES, type ClassId } from '../data/classes'
 import { WARM_SHARE } from '../data/failures'
-import { RIGS, RIG_VIEW, SHAKER, SHOP_RIGS, type RigId, type RigPiece, type ShopRigId } from '../data/rigs'
+import { RIGS, RIG_VIEW, SHAKER, SHOP_RIGS, VIEW_3D, type RigId, type RigPiece, type ShopRigId } from '../data/rigs'
 import { t, tf, type StringKey } from '../data/strings'
 import type { BuiltTruck } from '../sim/build'
 import { advanceLaps, lapLength, lapResult, startLaps, takeFeel, type LapRunner, type RunHistory } from '../sim/laps'
@@ -36,6 +36,7 @@ import { BAND_WORD, bandOf, ghostLegend, lineChart, shakerChart, type Band, type
 import { el, num } from './dom'
 import { jumpTo, type Jump } from './fixes'
 import { lapReport, shakerReport, type LapGhost } from './report'
+import { rigView } from './rigView'
 
 const AIR = fromCelsius(20)
 const C0 = 273.15
@@ -195,7 +196,9 @@ export function shopPanel(store: BuildStore): HTMLElement {
   stopBtn.addEventListener('click', () => finish(true))
   controls.append(fastBtn, skipBtn, stopBtn)
 
-  live.append(liveHead, progress, corners, frameLine, channelRow, chartTitle, chartHolder, legendHolder, ghostNote, controls)
+  // The 3D view of the run (plan PR 5). It moves into the report when the run ends, so the slow-motion replay is in sight.
+  const view3d = rigView()
+  live.append(view3d.element, liveHead, progress, corners, frameLine, channelRow, chartTitle, chartHolder, legendHolder, ghostNote, controls)
   const reportHolder = el('div', 'report-holder')
 
   // --- The bar that brings the player back after a fix jump ---
@@ -245,6 +248,7 @@ export function shopPanel(store: BuildStore): HTMLElement {
     sound.stop()
     active = null
     live.hidden = true
+    view3d.reset()
     reportHolder.replaceChildren()
     sync()
   }
@@ -271,11 +275,11 @@ export function shopPanel(store: BuildStore): HTMLElement {
     const truck = store.truck()
     const ghost = ghosts.get(ghostKey(cls, rig)) ?? null
     if (rig === 'shaker') {
-      const runner = startShaker(truck.ride, AIR)
+      const runner = startShaker(truck.ride, AIR, VIEW_3D.poseSeconds)
       active = { kind: 'shaker', cls, truck, runner, ghost: ghost?.kind === 'shaker' ? ghost.points : null, total: shakerSteps(runner), taken: 0 }
       sound.startShaker(truck.build.parts.engine, cls)
     } else {
-      const runner = startLaps(truck.ride, truck.wear, RIGS[rig], seedFor(cls, rig), { airTemp: AIR })
+      const runner = startLaps(truck.ride, truck.wear, RIGS[rig], seedFor(cls, rig), { airTemp: AIR, poses: VIEW_3D.poseSeconds })
       active = { kind: 'laps', rig, cls, truck, runner, ghost: ghost?.kind === 'laps' ? ghost : null }
       sound.startLaps(truck.build.parts.engine, cls)
     }
@@ -291,6 +295,13 @@ export function shopPanel(store: BuildStore): HTMLElement {
     const laps = active.kind === 'laps'
     for (const n of [corners, frameLine, channelRow]) n.hidden = !laps
     ghostNote.textContent = active.ghost ? t('shop.ghostNote') : ''
+    live.prepend(view3d.element)
+    if (active.kind === 'laps') {
+      view3d.begin({ truck, road: active.runner.road, log: active.runner.poses! })
+    } else {
+      const sr = active.runner
+      view3d.begin({ truck, road: null, log: sr.poses!, beat: () => sr.freqs[Math.min(sr.index, sr.freqs.length - 1)] as number })
+    }
     live.hidden = false
     lastChartSamples = -1
     sync()
@@ -503,6 +514,8 @@ export function shopPanel(store: BuildStore): HTMLElement {
     reportHolder.replaceChildren(report)
     sync()
     const head = report.querySelector<HTMLElement>('.report-head')
+    head?.after(view3d.element)
+    view3d.finish(a.kind === 'laps' ? a.runner.run.w.broken : null)
     head?.focus({ preventScroll: true })
     report.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
   }

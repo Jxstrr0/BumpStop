@@ -454,3 +454,16 @@ input[type='range'] {
 }
 .truck-view figcaption { margin-top: 6px; }
 .truck-status { margin: 6px 0 0; }
+
+/* The 3D view of a rig run (plan PR 5). It sits at the top of the live view,
+   then moves under the report's heading for the slow-motion replay. */
+.rig-view { margin: 8px 0 12px; }
+.rig-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+}
+.rig-caption { margin-top: 6px; }

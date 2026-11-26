@@ -119,3 +119,21 @@ export const RIG_VIEW = {
   /** "Skip to the end" works this long per frame (ms), so the page keeps drawing. */
   skipBudgetMs: 24,
 } as const
+
+/**
+ * How the 3D view plays the rigs (plan PR 5; only the show, not the sim).
+ * The sim keeps its last few seconds of poses (`src/sim/poses.ts`); the view
+ * plays clips of it at true speed, then the break again in slow motion.
+ */
+export const VIEW_3D = {
+  /** Seconds of poses the sim keeps: enough for the slow-motion replay. */
+  poseSeconds: 4,
+  /** Each live clip is this long (s of sim time), played at true speed. */
+  clipSeconds: 2.5,
+  /** The break replay shows this many seconds before the break... */
+  replaySeconds: 3,
+  /** ...at this share of real speed. */
+  slowMotion: 0.3,
+  /** The shaker is slowed so no beat looks faster than this many a second (Hz). */
+  shakerShownHz: 2.5,
+} as const

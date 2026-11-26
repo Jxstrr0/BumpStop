@@ -17,6 +17,7 @@ import { FEEL } from '../data/sound'
 import type { WearSetup } from '../data/wear'
 import { buildProfile, type Profile } from './ground'
 import { emptyStats, enterSection, restingState, rideParams, stepRide, type RideParams, type RideState, type RideStats } from './ride'
+import { newPoseLog, notePose, type PoseLog } from './poses'
 import { Rng } from './rng'
 import { breakTrace, record, type BreakTrace } from './trace'
 import { damageOf, newWearRun, stepWear, worstDamage, type BreakEvent, type DamageSnapshot, type WearRun, type WearState } from './wear'
@@ -96,6 +97,8 @@ export interface LapOptions {
   airTemp: number
   /** Keep a trace for the break (default true). */
   trace?: boolean
+  /** Keep the last this many seconds of poses for the 3D view (default 0: none). See `poses.ts`. */
+  poses?: number
 }
 
 /** A lap run part-way through. Plain numbers and arrays; `advanceLaps` moves it on. */
@@ -129,6 +132,8 @@ export interface LapRunner {
   restLoad: number[]
   strikeArmed: boolean[]
   wasBottomed: boolean[]
+  /** The last few seconds of poses for the 3D view, if asked for. Read only; never changes a result. */
+  poses: PoseLog | null
 }
 
 /** The loop's road, built once: the same every lap. */
@@ -217,6 +222,7 @@ export function startLaps(setup: RideSetup, wear: WearSetup, rig: Rig, seed: num
     restLoad: p.axle.map((ax, i) => ax.tireRate * (p.staticTire[i] as number)),
     strikeArmed: [true, true, true, true],
     wasBottomed: [false, false, false, false],
+    poses: opts.poses ? newPoseLog(opts.poses) : null,
   }
   if (!r.done) {
     startLap(r, 1)
@@ -262,6 +268,8 @@ export function advanceLaps(r: LapRunner, maxSteps: number): number {
     r.step++
     taken++
     feel.time += DT
+    // The 3D view's pose log: every few steps, and always the step that broke.
+    if (r.poses) notePose(r.poses, s, r.piece, w.distance, speed, 0, w.broken !== null)
     for (let i = 0; i < 4; i++) {
       const use = (forces.compression[i] as number) / (p.axle[i] as AxleSetup).bumpTravel
       if (use > r.travelPeak) r.travelPeak = use
