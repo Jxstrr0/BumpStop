@@ -442,6 +442,51 @@ const STRINGS = {
   'zone.centre': 'centre',
   'zone.rear': 'rear',
 
+  // ── Raids (plan PR 7). Raid names are working names: Kelbo turned down the first ones (docs/NAMES.md). ──
+  'raid.summerSprint.name': 'Summer Sprint',
+  'raid.summerSprint.text': 'Three short summer stages on logging roads, rock and an old burn. Where a new truck proves itself.',
+  'raid.summerRaid.name': 'Summer Raid',
+  'raid.summerRaid.text': 'Five long summer days: eskers, rock country and hot haul roads. Damage piles up.',
+  'stage.loggingRoads': 'Logging roads',
+  'stage.rockCountry': 'Rock country',
+  'stage.oldBurn': 'The old burn',
+  'stage.eskers': 'Eskers and washboard',
+  'stage.haulRoads': 'Hot haul roads',
+
+  'pace.conserve': 'Conserve',
+  'pace.steady': 'Steady',
+  'pace.push': 'Push',
+
+  // Drivers go by their trade until Kelbo picks names for them (docs/NAMES.md).
+  'driver.veteran': 'The veteran',
+  'driver.veteranText': 'Smooth and steady, kind to the truck. Reads rock gardens like a book.',
+  'driver.charger': 'The charger',
+  'driver.chargerText': 'Quick, and hard on the kit. Flies the whoops and jumps.',
+  'driver.gravelAce': 'The gravel ace',
+  'driver.gravelAceText': 'A touch quick, neither smooth nor rough. Finds time on fast gravel.',
+  'driver.mechanic': 'The mechanic',
+  'driver.mechanicText': 'Steady and fairly smooth. Fixes things at the roadside in two-thirds the time.',
+
+  'job.newTire': 'Fit a new tire',
+  'job.patchTire': 'Patch the tire',
+  'job.newShock': 'Fit a new shock',
+  'job.rebuildShock': 'Rebuild the shock',
+  'job.newCv': 'Fit a new CV joint',
+  'job.weldMount': 'Weld and plate the mount',
+  'job.weldFrame': 'Weld and gusset the frame',
+
+  // Rival teams: proposed names, waiting on Kelbo's OK (docs/NAMES.md).
+  'team.brannigan': 'Brannigan Brothers',
+  'team.highbank': 'Highbank Racing',
+  'team.hardpan': 'Hardpan Haulage Works',
+  'team.jackrabbit': 'Jackrabbit Sport',
+  'team.privateer': 'Privateer',
+  'habit.brannigan': 'Push hard, break things, fix them by the roadside.',
+  'habit.highbank': 'New money: the newest parts, still learning to look after them.',
+  'habit.hardpan': 'Slow, steady, never quits. Over-builds everything.',
+  'habit.jackrabbit': 'Quick and light. Their dampers cook in the heat.',
+  'habit.privateer': 'A small team on a small budget, doing it for the love of it.',
+
   'footer.studio': 'Longlight Interactive',
   'boot.failed': 'Bump Stop could not start. Reload to try again.',
 } as const
