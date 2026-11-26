@@ -214,6 +214,11 @@ export function buildTruck(input: TruckBuild): BuiltTruck {
       redLine: md.redLine + damper.tempLimit,
       warmFrom: md.warmFrom + damper.tempLimit,
     }
+    // Spool valves (2017 on): damping by position in the travel, and oil heat that matters less.
+    if (damper.spool) {
+      dmp.position = { ...damper.spool.position }
+      dmp.oilSense = damper.spool.oilSense
+    }
 
     rideAxles.push({
       ...muleAxle,

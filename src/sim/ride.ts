@@ -205,9 +205,11 @@ export function emptyStats(): RideStats {
  * set (1 at 40 °C). Below 1 is fade; above 1 is cold, stiff oil.
  */
 export function dampingMultiplier(oilTemp: number, damper: DamperSetup): number {
-  let m = detExp(-DAMPER_OIL.viscositySlope * (oilTemp - DAMPER_OIL.referenceTemp))
+  // A spool valve's ports care less how thick the oil is (`oilSense` below 1).
+  const sense = damper.oilSense ?? 1
+  let m = detExp(-DAMPER_OIL.viscositySlope * sense * (oilTemp - DAMPER_OIL.referenceTemp))
   // Below freezing the oil thickens faster (winter, plan PR 10).
-  if (oilTemp < DAMPER_OIL.coldFrom) m *= detExp(DAMPER_OIL.coldSlope * (DAMPER_OIL.coldFrom - oilTemp))
+  if (oilTemp < DAMPER_OIL.coldFrom) m *= detExp(DAMPER_OIL.coldSlope * sense * (DAMPER_OIL.coldFrom - oilTemp))
   const foam = (oilTemp - damper.aerationTemp) / DAMPER_OIL.aerationSpan
   if (foam > 0) m *= 1 - (1 - DAMPER_OIL.aerationFloor) * (foam > 1 ? 1 : foam)
   if (m > DAMPER_OIL.maxMultiplier) m = DAMPER_OIL.maxMultiplier
@@ -220,6 +222,32 @@ export function damperForce(speed: number, d: DamperSetup): number {
   if (speed >= 0) return speed <= d.knee ? d.compLow * speed : d.compLow * d.knee + d.compHigh * (speed - d.knee)
   const s = -speed
   return -(s <= d.knee ? d.rebLow * s : d.rebLow * d.knee + d.rebHigh * (s - d.knee))
+}
+
+/**
+ * Position-sensitive damping (spool-valve dampers, `DamperSetup.position`):
+ * how hard the damper damps at this point in the travel, as a share of its
+ * setting. `c` is compression from ride height (m, + is up), `v` the shaft
+ * speed (+ is compression). 1 for a damper without it.
+ *
+ * Compression firms up near the bump end and rebound near the droop end,
+ * each on a smooth curve (the square of how far into the zone the wheel is),
+ * so there is no sudden step for the wheel to bounce off.
+ */
+export function positionScale(c: number, v: number, d: DamperSetup, bumpTravel: number, droopTravel: number): number {
+  const pd = d.position
+  if (!pd) return 1
+  let into = 0
+  if (v > 0) {
+    const span = bumpTravel * pd.zone
+    into = span > 0 ? (c - (bumpTravel - span)) / span : 0
+  } else if (v < 0) {
+    const span = droopTravel * pd.zone
+    into = span > 0 ? (-c - (droopTravel - span)) / span : 0
+  }
+  if (into <= 0) return pd.mid
+  if (into > 1) into = 1
+  return pd.mid + (pd.end - pd.mid) * into * into
 }
 
 /** Heat each damper sheds per kelvin above the air at this road speed (W/K). */
@@ -319,7 +347,8 @@ export function stepRide(
     // Damper: force from shaft speed, scaled by how thin the oil is right now.
     const temp = s.oilTemp[i] as number
     const mult = dampingMultiplier(temp, dm)
-    const damp = damperForce(v, dm) * mult
+    // Spool-valve dampers also damp by where the wheel is in its travel.
+    const damp = damperForce(v, dm) * mult * (dm.position ? positionScale(c, v, dm, ax.bumpTravel, ax.droopTravel) : 1)
     const power = damp * v // always >= 0: a damper only ever turns motion into heat
 
     const strut = load + bar + damp // pushes the body up and the wheel down

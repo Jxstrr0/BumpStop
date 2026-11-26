@@ -9,6 +9,9 @@
  *   (all four corners), and money (cr.). A part only exists in the classes it
  *   lists, so a heavy-truck-only part has just a `heavy` number.
  * - `year` is the first year it can be bought (the career runs 1985 to 2025).
+ *   The newest parts (2017 to 2025) give the last career years something to
+ *   chase: spool-valve dampers, aramid tires, forged beadlocks, gas-charged
+ *   bump stops and twin-turbo engines for the light 4x4 and the heavy truck.
  * - The other numbers are multipliers on the class's test mule
  *   (`src/data/ride.ts` and `src/data/wear.ts`), so 1 means "the same as the
  *   mule". Each class's stock build (`src/data/kit.ts`) uses parts that are
@@ -17,6 +20,7 @@
  * No part makers are named yet: names wait on Kelbo's OK (`docs/NAMES.md`).
  */
 import type { ClassId } from './classes'
+import type { PositionDamping } from './ride'
 import type { StringKey } from './strings'
 
 /** The part slots, in the order the build screen shows them. */
@@ -99,6 +103,13 @@ export interface DamperPart extends PartCommon {
   tempLimit: number
   /** Clicks each way from the middle on each adjuster (0 = no adjuster, set at the factory). */
   clicks: { compLow: number; compHigh: number; rebound: number }
+  /**
+   * Spool valves (2017 on) in place of shim stacks: damping that follows
+   * where the wheel is in its travel (`position`, see `PositionDamping` in
+   * `src/data/ride.ts`) and oil heat that matters less (`oilSense`, a share
+   * of a normal damper's). Missing on every other damper.
+   */
+  spool?: { position: PositionDamping; oilSense: number }
 }
 
 export interface BumpStopPart extends PartCommon {
@@ -252,6 +263,14 @@ export const PARTS: readonly Part[] = [
   { slot: 'dampers', id: 'electronic', name: 'part.electronic', text: 'part.electronicText', year: 2016,
     mass: { light4x4: 22, heavy: 110, sxs: 12 }, cost: { light4x4: 18000, heavy: 50000, sxs: 13000 },
     heat: 1.9, cool: 1.4, tempLimit: 20, clicks: { compLow: 4, compHigh: 4, rebound: 4 } },
+  // Spool valves in place of shim stacks (Kelbo picked the name, 26 November 2026). A touch softer through the
+  // middle of the travel, firming to 3.5 times in the last 35% at each end (so they catch the big hits before the bump
+  // stop does), and the oil's heat matters half as much (so they hold their damping hot and aren't as stiff on a
+  // frozen morning). Stiffer at the ends means the tires take more of a big landing: watch the tire pressure.
+  { slot: 'dampers', id: 'spoolValve', name: 'part.spoolValve', text: 'part.spoolValveText', year: 2017,
+    mass: { light4x4: 21, heavy: 105, sxs: 12 }, cost: { light4x4: 21000, heavy: 58000, sxs: 15000 },
+    heat: 1.9, cool: 1.4, tempLimit: 20, clicks: { compLow: 4, compHigh: 4, rebound: 4 },
+    spool: { position: { mid: 0.9, zone: 0.35, end: 3.5 }, oilSense: 0.5 } },
 
   // ── Bump stops ──
   { slot: 'bumpStops', id: 'rubber', name: 'part.rubber', text: 'part.rubberText', year: 1985,
@@ -260,6 +279,9 @@ export const PARTS: readonly Part[] = [
     mass: { light4x4: 2, heavy: 10, sxs: 1 }, cost: { light4x4: 600, heavy: 2000, sxs: 400 }, rate: 1.2, progression: 10, strength: 1.2 },
   { slot: 'bumpStops', id: 'hydraulic', name: 'part.hydraulic', text: 'part.hydraulicText', year: 2003,
     mass: { light4x4: 8, heavy: 40, sxs: 4 }, cost: { light4x4: 4500, heavy: 14000, sxs: 3000 }, rate: 1.5, progression: 5, strength: 1.8 },
+  // Gas-charged (2023): a hydraulic stop with a nitrogen spring behind it, gentler at first touch and tougher still.
+  { slot: 'bumpStops', id: 'gasCharged', name: 'part.gasCharged', text: 'part.gasChargedText', year: 2023,
+    mass: { light4x4: 7, heavy: 35, sxs: 3 }, cost: { light4x4: 6500, heavy: 19000, sxs: 4200 }, rate: 1.35, progression: 4.5, strength: 2 },
 
   // ── Anti-roll bars ──
   { slot: 'antiRoll', id: 'noBars', name: 'part.noBars', text: 'part.noBarsText', year: 1985,
@@ -284,6 +306,8 @@ export const PARTS: readonly Part[] = [
     mass: { light4x4: 50, heavy: 170, sxs: 26 }, cost: { light4x4: 2200, heavy: 7000, sxs: 1500 }, unsprung: 0.92, beadlock: false },
   { slot: 'wheels', id: 'beadlocks', name: 'part.beadlocks', text: 'part.beadlocksText', year: 1985,
     mass: { light4x4: 84, heavy: 280, sxs: 42 }, cost: { light4x4: 3200, heavy: 10000, sxs: 2200 }, unsprung: 1.04, beadlock: true },
+  { slot: 'wheels', id: 'forgedBeadlocks', name: 'part.forgedBeadlocks', text: 'part.forgedBeadlocksText', year: 2019,
+    mass: { light4x4: 60, heavy: 205, sxs: 30 }, cost: { light4x4: 6500, heavy: 20000, sxs: 4400 }, unsprung: 0.93, beadlock: true },
 
   // ── Tires ──
   { slot: 'tires', id: 'allTerrain', name: 'part.allTerrain', text: 'part.allTerrainText', year: 1985,
@@ -297,6 +321,11 @@ export const PARTS: readonly Part[] = [
     mass: { light4x4: 92, heavy: 460, sxs: 42 }, cost: { light4x4: 3400, heavy: 16000, sxs: 2200 }, stiffness: 1, casing: 1, unsprung: 1.03, studded: true },
   { slot: 'tires', id: 'studdedPly', name: 'part.studdedPly', text: 'part.studdedPlyText', year: 1985,
     mass: { light4x4: 104, heavy: 520, sxs: 48 }, cost: { light4x4: 4600, heavy: 22000, sxs: 3000 }, stiffness: 1.15, casing: 1.25, unsprung: 1.08, studded: true },
+  // Aramid-belted rally tires (2018): a casing as tough as heavy ply, about the weight of a rally tire, and dear.
+  { slot: 'tires', id: 'aramidRally', name: 'part.aramidRally', text: 'part.aramidRallyText', year: 2018,
+    mass: { light4x4: 86, heavy: 430, sxs: 39 }, cost: { light4x4: 5200, heavy: 25000, sxs: 3400 }, stiffness: 1.05, casing: 1.3, unsprung: 0.99, studded: false },
+  { slot: 'tires', id: 'studdedAramid', name: 'part.studdedAramid', text: 'part.studdedAramidText', year: 2018,
+    mass: { light4x4: 90, heavy: 450, sxs: 41 }, cost: { light4x4: 6400, heavy: 30000, sxs: 4200 }, stiffness: 1.05, casing: 1.3, unsprung: 1.02, studded: true },
 
   // ── Protection ──
   { slot: 'protection', id: 'noGuards', name: 'part.noGuards', text: 'part.noGuardsText', year: 1985,
@@ -315,12 +344,16 @@ export const PARTS: readonly Part[] = [
     mass: { light4x4: 260 }, cost: { light4x4: 9000 }, power: 170 * kW, torque: 1.3 },
   { slot: 'engine', id: 'turboDiesel', name: 'part.turboDiesel', text: 'part.turboDieselText', year: 1994,
     mass: { light4x4: 250 }, cost: { light4x4: 12000 }, power: 140 * kW, torque: 1.25 },
+  { slot: 'engine', id: 'twinTurboV6', name: 'part.twinTurboV6', text: 'part.twinTurboV6Text', year: 2017,
+    mass: { light4x4: 235 }, cost: { light4x4: 16000 }, power: 190 * kW, torque: 1.35 },
   { slot: 'engine', id: 'dieselSix', name: 'part.dieselSix', text: 'part.dieselSixText', year: 1985,
     mass: { heavy: 950 }, cost: { heavy: 30000 }, power: 300 * kW, torque: 1 },
   { slot: 'engine', id: 'turboDieselSix', name: 'part.turboDieselSix', text: 'part.turboDieselSixText', year: 1990,
     mass: { heavy: 1000 }, cost: { heavy: 50000 }, power: 420 * kW, torque: 1.2 },
   { slot: 'engine', id: 'dieselV8', name: 'part.dieselV8', text: 'part.dieselV8Text', year: 1985,
     mass: { heavy: 1150 }, cost: { heavy: 55000 }, power: 450 * kW, torque: 1.3 },
+  { slot: 'engine', id: 'twinTurboDieselSix', name: 'part.twinTurboDieselSix', text: 'part.twinTurboDieselSixText', year: 2020,
+    mass: { heavy: 1020 }, cost: { heavy: 72000 }, power: 500 * kW, torque: 1.35 },
   { slot: 'engine', id: 'twin', name: 'part.twin', text: 'part.twinText', year: 1985,
     mass: { sxs: 55 }, cost: { sxs: 2500 }, power: 45 * kW, torque: 1 },
   { slot: 'engine', id: 'triple', name: 'part.triple', text: 'part.tripleText', year: 1995,

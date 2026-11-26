@@ -64,7 +64,8 @@ export const FRAME_CHANNELS: readonly FrameChannel[] = [
 /**
  * A setting the report can jump to (`src/ui/fixes.ts`). `rebound` (more) and
  * `lighterWheels` are for the shaker rig's report; `lessRebound` is softer
- * rebound for hot dampers.
+ * rebound for hot dampers. `spoolValve` is the position-sensitive dampers
+ * (2017 on), which firm up near the end of the travel.
  */
 export type FixTarget =
   | 'damperSize'
@@ -84,6 +85,7 @@ export type FixTarget =
   | 'rebound'
   | 'lessRebound'
   | 'lighterWheels'
+  | 'spoolValve'
 
 /**
  * The report's traces turn amber at this share of a limit, for channels
@@ -132,6 +134,8 @@ export const FAILURES: Readonly<Record<FailureKind, FailureInfo>> = {
     frame: [],
     fixes: [
       { target: 'springRate', text: 'fix.stifferSprings' },
+      // Only once they're on sale (2017) and not already fitted; otherwise the report skips to the next one.
+      { target: 'spoolValve', text: 'fix.spoolValve' },
       { target: 'bumpStops', text: 'fix.bumpStops' },
       { target: 'rideHeight', text: 'fix.rideHeight' },
     ],

@@ -86,6 +86,36 @@ export interface DamperSetup {
   redLine: number
   /** Traces turn amber from here (K). */
   warmFrom: number
+  /**
+   * Spool-valve dampers only (2017 on): damping that follows where the wheel
+   * is in its travel. Soft through the middle, firming up near each end.
+   * Missing means the damper damps the same all the way through.
+   */
+  position?: PositionDamping
+  /**
+   * How much the oil's temperature changes the damping, as a share of a
+   * normal damper's (1). A spool valve meters the oil through sharp-edged
+   * ports, where thin or thick oil flows nearly the same, so it fades less
+   * when hot and is less stiff on a frozen morning. Missing means 1.
+   */
+  oilSense?: number
+}
+
+/**
+ * Position-sensitive damping (spool-valve dampers). Through the middle of the
+ * travel the damper runs at `mid` of its setting. In the last `zone` share of
+ * the bump travel the compression damping climbs to `end` times its setting
+ * at the bump stop and beyond, which catches a big hit before it bottoms out.
+ * In the last `zone` share of the droop travel the rebound damping climbs the
+ * same way, so the wheel doesn't slam onto its limit strap.
+ */
+export interface PositionDamping {
+  /** Damping through the middle of the travel, as a share of the setting. */
+  mid: number
+  /** Share of the bump (and droop) travel at each end where it firms up. */
+  zone: number
+  /** Damping at the very end, as a share of the setting. */
+  end: number
 }
 
 export interface AxleSetup {

@@ -28,6 +28,7 @@ export function fixJump(target: FixTarget, end: End, b: TruckBuild): Jump | null
   const slider = (key: keyof AxleSettings): Jump => ({ kind: 'slider', end, key })
   switch (target) {
     case 'damperSize':
+    case 'spoolValve':
       return { kind: 'slot', slot: 'dampers' }
     case 'compression': {
       // Only dampers with a compression adjuster have the slider; otherwise the dampers slot.
@@ -100,6 +101,9 @@ export function fixUseful(target: FixTarget, end: End, b: TruckBuild, year: numb
     case 'rebound':
       if (fitted.clicks.rebound > 0) return set.rebound < fitted.clicks.rebound
       return dampersOnSale(b, year).some((p) => p.clicks.rebound > 0)
+    case 'spoolValve':
+      // Position-sensitive dampers that firm up at the end of the stroke: only once on sale, and not if they're fitted.
+      return !fitted.spool && dampersOnSale(b, year).some((p) => p.spool !== undefined)
     case 'lighterWheels': {
       const wheels = partIn(b, 'wheels')
       return partsFor(b.cls, 'wheels').some((p) => p.year <= year && (p.mass[b.cls] ?? Infinity) < (wheels.mass[b.cls] ?? 0))

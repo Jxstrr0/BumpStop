@@ -52,6 +52,7 @@ export const GLOSSARY = [
   { id: 'sag', see: 'springRate' },
   { id: 'solidAxle' },
   { id: 'springRate', see: 'springRate' },
+  { id: 'spoolValve', see: 'spoolValve' },
   { id: 'sprung', see: 'lighterWheels' },
   { id: 'stage' },
   { id: 'studs', see: 'tireCasing' },

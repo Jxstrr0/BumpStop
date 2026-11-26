@@ -135,6 +135,17 @@ gets one of the pair (`sponsorName` in `src/sim/career.ts`). Names in
 Northern Lard Oil was offered and became Ptarmigan Lard Oil (no "North-"
 names).
 
+## Parts
+
+Parts are named by what they are ("Bypass dampers", "Turbo diesel"), with
+one exception:
+
+- **Zed-Two spool-valve dampers** (Kelbo, 26 November 2026), the 2017
+  spool-valve shocks: a nod to the factory spool-valve shocks on a
+  well-known off-road pickup. "Zed-Two" is Z-2 said the Canadian way; the
+  real truck's and shock maker's names are trademarks and stay out of the
+  game.
+
 ## Still to name
 
 Parts makers, the crew at the garage, privateer customers (known by race
