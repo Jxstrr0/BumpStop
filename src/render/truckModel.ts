@@ -8,8 +8,16 @@
  * - the body bounces, pitches and rolls,
  * - each wheel rides up and down on its own and spins with the distance,
  * - solid axles tilt as one wheel rises past the other,
- * - arms swing to follow the wheels,
+ * - arms (wishbones, trailing arms, drive shafts, tie rods) swing to follow
+ *   the wheels,
  * - each shock and spring stretches between its two mounts.
+ *
+ * A truck can carry more than one suspension layout at an end (the light
+ * 4x4's beam axle or double wishbones, say). Each layout's parts sit in a
+ * `Fit_frontSusp_<part>_Rig…` group that `fit()` shows or hides like any
+ * bolt-on, and a layout with its own shock mounts names them after its parts
+ * (`MountTop_FL_wishbone`); a corner with no such mounts uses the plain
+ * `MountTop_FL` / `MountLow_FL`. A hidden axle doesn't tilt its hubs.
  *
  * Each model also holds every part a player can bolt on (dampers, bump
  * stops, bars, axles, wheels, tires, guards, spares, engine bits, frames,
@@ -56,21 +64,36 @@ export interface Stance {
   rear: number
 }
 
-interface Shock {
+/** A pair of shock mounts: the plain ones, or one suspension layout's own. */
+interface Mounts {
   top: THREE.Object3D
   low: THREE.Object3D
+  /** Mount to mount at rest (m). */
+  rest: number
+  /** The suspension parts these are for; null for the plain ones. */
+  parts: string[] | null
+}
+
+interface Shock {
   body: THREE.Object3D
   shaft: THREE.Object3D
   spring: THREE.Object3D
-  /** Mount to mount at rest (m). */
-  rest: number
+  /** Every pair of mounts at this corner, and the pair the fitted part uses. */
+  mounts: Mounts[]
+  active: Mounts
 }
 
 interface Arm {
   arm: THREE.Object3D
   end: THREE.Object3D
-  /** Pivot to end at rest, in the body's space. */
+  /** Pivot to end at rest, in the arm's parent's space. */
   restDir: THREE.Vector3
+}
+
+/** True when a node and everything above it is shown (a hidden layout hides its arms and axle). */
+function shown(o: THREE.Object3D): boolean {
+  for (let n: THREE.Object3D | null = o; n; n = n.parent) if (!n.visible) return false
+  return true
 }
 
 /** The part in each slot, as a build lists them (`TruckBuild.parts`). */
@@ -129,7 +152,7 @@ export class TruckModel {
   private wheels: THREE.Object3D[]
   private wheelRest: THREE.Quaternion[]
   private shocks: Shock[]
-  private arms: (Arm | null)[]
+  private arms: Arm[] = []
   private axles: { node: THREE.Object3D; left: number; right: number }[]
   /** Every bolt-on part in the model, and the slot and part ids that show it. */
   private fits: { node: THREE.Object3D; slot: string; parts: string[] }[] = []
@@ -160,18 +183,34 @@ export class TruckModel {
 
     scene.updateMatrixWorld(true)
     const world = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3())
+    // Shock mounts: MountTop_FL, or MountTop_FL_<part>[-<part>] for one layout's own.
+    const tops = new Map<string, THREE.Object3D>()
+    const lows = new Map<string, THREE.Object3D>()
+    // Arms: Arm_FL_<what>, each pointing at its ArmEnd_FL_<what> on the hub.
+    const armNodes: THREE.Object3D[] = []
+    scene.traverse((o) => {
+      const m = /^Mount(Top|Low)_(FL|FR|RL|RR)(?:_([A-Za-z0-9-]+))?$/.exec(o.name)
+      if (m) (m[1] === 'Top' ? tops : lows).set(`${m[2]}|${m[3] ?? ''}`, o)
+      if (/^Arm_(FL|FR|RL|RR)(_\w+)?$/.test(o.name)) armNodes.push(o)
+    })
     this.shocks = CORNERS.map((c) => {
-      const top = find(`MountTop_${c}`)
-      const low = find(`MountLow_${c}`)
-      return { top, low, body: find(`ShockBody_${c}`), shaft: find(`ShockShaft_${c}`), spring: find(`Spring_${c}`), rest: world(top).distanceTo(world(low)) }
+      const mounts: Mounts[] = []
+      for (const [key, top] of tops) {
+        const [corner, tag] = key.split('|') as [string, string]
+        const low = lows.get(key)
+        if (corner !== c || !low) continue
+        mounts.push({ top, low, rest: world(top).distanceTo(world(low)), parts: tag ? tag.split('-') : null })
+      }
+      const plain = mounts.find((m) => m.parts === null)
+      if (!plain) throw new Error(`Truck model ${cls} has no MountTop_${c}`)
+      return { body: find(`ShockBody_${c}`), shaft: find(`ShockShaft_${c}`), spring: find(`Spring_${c}`), mounts, active: plain }
     })
-    this.arms = CORNERS.map((c) => {
-      const arm = scene.getObjectByName(`Arm_${c}`)
-      const end = scene.getObjectByName(`ArmEnd_${c}`)
-      if (!arm || !end) return null
-      const restDir = this.body.worldToLocal(world(end)).sub(arm.position).normalize()
-      return { arm, end, restDir }
-    })
+    for (const arm of armNodes) {
+      const end = scene.getObjectByName(arm.name.replace(/^Arm_/, 'ArmEnd_'))
+      if (!end || !arm.parent) continue
+      const restDir = arm.parent.worldToLocal(world(end)).sub(arm.position).normalize()
+      this.arms.push({ arm, end, restDir })
+    }
     this.axles = []
     for (const [key, left, right] of [['F', 0, 1], ['R', 2, 3]] as const) {
       const node = scene.getObjectByName(`Axle_${key}`)
@@ -189,12 +228,17 @@ export class TruckModel {
     this.fit(KITS[cls].stock.parts)
   }
 
-  /** Show the build's own parts and hide the rest. */
+  /** Show the build's own parts and hide the rest, and hang the shocks on the suspension's own mounts. */
   fit(parts: FittedParts): void {
     for (const f of this.fits) {
       const part = parts[f.slot as SlotId]
       f.node.visible = part !== undefined && f.parts.includes(part)
     }
+    this.shocks.forEach((s, i) => {
+      const susp = parts[i < 2 ? 'frontSusp' : 'rearSusp']
+      const own = susp === undefined ? undefined : s.mounts.find((m) => m.parts?.includes(susp))
+      s.active = own ?? s.mounts.find((m) => m.parts === null)!
+    })
   }
 
   /** Overall length (m), for framing the camera. */
@@ -233,8 +277,9 @@ export class TruckModel {
       const spin = new THREE.Quaternion().setFromAxisAngle(SPIN_AXIS, -p.distance / this.radius)
       this.wheels[i]!.quaternion.copy(spin).multiply(this.wheelRest[i]!)
     }
-    // Solid axles: both hubs tilt with the beam.
+    // Solid axles: both hubs tilt with the beam (not when the build has independent arms there).
     for (const ax of this.axles) {
+      if (!shown(ax.node)) continue
       const l = this.hubs[ax.left]!
       const r = this.hubs[ax.right]!
       const angle = Math.atan2(l.position.y - r.position.y, this.track)
@@ -254,15 +299,25 @@ export class TruckModel {
       }
     }
 
+    // Arms first: some layouts hang the shock's bottom on an arm.
     this.root.updateMatrixWorld(true)
+    const end = new THREE.Vector3()
+    for (const a of this.arms) {
+      if (!shown(a.arm)) continue
+      a.arm.parent!.worldToLocal(a.end.getWorldPosition(end))
+      a.arm.quaternion.setFromUnitVectors(a.restDir, end.sub(a.arm.position).normalize())
+    }
+    this.root.updateMatrixWorld(true)
+
     const top = new THREE.Vector3()
     const low = new THREE.Vector3()
     const dir = new THREE.Vector3()
     for (let i = 0; i < 4; i++) {
       const s = this.shocks[i]!
+      const m = s.active
       // Mount positions in the model's own space (the root may sit anywhere in the scene).
-      this.root.worldToLocal(s.top.getWorldPosition(top))
-      this.root.worldToLocal(s.low.getWorldPosition(low))
+      this.root.worldToLocal(m.top.getWorldPosition(top))
+      this.root.worldToLocal(m.low.getWorldPosition(low))
       if (this.broken.get(i) === 'mount') top.y -= 0.12 * (this.radius / 0.4)
       dir.subVectors(low, top)
       const length = dir.length()
@@ -271,15 +326,9 @@ export class TruckModel {
       s.body.quaternion.setFromUnitVectors(DOWN, dir)
       s.spring.position.copy(top)
       s.spring.quaternion.copy(s.body.quaternion)
-      s.spring.scale.set(1, length / s.rest, 1)
+      s.spring.scale.set(1, length / m.rest, 1)
       s.shaft.position.copy(low)
       s.shaft.quaternion.setFromUnitVectors(UP, dir.negate())
-
-      const arm = this.arms[i]
-      if (arm) {
-        const end = this.body.worldToLocal(arm.end.getWorldPosition(new THREE.Vector3()))
-        arm.arm.quaternion.setFromUnitVectors(arm.restDir, end.sub(arm.arm.position).normalize())
-      }
     }
   }
 

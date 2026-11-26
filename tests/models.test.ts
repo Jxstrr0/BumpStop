@@ -8,6 +8,10 @@
  * The models also carry every part a player can bolt on, in nodes named
  * `Fit_<slot>_<part>[-<part>]_<where>`: these tests check each name is a real
  * slot and part, and that the parts you can see on a real truck are there.
+ *
+ * Each suspension layout's own shock mounts (`MountTop_FL_wishbone`) must
+ * hold the shock at exactly the stock length at rest, so one set of shocks
+ * fits every layout, and every arm needs the end on the hub it points at.
  */
 import { readFileSync, statSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
@@ -19,6 +23,8 @@ import { TEST_MULES } from '../src/data/ride'
 interface GltfNode {
   name?: string
   translation?: [number, number, number]
+  rotation?: [number, number, number, number]
+  scale?: [number, number, number]
   children?: number[]
 }
 
@@ -63,6 +69,44 @@ describe.each(CLASSES.map((c) => c.id))('the %s model', (cls) => {
     }
   })
 
+  /** Where a node sits at rest (the nodes up to a mount or arm are only ever moved, never turned). */
+  const parentOf = new Map<number, number>()
+  json.nodes.forEach((n, i) => n.children?.forEach((ch) => parentOf.set(ch, i)))
+  const restPosition = (name: string): number[] => {
+    let i: number | undefined = json.nodes.findIndex((n) => n.name === name)
+    const at = [0, 0, 0]
+    while (i !== undefined) {
+      const n = json.nodes[i]!
+      expect(n.rotation === undefined || Math.abs(n.rotation[3]) > 0.999999, `${n.name} is turned`).toBe(true)
+      expect(n.scale === undefined, `${n.name} is scaled`).toBe(true)
+      n.translation?.forEach((v, k) => (at[k]! += v))
+      i = parentOf.get(i)
+    }
+    return at
+  }
+
+  it('holds the shocks at the stock length on every layout\'s own mounts', () => {
+    const own = [...byName.keys()].filter((n) => /^MountTop_(FL|FR|RL|RR)_[A-Za-z0-9-]+$/.test(n))
+    if (cls !== 'heavy') expect(own.length).toBeGreaterThan(0)
+    for (const top of own) {
+      const [, corner, tag] = /^MountTop_(\w\w)_(.+)$/.exec(top)!
+      const low = `MountLow_${corner}_${tag}`
+      expect(byName.has(low), low).toBe(true)
+      const dist = (a: string, b: string) => Math.hypot(...restPosition(a).map((v, k) => v - restPosition(b)[k]!))
+      expect(dist(top, low), top).toBeCloseTo(dist(`MountTop_${corner}`, `MountLow_${corner}`), 3)
+      for (const id of tag!.split('-')) {
+        expect(PARTS.find((p) => p.id === id)?.slot, `${top}: ${id}`).toBe(corner![0] === 'F' ? 'frontSusp' : 'rearSusp')
+      }
+    }
+  })
+
+  it('gives every arm its end on the hub', () => {
+    for (const name of byName.keys()) {
+      if (!/^Arm_(FL|FR|RL|RR)(_\w+)?$/.test(name)) continue
+      expect(byName.has(name.replace(/^Arm_/, 'ArmEnd_')), name).toBe(true)
+    }
+  })
+
   it('names only real slots and parts for this class', () => {
     expect(fits.length).toBeGreaterThan(0)
     for (const f of fits) {
@@ -77,9 +121,7 @@ describe.each(CLASSES.map((c) => c.id))('the %s model', (cls) => {
   })
 
   it('draws every part you can see', () => {
-    // The side-by-side's arms are the same shape for every suspension part, for now.
-    const slots = SLOTS.filter((s) => !(cls === 'sxs' && s.endsWith('Susp')))
-    for (const slot of slots) {
+    for (const slot of SLOTS) {
       for (const part of PARTS.filter((p) => p.slot === slot && p.mass[cls] !== undefined && !NOTHING_TO_SEE.has(p.id))) {
         const nodes = fits.filter((f) => f.slot === slot && f.parts.includes(part.id))
         expect(nodes.length, `${slot} ${part.id}`).toBeGreaterThan(0)
