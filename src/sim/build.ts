@@ -219,6 +219,8 @@ export function buildTruck(input: TruckBuild): BuiltTruck {
       dmp.position = { ...damper.spool.position }
       dmp.oilSense = damper.spool.oilSense
     }
+    // Bypass tubes (bypass 1996, internal bypass 2008): damping that firms up in steps towards each end.
+    if (damper.bypass) dmp.zones = damper.bypass
 
     rideAxles.push({
       ...muleAxle,

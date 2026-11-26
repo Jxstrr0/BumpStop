@@ -93,6 +93,12 @@ export interface DamperSetup {
    */
   position?: PositionDamping
   /**
+   * Bypass dampers only (1996 on): tubes along the body let oil slip past the
+   * piston through the middle of the stroke, and close off one by one towards
+   * each end, so the damping firms up in steps. Missing means no bypass tubes.
+   */
+  zones?: BypassZones
+  /**
    * How much the oil's temperature changes the damping, as a share of a
    * normal damper's (1). A spool valve meters the oil through sharp-edged
    * ports, where thin or thick oil flows nearly the same, so it fades less
@@ -116,6 +122,32 @@ export interface PositionDamping {
   zone: number
   /** Damping at the very end, as a share of the setting. */
   end: number
+}
+
+/**
+ * Bypass tubes (bypass and internal bypass dampers). Through the middle of the
+ * travel every tube is open and the damper runs at `mid` of its setting. Going
+ * outwards, the piston slides past each tube's last port in turn: from there
+ * on that tube is shut and the damping steps up to its `scale`. Compression
+ * steps up towards full bump and rebound towards full droop; rebound near
+ * full bump and compression near full droop stay at `mid`, so the wheel can
+ * always get back to the middle (each tube has a one-way valve).
+ *
+ * Unlike a spool valve's smooth climb (`PositionDamping`), these are plateaus
+ * with a short ramp (`port`) between them, they start firming earlier, and
+ * they stop well short of a spool valve's 3.5 times at the very end.
+ */
+export interface BypassZones {
+  /** Damping through the middle, with every tube open, as a share of the setting. */
+  mid: number
+  /**
+   * One step per tube, from the middle outwards: `from` is the share of the
+   * bump (or droop) travel, measured from ride height, where the piston passes
+   * that tube's last port; `scale` is the damping from there on.
+   */
+  steps: readonly { from: number; scale: number }[]
+  /** Share of the travel a port takes to close as the piston slides over it: the ramp between steps. */
+  port: number
 }
 
 export interface AxleSetup {
