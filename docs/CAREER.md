@@ -157,8 +157,36 @@ second). It opens:
 | 30 | A third mechanic |
 | 35 | A regional sponsor, Muskeg Tire Co. or Hoarfrost Cola (4,000 a raid) |
 | 40 | A welding bay (cheaper repairs again) |
+| 50 | A bigger parts truck (35,000; two more tires, a shock and a CV joint on every raid) |
 | 60 | The Whole Damn Country with your own truck |
+| 70 | A shock dyno (45,000; shock oil tires a third slower) |
+| 100 | A spring setting rig (40,000; springs sag 40% slower) |
 | 120 | A works deal with Boreal Bolt & Nut or Ptarmigan Lard Oil: 8,000 a raid and a quarter off parts |
+| 130 | A night shift (60,000, after the third mechanic; three more bivouac hours) |
+| 160 | A machine shop (55,000, after the welding bay; cheaper repairs again) |
+
+### Crew and tools late in a career
+
+The last five upgrades (Kelbo asked, 26 November 2026) give late money
+somewhere to go: before them a garage had bought everything by about the
+fourth season and then just banked (a light 4x4 bot had about 294,000 after
+eight). They cost 235,000 together and open from about the third season to
+the seventh. They all help your own raids, never a privateer's contract:
+
+- **A bigger parts truck** adds its spares to the truck's own at the start
+  of each raid (`RaidEntry.extraSpares`). They're restocked after the raid
+  like the rest.
+- **A shock dyno** and **a spring setting rig** slow the bivouac wear
+  (`RaidEntry.oilWear`, `RaidEntry.springSag`, used in `tireCondition`):
+  the oil tires at 0.65 times the rate and the springs sag at 0.6 times.
+  The bushings are unchanged.
+- **A night shift** adds three hours a night and **a machine shop** takes
+  0.07 more off the repair share (0.45 at the start, 0.08 with everything).
+
+All three raid fields are left out when they don't apply, so raids saved
+before them carry on as they were and the save format didn't change. The
+Crew and tools list shows what you can buy now; the rest are folded under
+"Later, with more reputation", and what you have is one line on top.
 
 Sponsors don't stack: the best one you qualify for is the one you have.
 Which of each pair a career gets comes from its seed (`sponsorName`), and

@@ -11,7 +11,7 @@
  * privateers are still working names. All live only in `src/data/strings.ts`.
  */
 import type { ClassId } from './classes'
-import { FIRST_YEAR, LAST_YEAR, type SlotId } from './parts'
+import { FIRST_YEAR, LAST_YEAR, type SlotId, type SpareId } from './parts'
 import type { DriverId, RaidId, RivalTrouble, Season } from './raids'
 import type { StringKey } from './strings'
 
@@ -146,7 +146,9 @@ export const SPONSORS: readonly Sponsor[] = [
 
 // ── The shop ──
 
-export type UpgradeId = 'secondMechanic' | 'thirdMechanic' | 'press' | 'welder'
+export type UpgradeId =
+  | 'secondMechanic' | 'thirdMechanic' | 'press' | 'welder'
+  | 'partsTruck' | 'dyno' | 'springRig' | 'nightShift' | 'machineShop'
 
 export interface Upgrade {
   id: UpgradeId
@@ -157,18 +159,42 @@ export interface Upgrade {
   hours: number
   /** Taken off `CAREER.repairShare` after a raid. */
   repair: number
+  /** Extra spares carried on every raid you enter yourself, on top of what the truck's spares part carries. */
+  spares?: Readonly<Record<SpareId, number>>
+  /** Shock oil tires this many times as fast over a raid (below 1 is slower; see `src/data/condition.ts`). */
+  oilWear?: number
+  /** Springs sag this many times as fast over a raid. */
+  springSag?: number
   /** Needs this one first. */
   needs: UpgradeId | null
   name: StringKey
   text: StringKey
 }
 
-/** The shop grows (plan): crew for more hours at the bivouac, tools for cheaper repairs. Still one garage. */
+/**
+ * The shop grows (plan): crew for more hours at the bivouac, tools for
+ * cheaper repairs. Still one garage.
+ *
+ * The last five (Kelbo asked, 26 November 2026) are for late in a career,
+ * when the garage has money and nothing to spend it on: a career bot in a
+ * light 4x4 banks about 294,000 after eight seasons, against 54,000 for the
+ * first four. They need a reputation of 50 to 160 (a steady garage gains
+ * about 25 a season, so they come in from the third season to about the
+ * seventh) and cost 35,000 to 60,000 each (235,000 together), and they
+ * help on a raid rather than at the bank:
+ * more spares, more hours, oil and springs that last longer. Only your own
+ * truck gets them; a privateer's contract raid brings its own crew.
+ */
 export const UPGRADES: readonly Upgrade[] = [
   { id: 'secondMechanic', cost: 9000, rep: 5, hours: 2, repair: 0, needs: null, name: 'upgrade.secondMechanic', text: 'upgrade.secondMechanicText' },
   { id: 'press', cost: 7000, rep: 10, hours: 0, repair: 0.15, needs: null, name: 'upgrade.press', text: 'upgrade.pressText' },
   { id: 'thirdMechanic', cost: 22000, rep: 30, hours: 2, repair: 0, needs: 'secondMechanic', name: 'upgrade.thirdMechanic', text: 'upgrade.thirdMechanicText' },
   { id: 'welder', cost: 16000, rep: 40, hours: 0, repair: 0.15, needs: 'press', name: 'upgrade.welder', text: 'upgrade.welderText' },
+  { id: 'partsTruck', cost: 35000, rep: 50, hours: 0, repair: 0, spares: { tire: 2, shock: 1, cv: 1 }, needs: null, name: 'upgrade.partsTruck', text: 'upgrade.partsTruckText' },
+  { id: 'dyno', cost: 45000, rep: 70, hours: 0, repair: 0, oilWear: 0.65, needs: null, name: 'upgrade.dyno', text: 'upgrade.dynoText' },
+  { id: 'springRig', cost: 40000, rep: 100, hours: 0, repair: 0, springSag: 0.6, needs: null, name: 'upgrade.springRig', text: 'upgrade.springRigText' },
+  { id: 'nightShift', cost: 60000, rep: 130, hours: 3, repair: 0, needs: 'thirdMechanic', name: 'upgrade.nightShift', text: 'upgrade.nightShiftText' },
+  { id: 'machineShop', cost: 55000, rep: 160, hours: 0, repair: 0.07, needs: 'welder', name: 'upgrade.machineShop', text: 'upgrade.machineShopText' },
 ]
 
 // ── Prep contracts ──

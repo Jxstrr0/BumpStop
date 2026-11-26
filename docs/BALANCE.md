@@ -196,3 +196,22 @@ eighth season well off, where before it was scraping by, because own
 entries pay. The bot spends on every part it can, so the spare money is
 what the parts can't use. On the finale the bot on Steady came 2nd to 4th
 every year and never won; on Push it won once (light 4x4).
+
+## Late crew and tools (1.11, 26 November 2026)
+
+Five more crew and tools (`UPGRADES`, `docs/CAREER.md`) give that spare
+money somewhere to go. The light 4x4 bot (seed 1, Steady, ten seasons)
+before and after:
+
+| | Wins | Finale open | Bank at the end |
+| --- | --- | --- | --- |
+| Before (1.10) | 7 in 52 | fourth season | 326,872 |
+| After (1.11) | 7 in 52 | fourth season | 88,145 |
+
+The bot buys each one as its reputation opens it, so the bank stays low
+until about the eighth season and then climbs again. The upgrades help on
+the road (more spares and hours, slower oil and spring wear) but don't
+change the bot's results on Steady: they make a long raid kinder to a
+truck rather than faster. The heavy truck's money is about 3.5 times a
+light 4x4's and the upgrades cost the same for every class, so a heavy
+garage still buys them all early.

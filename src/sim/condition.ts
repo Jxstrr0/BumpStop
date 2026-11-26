@@ -37,6 +37,9 @@ export interface ConditionLoad {
   harsh: boolean
   /** The pace call it was driven at (Steady if left out): harsh kilometres age springs and bushings faster at Push. */
   pace?: PaceId
+  /** The garage's shock dyno and spring rig (career only): oil tires and springs sag this many times as fast (1 if left out). */
+  oilWear?: number
+  springSag?: number
 }
 
 /** Add one piece of a stage's wear to the condition (changes `c`). */
@@ -54,9 +57,9 @@ export function tireCondition(c: Condition, truck: BuiltTruck, load: ConditionLo
       hits += load.bottomOuts[corner] ?? 0
     }
     // The two shocks share one service, so the axle's oil is the average of the pair.
-    c.oil[axle] = cap((c.oil[axle] as number) + oil / 2)
+    c.oil[axle] = cap((c.oil[axle] as number) + (oil / 2) * (load.oilWear ?? 1))
     const harshKm = load.harsh ? km * CONDITION.paceLoad[load.pace ?? 'steady'] : 0
-    c.spring[axle] = cap((c.spring[axle] as number) + hits * CONDITION.spring.perBottomOut + harshKm * CONDITION.spring.perHarshKm)
+    c.spring[axle] = cap((c.spring[axle] as number) + (hits * CONDITION.spring.perBottomOut + harshKm * CONDITION.spring.perHarshKm) * (load.springSag ?? 1))
     c.bushing[axle] = cap((c.bushing[axle] as number) + hits * CONDITION.bushing.perBottomOut + harshKm * CONDITION.bushing.perHarshKm)
   }
 }

@@ -33,7 +33,7 @@ import {
   UPGRADES, type CalendarEvent, type QuirkId, type Sponsor, type TeamId, type Tier, type UpgradeId,
 } from '../data/career'
 import { KITS, type AxleSettings, type TruckBuild } from '../data/kit'
-import { FIRST_YEAR, LAST_YEAR, PARTS, SLOTS, SPARE_IDS, type SlotId } from '../data/parts'
+import { FIRST_YEAR, LAST_YEAR, PARTS, SLOTS, SPARE_IDS, type SlotId, type SpareId } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, JOBS, RAID, RAIDS, type DriverId, type PaceId, type RaidId, type Season } from '../data/raids'
 import type { StringKey } from '../data/strings'
 import {
@@ -239,6 +239,28 @@ export function discountOf(c: CareerState): number {
 /** Mechanic hours at each of your bivouacs. */
 export function crewHours(c: CareerState): number {
   return RAID.bivouacHours + UPGRADES.filter((u) => c.upgrades.includes(u.id)).reduce((s, u) => s + u.hours, 0)
+}
+
+/** Spares the garage's parts truck brings to each of your raids, on top of the truck's own. */
+export function garageSpares(c: CareerState): Record<SpareId, number> {
+  const out = { tire: 0, shock: 0, cv: 0 }
+  for (const u of UPGRADES) {
+    if (!u.spares || !c.upgrades.includes(u.id)) continue
+    for (const id of SPARE_IDS) out[id] += u.spares[id]
+  }
+  return out
+}
+
+/** How fast the shock oil tires and the springs sag on your raids (1 = as usual): the shock dyno and the spring rig. */
+export function garageCare(c: CareerState): { oilWear: number; springSag: number } {
+  let oilWear = 1
+  let springSag = 1
+  for (const u of UPGRADES) {
+    if (!c.upgrades.includes(u.id)) continue
+    oilWear *= u.oilWear ?? 1
+    springSag *= u.springSag ?? 1
+  }
+  return { oilWear, springSag }
 }
 
 /** Share of a worn part's price that putting it right costs. */
@@ -542,6 +564,7 @@ export function enterOwn(c: CareerState, driver: DriverId, bench?: TruckBuild): 
   // Parts at the bivouacs come out of the garage's own money (none when broke), and are settled after the raid.
   return enterRaid(e.raid, b, driver, {
     seed: eventSeed(c), field: careerField(c.teams, cls, e.tier, c.year), hours: crewHours(c), budget: Math.max(0, c.money),
+    extraSpares: garageSpares(c), ...garageCare(c),
   })
 }
 
@@ -632,8 +655,10 @@ export function repairBill(c: CareerState, state: RaidState): { repairs: number;
     repairs += (state.cond.spring[axle] ?? 0) * job('newSprings')
   }
   const carried = partIn(b, 'spares').carries
+  // The parts truck's spares are restocked too.
+  const more = state.entry.extraSpares
   let spares = 0
-  for (const s of SPARE_IDS) spares += Math.max(0, carried[s] - state.spares[s]) * SPARE_PRICE[s] * CLASS_MONEY[cls]
+  for (const s of SPARE_IDS) spares += Math.max(0, carried[s] + (more?.[s] ?? 0) - state.spares[s]) * SPARE_PRICE[s] * CLASS_MONEY[cls]
   return { repairs: Math.round(repairs * share), spares: Math.round(spares) }
 }
 

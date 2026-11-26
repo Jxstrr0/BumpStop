@@ -82,6 +82,15 @@ export interface RaidEntry {
    * allowance.
    */
   budget?: number
+  /**
+   * Career raids with the garage's late tools (Kelbo asked, 26 November
+   * 2026): spares the parts truck brings on top of what the truck carries,
+   * and how fast the shock oil tires and the springs sag (1, or left out, is
+   * as usual). See `UPGRADES` in `src/data/career.ts`.
+   */
+  extraSpares?: Record<SpareId, number>
+  oilWear?: number
+  springSag?: number
 }
 
 /** A stop on a stage: what broke, where, and what the crew did. */
@@ -376,7 +385,10 @@ export function raidField(state: RaidState): readonly Rival[] {
 }
 
 /** Career raids pass `extra`: the year's seed, the field, the crew's hours and the money for parts (see `RaidEntry`). */
-export function enterRaid(raid: RaidId, build: TruckBuild, driver: DriverId, extra?: Pick<RaidEntry, 'seed' | 'field' | 'hours' | 'budget'>): RaidState {
+export function enterRaid(
+  raid: RaidId, build: TruckBuild, driver: DriverId,
+  extra?: Pick<RaidEntry, 'seed' | 'field' | 'hours' | 'budget' | 'extraSpares' | 'oilWear' | 'springSag'>,
+): RaidState {
   const b = structuredClone(build)
   const carries = partIn(b, 'spares').carries
   const entry: RaidEntry = { raid, build: b, driver }
@@ -384,12 +396,16 @@ export function enterRaid(raid: RaidId, build: TruckBuild, driver: DriverId, ext
   if (extra?.field) entry.field = structuredClone(extra.field)
   if (extra?.hours !== undefined) entry.hours = extra.hours
   if (extra?.budget !== undefined) entry.budget = Math.max(0, extra.budget)
+  if (extra?.extraSpares && SPARE_IDS.some((id) => extra.extraSpares![id] > 0)) entry.extraSpares = { ...extra.extraSpares }
+  if (extra?.oilWear !== undefined && extra.oilWear !== 1) entry.oilWear = extra.oilWear
+  if (extra?.springSag !== undefined && extra.springSag !== 1) entry.springSag = extra.springSag
+  const more = entry.extraSpares
   return {
     entry,
     stage: 0,
     phase: 'morning',
     wear: newWearState(),
-    spares: { tire: carries.tire, shock: carries.shock, cv: carries.cv },
+    spares: { tire: carries.tire + (more?.tire ?? 0), shock: carries.shock + (more?.shock ?? 0), cv: carries.cv + (more?.cv ?? 0) },
     results: [],
     cond: newCondition(),
     spent: 0,
@@ -543,6 +559,7 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     tireCondition(run.cond, run.truck, {
       damperEnergy: res.damperEnergy, peakTemp: res.peakTemp, bottomOuts: res.bottomOuts,
       distance: driven, harsh: RAID.harshGround.includes(ground), pace: currentPace(run),
+      oilWear: state.entry.oilWear, springSag: state.entry.springSag,
     })
     // The shore track is longer than the ice road it stands in for.
     run.time += (driven / speed) * lineFactor(driver, ground) * (ground !== seg.ground ? ICE_ROAD.shoreLength : 1)

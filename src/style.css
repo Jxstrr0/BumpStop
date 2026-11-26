@@ -629,6 +629,8 @@ input[type='range'] {
   cursor: pointer;
 }
 .career-calendar li.done { color: var(--muted); text-decoration: line-through; }
+/* Crew and tools not yet in reach (1.11): folded under the ones you can buy. */
+.shop-later > summary { min-height: 44px; padding: 10px 0; font-weight: 700; cursor: pointer; }
 /* The hall of fame (after 1.2): folded at the foot of the career panel, like the calendar. */
 .career-hall { margin-top: 16px; border-top: 1px solid var(--line); }
 .career-hall > summary {

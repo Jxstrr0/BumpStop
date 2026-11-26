@@ -4,7 +4,7 @@
  * One, and the career's place in the save (format 2).
  */
 import { describe, expect, it } from 'vitest'
-import { CALENDAR, CAREER, CLASS_MONEY, DRIVER_TERMS, QUIRKS, TEAMS, TIERS, UPGRADES } from '../src/data/career'
+import { CALENDAR, CAREER, CLASS_MONEY, DRIVER_TERMS, QUIRKS, SPARE_PRICE, TEAMS, TIERS, UPGRADES } from '../src/data/career'
 import { CLASSES } from '../src/data/classes'
 import type { TruckBuild } from '../src/data/kit'
 import { SLOTS } from '../src/data/parts'
@@ -14,8 +14,8 @@ import { readSave, newSave } from '../src/persist/save'
 import { changeCost, checkBuild, massAndCost, partIn, partsFor, stockBuild } from '../src/sim/build'
 import {
   buyTruck, buyUpgrade, cheapestBuild, contractProblems, contractRaid, crewHours, driveAuto, enterOwn, entryProblems, eventSeed,
-  fitOwn, isBroke, newCareer, nextEvent, offers, sellTruck, setContractBuild, settle, takeContract, truckPrice, truckValue,
-  upgradeProblem, type CareerState,
+  fitOwn, garageCare, garageSpares, isBroke, newCareer, nextEvent, offers, repairBill, repairShare, sellTruck, setContractBuild, settle,
+  takeContract, truckPrice, truckValue, upgradeProblem, type CareerState,
 } from '../src/sim/career'
 import { enterRaid, type RaidState, type StageRecord } from '../src/sim/raid'
 import { Rng } from '../src/sim/rng'
@@ -477,9 +477,64 @@ describe('the shop', () => {
     expect(upgradeProblem(c, 'secondMechanic')).toBe('money')
     c.money = 1_000_000
     expect(upgradeProblem(c, 'thirdMechanic')).toBe('needs')
-    for (const u of UPGRADES) buyUpgrade(c, u.id)
+    for (const u of UPGRADES.filter((x) => x.rep <= 100)) buyUpgrade(c, u.id)
     expect(crewHours(c)).toBe(RAID.bivouacHours + 4)
     expect(upgradeProblem(c, 'press')).toBe('owned')
+    expect(upgradeProblem(c, 'nightShift')).toBe('rep')
+  })
+
+  it('keeps the late crew and tools for late in a career, for real money', () => {
+    const late = UPGRADES.filter((u) => ['partsTruck', 'dyno', 'springRig', 'nightShift', 'machineShop'].includes(u.id))
+    expect(late).toHaveLength(5)
+    for (const u of late) {
+      expect(u.rep).toBeGreaterThanOrEqual(50)
+      expect(u.cost).toBeGreaterThanOrEqual(35_000)
+    }
+    // Together they're a real place for late money to go (a light 4x4 bot banks about 294,000 after eight seasons).
+    expect(late.reduce((sum, u) => sum + u.cost, 0)).toBeGreaterThanOrEqual(200_000)
+    const c = newCareer(2)
+    c.rep = 1000
+    c.money = 1_000_000
+    expect(upgradeProblem(c, 'nightShift')).toBe('needs')
+    expect(upgradeProblem(c, 'machineShop')).toBe('needs')
+    for (const u of UPGRADES) buyUpgrade(c, u.id)
+    expect(crewHours(c)).toBe(RAID.bivouacHours + 7)
+    expect(repairShare(c)).toBeCloseTo(CAREER.repairShare - 0.37, 9)
+    expect(repairShare(c)).toBeGreaterThan(0)
+    expect(garageSpares(c)).toEqual({ tire: 2, shock: 1, cv: 1 })
+    expect(garageCare(c)).toEqual({ oilWear: 0.65, springSag: 0.6 })
+  })
+
+  it('sends the parts truck, the dyno and the spring rig to your own raids only', () => {
+    const c = newCareer(31)
+    c.money = 1_000_000
+    c.rep = 1000
+    buyTruck(c, 'light4x4')
+    const carries = partIn(c.own!, 'spares').carries
+    // Without them a raid is as it always was.
+    const before = enterOwn(c, 'veteran')
+    expect(before.entry.extraSpares).toBeUndefined()
+    expect(before.entry.oilWear).toBeUndefined()
+    expect(before.spares).toEqual({ ...carries })
+    settle(c, before, true)
+    for (const id of ['partsTruck', 'dyno', 'springRig'] as const) buyUpgrade(c, id)
+    const state = enterOwn(c, 'veteran')
+    expect(state.entry.extraSpares).toEqual({ tire: 2, shock: 1, cv: 1 })
+    expect(state.entry.oilWear).toBe(0.65)
+    expect(state.entry.springSag).toBe(0.6)
+    expect(state.spares).toEqual({ tire: carries.tire + 2, shock: carries.shock + 1, cv: carries.cv + 1 })
+    // Every spare used is bought again, the parts truck's too; unused ones cost nothing.
+    expect(repairBill(c, state).spares).toBe(0)
+    state.spares = { tire: 0, shock: 0, cv: 0 }
+    const used = (carries.tire + 2) * SPARE_PRICE.tire + (carries.shock + 1) * SPARE_PRICE.shock + (carries.cv + 1) * SPARE_PRICE.cv
+    expect(repairBill(c, state).spares).toBe(used)
+    settle(c, state, true)
+    // A privateer's contract raid brings its own crew.
+    const contract = offers(c).find((o) => o.rep <= c.rep)!
+    takeContract(c, contract)
+    const theirs = contractRaid(c)
+    expect(theirs.entry.extraSpares).toBeUndefined()
+    expect(theirs.entry.oilWear).toBeUndefined()
   })
 })
 
@@ -525,6 +580,20 @@ describe('the career in the save (format 2)', () => {
     s2.career = c2
     s2.raid = enterOwn(c2, 'veteran')
     expect(readSave(JSON.parse(JSON.stringify(s2)))).toEqual(s2)
+
+    // An own raid with the late crew and tools: the parts truck's spares and the dyno and spring rig carry over.
+    const c3 = newCareer(24)
+    c3.money = 1_000_000
+    c3.rep = 1000
+    for (const id of ['partsTruck', 'dyno', 'springRig'] as const) buyUpgrade(c3, id)
+    buyTruck(c3, 'light4x4')
+    const s3 = newSave()
+    s3.career = c3
+    s3.raid = enterOwn(c3, 'veteran')
+    expect(readSave(JSON.parse(JSON.stringify(s3)))).toEqual(s3)
+    const bent = JSON.parse(JSON.stringify(s3))
+    bent.raid.entry.oilWear = 3
+    expect(() => readSave(bent)).toThrow()
   })
 
   it('drops an own-raid job that has no raid, and buys a damaged rival truck again', () => {
