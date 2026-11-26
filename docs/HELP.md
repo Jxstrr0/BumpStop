@@ -52,7 +52,7 @@ the part or slider, **Show me** jumps to it. The list is
 ## The first-job guide (11b)
 
 The career's very first job is a tutorial. While the garage is on its first
-raid (the Winter Sprint since PR 10c), a **Your first job** box sits at the
+raid (the Cold Start 300 since PR 10c), a **Your first job** box sits at the
 top of the Career panel with the steps, each ticking itself off when it's
 done, in any order:
 

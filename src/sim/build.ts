@@ -42,7 +42,7 @@ export interface BuiltTruck {
   wear: WearSetup
   /** Ready to race (kg). */
   mass: number
-  /** Antlers. */
+  /** Money (cr.). */
   cost: number
   /** Engine peak power (W). */
   power: number
@@ -136,7 +136,7 @@ function scaleFatigue(f: FatigueSpec, k: number): FatigueSpec {
   return { ...f, ultimate: f.ultimate * k, endurance: f.endurance * k, gate: f.gate * k }
 }
 
-/** Total mass (kg) and cost (antlers) of a build. */
+/** Total mass (kg) and cost (cr.) of a build. */
 export function massAndCost(b: TruckBuild): { mass: number; cost: number } {
   let mass = KITS[b.cls].baseMass
   let cost = 0
@@ -299,7 +299,7 @@ export type BuildProblem =
 export interface BuildRules {
   /** The year it is: parts that come out later can't be bought (career, plan PR 9). */
   year: number
-  /** Antlers to spend. */
+  /** Money (cr.) to spend. */
   budget: number
   /**
    * The career's own truck (plan PR 9): the parts already on it cost

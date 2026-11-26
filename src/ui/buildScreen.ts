@@ -87,7 +87,7 @@ function problemText(p: BuildProblem, store: BuildStore): string {
   }
 }
 
-/** "+12 kg · −3,500 antlers" against the part fitted now. */
+/** "+12 kg · −3,500 cr." against the part fitted now. */
 function deltaText(part: Part, current: Part, store: BuildStore): string {
   const cls = store.cls()
   const sign = (v: number) => (v > 0 ? `+${num(v)}` : v < 0 ? `−${num(-v)}` : '±0')

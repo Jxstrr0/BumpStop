@@ -66,6 +66,10 @@ export function settingsPanel(): HTMLElement {
   const oHead = el('h3', '', t('offline.title'))
   const oLine = el('p', 'small', t(`offline.${offlineState()}`))
 
-  box.append(gHead, gLead, row, now, reloadNote, tiers, oHead, oLine)
+  // Credits (plan PR 13): who made it and what it's made with. The full list is CREDITS.md.
+  const cHead = el('h3', '', t('credits.title'))
+  const credits = el('ul', 'small credit-list')
+  for (const key of ['credits.made', 'credits.fonts', 'credits.code', 'credits.sound'] as const) credits.append(el('li', '', t(key)))
+  box.append(gHead, gLead, row, now, reloadNote, tiers, oHead, oLine, cHead, credits)
   return box
 }
