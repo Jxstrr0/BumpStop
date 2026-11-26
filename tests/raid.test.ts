@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { CLASS_WORK, DRIVERS, PACE_SPEED, RAID, RAIDS, ROADSIDE, STEADY_KMH, } from '../src/data/raids'
 import { buildTruck, stockBuild } from '../src/sim/build'
-import { CLIP, clipRecorder, type Clip } from '../src/sim/highlight'
+import { CLIP, clipRecorder, legHighlights, type Clip } from '../src/sim/highlight'
 import {
   advanceStage, bivouacJobs, checkJobs, closingTime, coolingTime, doJobs, driveStage, enterRaid, fatigueOf, finishStage,
   groundSpeed, leaveCheckpoint, parTime, raidTruck, stageLegs, standings, startStage, type Job, type RaidState,
@@ -353,5 +353,32 @@ describe('rivals and standings', () => {
     const state = shortRaid('fullKit')
     expect(state.wear).toEqual(newWearState())
     expect(state.spares).toEqual({ tire: 2, shock: 2, cv: 2 })
+  })
+})
+
+describe('picking the highlight', () => {
+  it('keeps every break and spreads the rest along the leg', () => {
+    const fake = (at: number, leg: number, broken = false) =>
+      ({ at, leg, broken: broken ? ({ kind: 'tire' } as never) : null }) as unknown as Clip
+    const clips = [...Array.from({ length: 20 }, (_, k) => fake(k * 1000, 0)), fake(4500, 0, true), fake(30000, 1)]
+    const picked = legHighlights(clips, 0, 6)
+    expect(picked).toHaveLength(6)
+    expect(picked.filter((c) => c.broken)).toHaveLength(1)
+    expect(picked.every((c) => c.leg === 0)).toBe(true)
+    for (let k = 1; k < picked.length; k++) expect(picked[k]!.at).toBeGreaterThan(picked[k - 1]!.at)
+    expect(picked[0]!.at).toBeLessThan(5000)
+    expect(picked[picked.length - 1]!.at).toBeGreaterThan(15000)
+    expect(legHighlights(clips, 1, 6)).toHaveLength(1)
+  })
+})
+
+describe('raid screen words', () => {
+  it('writes clock times, gaps and places', async () => {
+    const { clock, gap, ordinal } = await import('../src/ui/raid')
+    expect(clock(3849)).toBe('1:04:09')
+    expect(clock(59.6)).toBe('0:01:00')
+    expect(gap(252)).toBe('+4:12')
+    expect(gap(3849)).toBe('+1:04:09')
+    expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 101].map(ordinal)).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '101st'])
   })
 })

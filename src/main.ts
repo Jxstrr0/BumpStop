@@ -1,8 +1,8 @@
 /**
  * Bump Stop's entry point. For now it shows one screen: a preview of the
  * "roadbook" look (plan PR 0) with the build screen (plan PR 3) and the shop's
- * three rigs and the report (plan PR 4), which test the truck on it. Then it
- * hides the loading screen.
+ * three rigs and the report (plan PR 4), which test the truck on it, and the
+ * raids (plan PR 7), which race it. Then it hides the loading screen.
  */
 import '@fontsource/space-grotesk/latin-500.css'
 import '@fontsource/big-shoulders/latin-700.css'
@@ -16,6 +16,7 @@ import { makeBuildStore } from './ui/buildStore'
 import { el } from './ui/dom'
 import { bindLoadingScreen } from './ui/loading'
 import { roadbookStrip } from './ui/preview'
+import { raidPanel } from './ui/raid'
 import { shopPanel } from './ui/shop'
 
 const loading = bindLoadingScreen()
@@ -59,6 +60,7 @@ function previewScreen(app: HTMLElement): void {
     loopPanel(),
     buildPanel(store),
     shopPanel(store),
+    raidPanel(store),
     roadbookStrip(),
     el('p', 'note', t('preview.note')),
     footer(),

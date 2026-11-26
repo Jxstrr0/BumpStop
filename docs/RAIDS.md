@@ -5,7 +5,38 @@ pace calls, roadside fixes, the bivouac), `src/sim/rivals.ts` (the other
 entries) and `src/sim/highlight.ts` (clips for the 3D); long stages run
 through `src/sim/stage.ts`. Every number is in `src/data/raids.ts`.
 
-Part 7a is the sim and its tests. Part 7b adds the screens.
+Part 7a is the sim and its tests. Part 7b adds the screens
+(`src/ui/raid.ts`, with the 3D highlight in `src/ui/raidView.ts`).
+
+## The screens
+
+The Raids panel sits under the shop and moves through the raid:
+
+1. **Entry:** pick the raid and the driver. The truck is the one on the
+   build screen and must pass the build rules; it says what spares are on
+   board (and warns if there are none).
+2. **Morning:** "Day 1 of 3", the stage's length, air temperature and par
+   time; the roadbook (each piece of ground with its kilometre, and the two
+   checkpoints); the truck's worn parts and spares; the pace call.
+3. **The stage, a leg at a time.** The sim drives the leg (about a second on
+   a phone), then its highlight plays: up to seven clips (every break, the
+   rest spread along the leg), about half a minute. Clips play in 3D at
+   true speed; a break plays in slow motion, closing in on the corner. Under
+   the 3D: the leg, kilometre, ground and pace, a progress bar, and the live
+   trace of the hottest oil or the most worn part filling in along the
+   stage, with the stops listed as the highlight reaches them. "Skip"
+   jumps to the checkpoint.
+4. **Checkpoint card:** the clock, the place in class at this checkpoint,
+   the hottest oil and the most worn part, and the pace call for the next leg.
+5. **Results:** the stage time, each stop, the day's table and the overall
+   table (rivals' trouble noted under their names).
+6. **Bivouac:** the hours bar, the spares left, and a button for each job.
+   One job per part; jobs that don't fit the hours or spares grey out and say
+   why.
+7. **Final results** after the last stage, then enter another raid.
+
+"Retire from the raid" (tap twice) goes back to the entry. The raid lives in
+memory until saves (plan PR 8): a reload starts over.
 
 ## A raid day
 

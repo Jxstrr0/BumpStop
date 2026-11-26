@@ -25,6 +25,10 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
   is at the top of the script and in `docs/3D.md`.
 - How it sounds (engine voices, gears, how loud each sound is, the buzz
   patterns): `src/data/sound.ts`. In plain words: `docs/SOUND.md`.
+- Raids (Steady speeds per ground, pace calls, drivers, roadside fixes,
+  bivouac jobs, the raids' stages and the rival entries):
+  `src/data/raids.ts`. Raid, driver and team names: `src/data/strings.ts`.
+  In plain words: `docs/RAIDS.md`.
 - Colours: the top of `src/style.css`.
 - The plan: `docs/BUMP-STOP-PLAN.md`. Where it's up to: `docs/STATUS.md`.
 - Names: `docs/NAMES.md`.

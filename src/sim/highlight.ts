@@ -132,3 +132,18 @@ export function clipRecorder(out: Clip[], leg: number, offset: number): ClipSink
     },
   }
 }
+
+/**
+ * The clips to show for one leg: every clip that ends on a break, and others
+ * spread evenly along the leg, `max` in all (more if there were more breaks).
+ */
+export function legHighlights(clips: readonly Clip[], leg: number, max: number): Clip[] {
+  const mine = clips.filter((c) => c.leg === leg)
+  const breaks = mine.filter((c) => c.broken)
+  const others = mine.filter((c) => !c.broken)
+  const room = Math.max(0, max - breaks.length)
+  const picked: Clip[] = [...breaks]
+  if (others.length <= room) picked.push(...others)
+  else for (let k = 0; k < room; k++) picked.push(others[Math.floor(((k + 0.5) * others.length) / room)] as Clip)
+  return picked.sort((a, b) => a.at - b.at)
+}
