@@ -181,3 +181,18 @@ before each stage, and under the ladder's and torture loop's reports,
 says what each pace call does to this truck (`docs/RAIDS.md`). With the
 new repair share, Push cost about 30% more in repairs and bivouac parts on
 Dust Supper (2,490 against 1,910).
+
+The career bot afterwards (one career a class, Push once the dampers are
+better than stock, 1985 to 1992), against the same bot on 1.8.2.0:
+
+| Class | Wins | Finale open | Finale won | Bank at the end |
+| --- | --- | --- | --- | --- |
+| Light 4x4 | 13 in 40 (13 before) | fourth season (same) | eighth season (same) | 293,659 (55,006) |
+| Heavy truck | 12 in 34 | fifth season | fifth season | 1,230,557 |
+| Side-by-side | 14 in 42 (15 in 41) | third season (fourth) | not in eight (same) | 119,310 (16,275) |
+
+Winning is about where it was; the money isn't. The garage now ends the
+eighth season well off, where before it was scraping by, because own
+entries pay. The bot spends on every part it can, so the spare money is
+what the parts can't use. On the finale the bot on Steady came 2nd to 4th
+every year and never won; on Push it won once (light 4x4).
