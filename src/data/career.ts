@@ -82,11 +82,11 @@ export interface TierRules {
 
 export const TIERS: Readonly<Record<Tier, TierRules>> = {
   regional: { entryFee: 1500, prizes: [6000, 3500, 2000], rep: 0, driverFee: 1,
-    repFor: { finish: 1, podium: 3, win: 5 } },
+    repFor: { finish: 1, podium: 2, win: 4 } },
   national: { entryFee: 4000, prizes: [15000, 9000, 5000, 2500], rep: 15, driverFee: 1.6,
-    repFor: { finish: 2, podium: 5, win: 9 } },
+    repFor: { finish: 2, podium: 4, win: 7 } },
   long: { entryFee: 9000, prizes: [40000, 22000, 12000, 6000, 3000], rep: 60, driverFee: 3,
-    repFor: { finish: 4, podium: 10, win: 20 } },
+    repFor: { finish: 3, podium: 8, win: 15 } },
 }
 
 /** Each hired driver's fee for a regional raid in a light 4x4, and the reputation they want before they'll drive for you. */
@@ -119,7 +119,7 @@ export interface Sponsor {
 export const SPONSORS: readonly Sponsor[] = [
   { rep: 10, pay: 1500, discount: 0, name: 'sponsor.local' },
   { rep: 35, pay: 4000, discount: 0, name: 'sponsor.regional' },
-  { rep: 80, pay: 8000, discount: 0.25, name: 'sponsor.works' },
+  { rep: 120, pay: 8000, discount: 0.25, name: 'sponsor.works' },
 ]
 
 // ── The shop ──
@@ -209,7 +209,7 @@ export const TEAMS: Readonly<Record<TeamId, TeamSpec>> = {
     id: 'brannigan', name: 'team.brannigan', habit: 'habit.brannigan',
     classes: [{ cls: 'light4x4', from: 1985, number: 7 }, { cls: 'sxs', from: 2004, number: 307 }],
     tiers: ['regional', 'national', 'long'],
-    pace: 0.91, hardness: 1.5, buy: 'power',
+    pace: 0.95, hardness: 1.5, buy: 'power',
     priority: ['engine', 'dampers', 'tires', 'frontSusp', 'rearSusp', 'wheels'],
     budget: 0.85, copy: 0.5, trouble: ['axle', 'tire', 'bottoming'],
   },
@@ -217,15 +217,15 @@ export const TEAMS: Readonly<Record<TeamId, TeamSpec>> = {
     id: 'highbank', name: 'team.highbank', habit: 'habit.highbank',
     classes: [{ cls: 'light4x4', from: 1990, number: 11 }, { cls: 'heavy', from: 1994, number: 505 }, { cls: 'sxs', from: 1998, number: 305 }],
     tiers: ['regional', 'national', 'long'],
-    pace: 0.94, hardness: 1.1, buy: 'newest',
+    pace: 0.96, hardness: 1.1, buy: 'newest',
     priority: ['dampers', 'frontSusp', 'rearSusp', 'frame', 'bumpStops', 'axles', 'engine', 'wheels'],
     budget: 1.1, copy: 0.25, trouble: ['fade', 'mount', 'lost'],
   },
   hardpan: {
     id: 'hardpan', name: 'team.hardpan', habit: 'habit.hardpan',
     classes: [{ cls: 'heavy', from: 1985, number: 501 }, { cls: 'light4x4', from: 2000, number: 21 }],
-    tiers: ['national', 'long'],
-    pace: 0.96, hardness: 0.6, buy: 'strong',
+    tiers: ['regional', 'national', 'long'],
+    pace: 0.94, hardness: 0.6, buy: 'strong',
     priority: ['frame', 'axles', 'tires', 'protection', 'bumpStops', 'spares', 'dampers'],
     budget: 0.95, copy: 0.2, trouble: ['tire', 'stuck'],
   },
@@ -233,7 +233,7 @@ export const TEAMS: Readonly<Record<TeamId, TeamSpec>> = {
     id: 'jackrabbit', name: 'team.jackrabbit', habit: 'habit.jackrabbit',
     classes: [{ cls: 'sxs', from: 1985, number: 301 }, { cls: 'light4x4', from: 1996, number: 33 }],
     tiers: ['regional', 'national', 'long'],
-    pace: 0.9, hardness: 1.3, buy: 'light',
+    pace: 0.935, hardness: 1.3, buy: 'light',
     priority: ['frame', 'wheels', 'frontSusp', 'rearSusp', 'dampers', 'engine'],
     budget: 0.8, copy: 0.4, trouble: ['fade', 'fade', 'bottoming'],
   },
@@ -250,12 +250,12 @@ export const TEAM_TUNING = {
    */
   paceFromHeat: 0.02,
   paceFromTravel: 0.04,
-  paceFromPower: 0.15,
+  paceFromPower: 0.07,
   /** Trouble: chance times (strength rating) to the power of minus this, and (heat rating) too. */
   riskFromStrength: 1.5,
   riskFromHeat: 0.8,
   /** A rival's pace and chance of trouble stay inside these. */
-  paceLimits: [0.8, 1.15] as const,
+  paceLimits: [0.85, 1.15] as const,
   riskLimits: [0.03, 0.8] as const,
   /** Base chance of trouble on an average 100 km stage, before hardness and the truck. */
   risk: 0.12,
@@ -270,9 +270,10 @@ export const PRIVATEERS: readonly { cls: ClassId; number: number; pace: number; 
   { cls: 'light4x4', number: 31, pace: 0.99, risk: 0.2, trouble: ['tire', 'stuck', 'fade'] },
   { cls: 'light4x4', number: 47, pace: 1.03, risk: 0.25, trouble: ['tire', 'axle', 'lost'] },
   { cls: 'light4x4', number: 58, pace: 1.07, risk: 0.3, trouble: ['fade', 'bottoming', 'stuck'] },
-  { cls: 'heavy', number: 512, pace: 1, risk: 0.2, trouble: ['tire', 'axle', 'stuck'] },
-  { cls: 'heavy', number: 518, pace: 1.04, risk: 0.25, trouble: ['tire', 'stuck', 'lost'] },
-  { cls: 'heavy', number: 527, pace: 1.08, risk: 0.3, trouble: ['axle', 'stuck', 'mount'] },
+  // Heavy privateers are a little quicker: their trucks rarely break.
+  { cls: 'heavy', number: 512, pace: 0.96, risk: 0.2, trouble: ['tire', 'axle', 'stuck'] },
+  { cls: 'heavy', number: 518, pace: 1, risk: 0.25, trouble: ['tire', 'stuck', 'lost'] },
+  { cls: 'heavy', number: 527, pace: 1.04, risk: 0.3, trouble: ['axle', 'stuck', 'mount'] },
   { cls: 'sxs', number: 318, pace: 0.99, risk: 0.2, trouble: ['tire', 'stuck', 'axle'] },
   { cls: 'sxs', number: 322, pace: 1.03, risk: 0.25, trouble: ['tire', 'fade', 'lost'] },
   { cls: 'sxs', number: 326, pace: 1.07, risk: 0.3, trouble: ['fade', 'tire', 'bottoming'] },

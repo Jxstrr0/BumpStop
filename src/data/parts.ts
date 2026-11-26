@@ -206,7 +206,7 @@ export const PARTS: readonly Part[] = [
   { slot: 'frontSusp', id: 'solidAxleLeaf', name: 'part.solidAxleLeaf', text: 'part.solidAxleLeafText', year: 1985,
     mass: { light4x4: 95 }, cost: { light4x4: 2500 }, travel: 0.85, unsprung: 1.1, arm: 1, maxAngle: 1, mount: 1.25 },
   { slot: 'frontSusp', id: 'wishbone', name: 'part.wishbone', text: 'part.wishboneText', year: 1992,
-    mass: { light4x4: 80 }, cost: { light4x4: 11000 }, travel: 1.15, unsprung: 0.75, arm: 0.8, maxAngle: 0.9, mount: 1 },
+    mass: { light4x4: 80 }, cost: { light4x4: 11000 }, travel: 1.15, unsprung: 0.75, arm: 0.9, maxAngle: 0.95, mount: 1 },
   { slot: 'frontSusp', id: 'beamLeaf', name: 'part.beamLeaf', text: 'part.beamLeafText', year: 1985,
     mass: { heavy: 420 }, cost: { heavy: 8000 }, travel: 1, unsprung: 1, arm: 1, maxAngle: 1, mount: 1 },
   { slot: 'frontSusp', id: 'beamCoil', name: 'part.beamCoil', text: 'part.beamCoilText', year: 1990,

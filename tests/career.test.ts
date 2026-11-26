@@ -344,7 +344,8 @@ describe('rival teams', () => {
     const teams = teamsForYear(2010)
     const regional = careerField(teams, 'heavy', 'regional', 2010).map((r) => r.id)
     const national = careerField(teams, 'heavy', 'national', 2010).map((r) => r.id)
-    expect(regional.some((id) => id.startsWith('hardpan'))).toBe(false)
+    // Hardpan races every heavy raid (plan PR 13); a team only enters the tiers it lists.
+    expect(regional.some((id) => id.startsWith('hardpan'))).toBe(true)
     expect(national.some((id) => id.startsWith('hardpan'))).toBe(true)
     expect(national.filter((id) => id.startsWith('privateer')).length).toBe(3)
   })

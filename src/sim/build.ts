@@ -229,7 +229,9 @@ export function buildTruck(input: TruckBuild): BuiltTruck {
       damper: dmp,
     })
 
-    // The axle or CV joint runs straight at a fixed place in the stroke, so its angle at ride height follows the sag.
+    // The axle or CV joint runs straight at a fixed height above full droop, so its angle at ride height follows the sag.
+    // That height doesn't grow with a longer-travel part (plan PR 13): makers set the joint straight near ride height, and
+    // scaling it put the 1990s wishbones and trailing arms' joints off-straight on factory settings, snapping axles every stage.
     const ma = muleAw.axle
     wearAxles.push({
       mount: scaleFatigue(muleAw.mount, s.mount),
@@ -239,7 +241,7 @@ export function buildTruck(input: TruckBuild): BuiltTruck {
         fatigue: { ...ma.fatigue },
         strength: ma.strength * axles.strength,
         armLength: ma.armLength * s.arm,
-        straightAt: kit.straightFromDroop * s.travel - sag,
+        straightAt: kit.straightFromDroop - sag,
         maxAngle: ma.maxAngle * s.maxAngle,
         driveTorque: ma.driveTorque * engine.torque,
         spinMomentum: ma.spinMomentum * engine.torque,
