@@ -33,6 +33,7 @@ import { WARM_SHARE } from '../data/failures'
 import { RIGS, RIG_VIEW, SHAKER, SHOP_RIGS, VIEW_3D, type RigId, type RigPiece, type ShopRigId } from '../data/rigs'
 import { t, tf, type StringKey } from '../data/strings'
 import { buildTruck, type BuiltTruck } from '../sim/build'
+import { scopeOf, scoped, unscoped } from '../persist/ghost'
 import { ghostFromRun } from '../sim/ghost'
 import { advanceLaps, lapLength, lapResult, startLaps, takeFeel, type LapRunner, type RunHistory } from '../sim/laps'
 import { advanceShaker, shakerSteps, startShaker, type ShakerPoint, type ShakerRunner } from '../sim/shaker'
@@ -63,6 +64,11 @@ type Ghost = LapGhostRun | { kind: 'shaker'; points: ShakerPoint[] }
 export interface ShopSaves {
   ghosts: Record<string, unknown>
   onGhosts(ghosts: Record<string, unknown>): void
+  /**
+   * Where runs are filed: '' in free play, the career's own scope in a career
+   * (`careerScope`), so free play's last runs and best ghosts stay out of it.
+   */
+  scope?(): string
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -127,18 +133,26 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
   box.append(el('h2', '', t('shop.title')), el('p', 'lead', t('shop.lead')))
 
   const ghosts = new Map<string, Ghost>()
-  const ghostKey = (cls: ClassId, rig: ShopRigId) => `${cls}:${rig}`
-  // Ghosts from the saved garage, only for a class and rig that exist.
-  for (const c of CLASSES) {
-    for (const r of SHOP_RIGS) {
-      const g = readGhost(saves?.ghosts[ghostKey(c.id, r)])
-      if (g) ghosts.set(ghostKey(c.id, r), g)
-    }
+  const scope = () => saves?.scope?.() ?? ''
+  // The last run on a rig, filed under the career's scope in a career (Kelbo's playtest: free play's runs leaked in).
+  const ghostKey = (cls: ClassId, rig: ShopRigId) => scoped(scope(), `${cls}:${rig}`)
+  // Last-run lines from the saved garage, only for a class and rig that exist, in free play or a career.
+  const runKeys = new Set(CLASSES.flatMap((c) => SHOP_RIGS.map((r) => `${c.id}:${r}`)))
+  for (const [key, raw] of Object.entries(saves?.ghosts ?? {})) {
+    if (!runKeys.has(unscoped(key))) continue
+    const g = readGhost(raw)
+    if (g) ghosts.set(key, g)
   }
   // The ghost trucks (best runs and friends' ghosts) are kept beside the last-run lines, under their own keys.
-  const ghostsChanged = () => saves?.onGhosts({ ...Object.fromEntries(ghosts), ...race.stored() })
+  // Only free play's and this career's are kept: an old career's runs go when a new one starts in the slot.
+  const ghostsChanged = () => {
+    const all = { ...Object.fromEntries(ghosts), ...race.stored() }
+    const here = scope()
+    saves?.onGhosts(Object.fromEntries(Object.entries(all).filter(([key]) => scopeOf(key) === '' || scopeOf(key) === here)))
+  }
   const race = ghostRace({
     saved: saves?.ghosts ?? {},
+    scope,
     onChange: () => ghostsChanged(),
     onFriend(g) {
       // Put the friend's class and loop on the bench, if nothing's running and the career allows the class.
@@ -600,7 +614,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     if (a.kind === 'laps' && a.runner.run.w.broken && !stopped) sound.broke(a.runner.run.w.broken.kind)
     else sound.stop()
     drawLive(true)
-    const ctx = { rig, cls: a.cls, truck: a.truck, onFix, onRunAgain: () => begin() }
+    const ctx = { rig, cls: a.cls, truck: a.truck, year: store.rules().year, onFix, onRunAgain: () => begin() }
     let report: HTMLElement
     if (a.kind === 'shaker') {
       report = shakerReport(a.runner.points, a.ghost, ctx)

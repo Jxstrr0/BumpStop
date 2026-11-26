@@ -18,13 +18,13 @@ import { RIG_VIEW, type ShopRigId } from '../data/rigs'
 import { t, tf, type StringKey } from '../data/strings'
 import type { BuiltTruck } from '../sim/build'
 import type { LapRun } from '../sim/laps'
-import { shakerPeaks, washboardSpeed, type ShakerPoint } from '../sim/shaker'
+import { shakerPeaks, shakerVerdict, washboardSpeed, type ShakerGrade, type ShakerPoint } from '../sim/shaker'
 import type { BreakTrace } from '../sim/trace'
 import { msToKmh } from '../sim/units'
 import type { BreakEvent } from '../sim/wear'
-import { BAND_WORD, ghostLegend, lineChart, type Series } from './charts'
+import { BAND_WORD, ghostLegend, lineChart, type Band, type Series } from './charts'
 import { el, num } from './dom'
-import { endOf, fixJump, type End, type Jump } from './fixes'
+import { endOf, fixJump, fixUseful, type End, type Jump } from './fixes'
 
 const C0 = 273.15
 
@@ -44,6 +44,8 @@ export interface ReportContext {
   rig: ShopRigId
   cls: ClassId
   truck: BuiltTruck
+  /** The year on the bench: fixes that need parts not out yet are left off. */
+  year: number
   /** Jump to a fix on the build screen. */
   onFix: (jump: Jump) => void
   onRunAgain: () => void
@@ -171,10 +173,14 @@ function jumpText(jump: Jump): string {
   })
 }
 
-/** The fix buttons: each jumps to its part or slider. A fix with nowhere to go yet is plain text. */
+/**
+ * The fix buttons: each jumps to its part or slider. A fix with nowhere to go
+ * yet is plain text. Fixes that can't be done in this year (or on this
+ * truck) give way to the next one on the list, up to three.
+ */
 function fixList(fixes: readonly { target: FixTarget; text: StringKey }[], end: End, ctx: ReportContext): HTMLElement {
   const list = el('ul', 'fix-buttons')
-  for (const fix of fixes.slice(0, 3)) {
+  for (const fix of fixes.filter((f) => fixUseful(f.target, end, ctx.truck.build, ctx.year)).slice(0, 3)) {
     const jump = fixJump(fix.target, end, ctx.truck.build)
     const li = el('li')
     if (!jump) {
@@ -381,6 +387,29 @@ export function lapReport(run: LapRun, stopped: boolean, ghost: LapGhost | null,
   return box
 }
 
+/** The trace rule's colours for a shaker grade: calm is cool, lively warm, too much hot. Words always go with them. */
+const GRADE_BAND: Record<ShakerGrade, Band> = { calm: 'cool', lively: 'warm', wild: 'hot' }
+
+/**
+ * The shaker's verdict (Kelbo's playtest, 26 November 2026): Good, Fair or
+ * Poor, a chip each for the body and the wheels, and a sentence on what it
+ * means for a raid, so the two numbers under it have a judgement.
+ */
+function shakerVerdictBox(peaks: NonNullable<ReturnType<typeof shakerPeaks>>, cls: ClassId): HTMLElement {
+  const v = shakerVerdict(peaks, cls)
+  const box = el('div', `shaker-verdict ${GRADE_BAND[v.overall]}-edge`)
+  box.append(el('p', 'verdict-head', tf('shaker.verdict', { word: t(`shaker.grade.${v.overall}` as StringKey) })))
+  const chips = el('p', 'verdict-chips')
+  chips.append(
+    t('shaker.gradeBody'), ' ', el('span', `chip ${GRADE_BAND[v.body]}`, t(`shaker.gBody.${v.body}` as StringKey)), ' ',
+    t('shaker.gradeWheel'), ' ', el('span', `chip ${GRADE_BAND[v.wheel]}`, t(`shaker.gWheel.${v.wheel}` as StringKey)),
+  )
+  // Name whichever of the two is as bad as the verdict.
+  const what = v.body === v.overall && v.wheel === v.overall ? 'both' : v.body === v.overall ? 'body' : 'wheel'
+  box.append(chips, el('p', 'small', tf(`shaker.say.${v.overall}` as StringKey, { what: t(`shaker.what.${what}` as StringKey) })))
+  return box
+}
+
 /** The shaker's report: where the body and the wheels bounce most, what that means, and what changes it. */
 export function shakerReport(points: readonly ShakerPoint[], ghost: readonly ShakerPoint[] | null, ctx: ReportContext): HTMLElement {
   const box = el('section', 'report')
@@ -395,6 +424,7 @@ export function shakerReport(points: readonly ShakerPoint[], ghost: readonly Sha
   const gain = (g: number) => num(g, 1)
   head.append(tf('shaker.head', { body: hz(peaks.body.freq), wheel: hz(peaks.wheel.freq) }))
   box.append(
+    shakerVerdictBox(peaks, ctx.cls),
     el('p', 'cause', tf('shaker.bodyLine', { hz: hz(peaks.body.freq), end: t(`end.${peaks.body.end}` as StringKey), gain: gain(peaks.body.gain) })),
     el(
       'p',
@@ -426,7 +456,7 @@ export function shakerReport(points: readonly ShakerPoint[], ghost: readonly Sha
     [springFix, peaks.body.end],
     [hopFix, peaks.wheel.end],
   ] as const) {
-    const jump = fixJump(fix.target, end, ctx.truck.build)
+    const jump = fixUseful(fix.target, end, ctx.truck.build, ctx.year) ? fixJump(fix.target, end, ctx.truck.build) : null
     if (!jump) continue
     const b = el('button', 'fix-btn')
     b.type = 'button'

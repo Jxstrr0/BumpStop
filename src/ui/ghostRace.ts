@@ -20,7 +20,7 @@ import { CLASSES, type ClassId } from '../data/classes'
 import type { RigId, ShopRigId } from '../data/rigs'
 import { t, tf, type StringKey } from '../data/strings'
 import { decodeGhostCode, encodeGhostCode } from '../persist/code'
-import { GHOST_RIGS, ghostKey, readGhostRun, type GhostSource } from '../persist/ghost'
+import { GHOST_RIGS, ghostKey, readGhostRun, scoped, unscoped, type GhostSource } from '../persist/ghost'
 import { isNewBest, raceResult, type GhostRun } from '../sim/ghost'
 import { msToKmh } from '../sim/units'
 import { el, num } from './dom'
@@ -51,6 +51,8 @@ export interface GhostRaceOptions {
   onChange(): void
   /** A friend's ghost was pasted: put its class and loop on the bench if allowed. */
   onFriend(ghost: GhostRun): void
+  /** Where your best runs are filed: '' in free play, the career's own scope in a career (`careerScope`). */
+  scope?(): string
 }
 
 const className = (cls: ClassId) => t(CLASSES.find((c) => c.id === cls)!.name)
@@ -78,9 +80,12 @@ export function ghostRace(o: GhostRaceOptions): GhostRace {
   const ghosts = new Map<string, GhostRun>()
   for (const [key, raw] of Object.entries(o.saved)) {
     const g = readGhostRun(raw)
-    // Only keep a ghost that's filed under its own class and loop.
-    if (g && (key === ghostKey('best', g.cls, g.rig) || key === ghostKey('friend', g.cls, g.rig))) ghosts.set(key, g)
+    // Only keep a ghost that's filed under its own class and loop (best runs may sit under a career's scope).
+    const bare = unscoped(key)
+    if (g && (bare === ghostKey('best', g.cls, g.rig) || key === ghostKey('friend', g.cls, g.rig))) ghosts.set(key, g)
   }
+  /** Your best on a loop, in free play or this career: each keeps its own. Friends' ghosts are the same everywhere. */
+  const keyFor = (source: GhostSource, c: ClassId, r: RigId) => (source === 'best' ? scoped(o.scope?.() ?? '', ghostKey('best', c, r)) : ghostKey('friend', c, r))
   // Which ghost each class and loop races: null for none. Starts on your best, or a friend's if that's all there is.
   const chosen = new Map<string, GhostSource | null>()
   let cls: ClassId = 'light4x4'
@@ -113,7 +118,7 @@ export function ghostRace(o: GhostRaceOptions): GhostRace {
   const shareBtn = button(t('ghost.share'), 'btn')
   shareBtn.addEventListener('click', () => {
     if (!isLoop(rig)) return
-    const best = ghosts.get(ghostKey('best', cls, rig))
+    const best = ghosts.get(keyFor('best', cls, rig))
     if (!best) return
     void (async () => {
       const code = await encodeGhostCode(best)
@@ -144,7 +149,7 @@ export function ghostRace(o: GhostRaceOptions): GhostRace {
     void (async () => {
       try {
         const g = await decodeGhostCode(paste.box.value)
-        ghosts.set(ghostKey('friend', g.cls, g.rig), g)
+        ghosts.set(keyFor('friend', g.cls, g.rig), g)
         chosen.set(`${g.cls}:${g.rig}`, 'friend')
         paste.box.value = ''
         o.onChange()
@@ -171,7 +176,7 @@ export function ghostRace(o: GhostRaceOptions): GhostRace {
   function current(): GhostSource | null {
     if (!isLoop(rig)) return null
     const key = `${cls}:${rig}`
-    const has = (s: GhostSource) => ghosts.has(ghostKey(s, cls, rig as RigId))
+    const has = (s: GhostSource) => ghosts.has(keyFor(s, cls, rig as RigId))
     const pick = chosen.has(key) ? chosen.get(key)! : has('best') ? 'best' : has('friend') ? 'friend' : null
     return pick && has(pick) ? pick : null
   }
@@ -182,13 +187,13 @@ export function ghostRace(o: GhostRaceOptions): GhostRace {
     if (!isLoop(loop)) return
     const source = current()
     for (const { source: s, b } of choices) {
-      const there = s === null || ghosts.has(ghostKey(s, cls, loop))
+      const there = s === null || ghosts.has(keyFor(s, cls, loop))
       b.hidden = !there
       b.disabled = busy
       b.setAttribute('aria-pressed', String(s === source))
     }
-    const best = ghosts.get(ghostKey('best', cls, loop))
-    const friend = ghosts.get(ghostKey('friend', cls, loop))
+    const best = ghosts.get(keyFor('best', cls, loop))
+    const friend = ghosts.get(keyFor('friend', cls, loop))
     if (!best && !friend) line.textContent = t('ghost.noneYet')
     else if (source === null) line.textContent = t('ghost.off')
     else line.textContent = tf(source === 'best' ? 'ghost.bestLine' : 'ghost.friendLine', { did: ghostRunText(source === 'best' ? best! : friend!) })
@@ -208,11 +213,11 @@ export function ghostRace(o: GhostRaceOptions): GhostRace {
     pick(c, r) {
       if (c !== cls || r !== rig) return null
       const source = current()
-      const ghost = source ? ghosts.get(ghostKey(source, c, r)) : undefined
+      const ghost = source ? ghosts.get(keyFor(source, c, r)) : undefined
       return source && ghost ? { ghost, source } : null
     },
     record(run) {
-      const key = ghostKey('best', run.cls, run.rig)
+      const key = keyFor('best', run.cls, run.rig)
       if (!isNewBest(run, ghosts.get(key) ?? null)) return false
       ghosts.set(key, run)
       o.onChange()

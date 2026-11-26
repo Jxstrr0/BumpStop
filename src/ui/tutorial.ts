@@ -12,7 +12,11 @@
  * 6. Read the results, then a last word on what comes next.
  *
  * Each step has a "Show me" that scrolls to the right place, and a word or
- * two that open the help's glossary. "Hide the guide" folds it to one
+ * two that open the help's glossary. The guide sits in the Career panel, out
+ * of sight while the player works in the build screen or the shop, so when a
+ * step ticks off there a small note pops up at the top of the screen saying
+ * so and what's next, with a button back to the guide (Kelbo's playtest,
+ * 26 November 2026). On screen, the ticked step just flashes. "Hide the guide" folds it to one
  * button. How far the player got lives in localStorage (`bumpstop.guide`),
  * tied to the career's seed, so it isn't part of the save: losing it only
  * means the run steps tick again.
@@ -133,6 +137,70 @@ export interface Guide {
   update(c: CareerState | null, settled: Settlement | null): void
 }
 
+/** The steps that just ticked off: done now, not done before. */
+export function newlyDone(before: readonly GuideStep[], after: readonly GuideStep[]): GuideStepId[] {
+  const was = new Set(before.filter((x) => x.state === 'done').map((x) => x.id))
+  return after.filter((x) => x.state === 'done' && !was.has(x.id)).map((x) => x.id)
+}
+
+/** Is any of this element on screen? */
+function inView(node: HTMLElement): boolean {
+  const r = node.getBoundingClientRect()
+  return r.bottom > 0 && r.top < window.innerHeight && r.height > 0
+}
+
+/** The note that pops up when a step ticks off while the guide is out of sight. */
+interface Toast {
+  show(done: string, next: string | null, open: () => void): void
+}
+
+function makeToast(): Toast {
+  const bar = el('div', 'guide-toast')
+  bar.setAttribute('role', 'status')
+  bar.hidden = true
+  const kicker = el('p', 'kicker', t('guide.title'))
+  const doneLine = el('p', 'guide-toast-done')
+  const nextLine = el('p', 'small')
+  const open = el('button', 'btn small-btn', t('guide.toastOpen'))
+  open.type = 'button'
+  const close = el('button', 'btn small-btn guide-toast-close', '×')
+  close.type = 'button'
+  close.setAttribute('aria-label', t('guide.toastClose'))
+  const row = el('div', 'btn-row')
+  row.append(open, close)
+  bar.append(kicker, doneLine, nextLine, row)
+  let timer = 0
+  let onOpen = () => {}
+  const hide = () => {
+    window.clearTimeout(timer)
+    bar.hidden = true
+  }
+  // It goes by itself after a while, but not while the player is on its buttons.
+  const later = () => {
+    window.clearTimeout(timer)
+    timer = window.setTimeout(() => {
+      if (!bar.contains(document.activeElement)) hide()
+      else later()
+    }, 9000)
+  }
+  open.addEventListener('click', () => {
+    hide()
+    onOpen()
+  })
+  close.addEventListener('click', hide)
+  return {
+    show(done, next, go) {
+      if (!bar.isConnected) document.body.append(bar)
+      onOpen = go
+      doneLine.textContent = `✓ ${done}`
+      nextLine.textContent = next ?? ''
+      nextLine.hidden = next === null
+      bar.hidden = false
+      later()
+    },
+  }
+}
+
 export function firstJobGuide(showTerm: (id: GlossaryId) => void): Guide {
   const box = el('section', 'guide')
   box.setAttribute('aria-labelledby', 'guide-title')
@@ -140,6 +208,33 @@ export function firstJobGuide(showTerm: (id: GlossaryId) => void): Guide {
   let career: CareerState | null = null
   let settled: Settlement | null = null
   let p: GuideProgress | null = null
+  /** The steps as last drawn, to spot the ones that tick off; null until the first draw for a career. */
+  let lastSteps: GuideStep[] | null = null
+  let toast: Toast | null = null
+
+  /** Back to the guide: scroll it into view and put focus on its title. */
+  function openGuide(): void {
+    box.scrollIntoView({ behavior: smooth(), block: 'start' })
+    box.querySelector<HTMLElement>('h3')?.focus({ preventScroll: true })
+  }
+
+  /** A step ticked off: flash it if the guide is on screen, otherwise pop up the note. */
+  function ticked(id: GuideStepId, steps: readonly GuideStep[], c: CareerState): void {
+    if (inView(box)) {
+      const li = box.querySelector(`.guide-step[data-step="${id}"]`)
+      if (li instanceof HTMLElement) {
+        li.classList.remove('jumped')
+        void li.offsetWidth
+        li.classList.add('jumped')
+        window.setTimeout(() => li.classList.remove('jumped'), 2400)
+      }
+      return
+    }
+    const now = steps.find((x) => x.state === 'now')
+    const next = now && now.id !== 'results' ? tf('guide.toastNext', { step: stepWords(now.id, c).head }) : null
+    toast ??= makeToast()
+    toast.show(tf('guide.toastDone', { step: stepWords(id, c).head }), next, openGuide)
+  }
 
   // Runs and fixes in the shop count for the guide only with the privateer's truck on the bench.
   document.addEventListener(SHOP_EVENT, (ev) => {
@@ -190,6 +285,12 @@ export function firstJobGuide(showTerm: (id: GlossaryId) => void): Guide {
       return
     }
     box.hidden = false
+    // Spot steps that just ticked off (not on the first draw, and not once the player has hidden the guide).
+    const before = lastSteps
+    const nowSteps = guideSteps(c, p, settled)
+    lastSteps = nowSteps
+    const fresh = before ? newlyDone(before, nowSteps) : []
+    if (fresh.length && !p.hidden) queueMicrotask(() => ticked(fresh[fresh.length - 1]!, nowSteps, c))
     if (p.hidden) {
       const show = el('button', 'btn small-btn', t('guide.showAgain'))
       show.type = 'button'
@@ -208,8 +309,9 @@ export function firstJobGuide(showTerm: (id: GlossaryId) => void): Guide {
     title.id = 'guide-title'
     title.tabIndex = -1
     const list = el('ol', 'guide-steps')
-    for (const step of guideSteps(c, p, settled)) {
+    for (const step of nowSteps) {
       const li = el('li', `guide-step ${step.state}`)
+      li.dataset.step = step.id
       if (step.state === 'now') li.setAttribute('aria-current', 'step')
       const words = stepWords(step.id, c)
       const head = el('p', 'guide-head')
@@ -255,8 +357,14 @@ export function firstJobGuide(showTerm: (id: GlossaryId) => void): Guide {
       const show = guideActive(c) || (c !== null && firstPayOut?.job === 'contract' && c.season === 0 && c.next === 1 && c.stats.contracts === 1 && c.stats.raids === 0)
       career = show ? c : null
       settled = show && !guideActive(c) ? firstPayOut : null
-      if (career && (!p || p.seed !== career.seed)) p = readProgress(career.seed)
-      if (!career) p = null
+      if (career && (!p || p.seed !== career.seed)) {
+        p = readProgress(career.seed)
+        lastSteps = null
+      }
+      if (!career) {
+        p = null
+        lastSteps = null
+      }
       if (p && career?.job?.kind === 'contract' && p.number !== career.job.contract.number) {
         p.number = career.job.contract.number
         writeProgress(p)

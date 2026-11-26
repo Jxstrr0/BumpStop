@@ -558,6 +558,22 @@ input[type='range'] {
 .ghost-verdict p { margin: 0 0 4px; }
 .ghost-verdict p:last-child { margin-bottom: 0; }
 
+/* The shaker's verdict: Good, Fair or Poor, with the trace rule's colour on the edge and a word on every chip. */
+.shaker-verdict {
+  margin: 10px 0;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-left-width: 8px;
+  border-radius: 4px;
+}
+.shaker-verdict.cool-edge { border-left-color: var(--cool); }
+.shaker-verdict.warm-edge { border-left-color: var(--warm); }
+.shaker-verdict.hot-edge { border-left-color: var(--hot); }
+.shaker-verdict p { margin: 0 0 6px; }
+.shaker-verdict p:last-child { margin-bottom: 0; }
+.verdict-head { font-family: var(--head); font-size: 20px; text-transform: uppercase; }
+
 /* ── The career (plan PR 9b) ── */
 .career-status .readout-line { margin-bottom: 4px; }
 .career-broke {
@@ -750,6 +766,27 @@ input[type='range'] {
 .guide-finished { margin: 12px 0 0; font-weight: 600; }
 .guide > .btn { margin-top: 12px; }
 .guide.folded > .btn { margin-top: 0; }
+
+/* A first-job step ticked off while the guide was out of sight: a note at the top of the screen, clear of the re-run bar at the bottom. */
+.guide-toast {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px));
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 2px solid var(--ink);
+  border-left: 8px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+}
+.guide-toast[hidden] { display: none; }
+.guide-toast p { margin: 0 0 4px; }
+.guide-toast-done { font-weight: 600; }
+.guide-toast .btn-row { margin: 6px 0 0; }
+.guide-toast-close { min-width: 44px; margin-left: auto; }
 
 /* Truck card (plan PR 12): the preview under its heading. */
 .card-preview { display: block; width: 100%; max-width: 420px; height: auto; margin: 4px 0 12px; border: 1px solid var(--line); border-radius: 6px; }

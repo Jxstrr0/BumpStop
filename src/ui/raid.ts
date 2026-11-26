@@ -24,6 +24,7 @@ import { DRIVER_IDS, DRIVERS, FREE_RAID_IDS, JOBS, PACES, RAID, RAIDS, RIVALS, t
 import { t, tf, type StringKey } from '../data/strings'
 import { COND_PARTS, type CondPart } from '../data/condition'
 import type { WeatherId } from '../data/weather'
+import type { WearState } from '../sim/wear'
 import { checkBuild, partIn } from '../sim/build'
 import { conditionEffect } from '../sim/condition'
 import { driverName } from '../sim/career'
@@ -33,7 +34,7 @@ import {
   partsBudget, partsMoney, parTime, raidOf, raidTruck, raidWeather, stageKm, standings, startStage,
   type IceNote, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
 } from '../sim/raid'
-import { forecastWord, weatherOn, type StageWeather } from '../sim/weather'
+import { forecastAt, forecastWord, weatherOn, type StageWeather } from '../sim/weather'
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, bandOf, lineChart, type LineChart } from './charts'
 import { el, num } from './dom'
@@ -100,6 +101,17 @@ function partName(part: Job['part'], index: number): string {
   if (isCondPart(part)) return tf(`raidUi.part.${part}` as StringKey, { axle: t(`axleName.${index}` as StringKey) })
   if (part === 'frame') return tf('raidUi.part.frame', { zone: t(`zone.${['front', 'centre', 'rear'][index] ?? 'centre'}` as StringKey) })
   return tf(`raidUi.part.${part}` as StringKey, { corner: t(`cornerName.${index}` as StringKey) })
+}
+
+/** The most worn part on the truck right now, for the checkpoint card: which one, and how worn (0 to 1). */
+function mostWorn(w: WearState): { part: Job['part']; index: number; damage: number } {
+  let best: { part: Job['part']; index: number; damage: number } = { part: 'tire', index: 0, damage: 0 }
+  for (const part of ['tire', 'bottoming', 'axle', 'mount', 'frame'] as const) {
+    w[part].forEach((f, index) => {
+      if (f.damage > best.damage) best = { part, index, damage: f.damage }
+    })
+  }
+  return best
 }
 
 /** What tired oil, cracked bushings or sagged springs do to the truck, in plain words. */
@@ -633,7 +645,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       const field = [mine, ...r.rivals.map((x) => x.splits[r.leg] as number)].sort((a, b) => a - b)
       const pos = field.indexOf(mine) + 1
       const oil = Math.max(...r.oil) - C0
-      const wear = Math.max(...r.trace.wear.slice(-1))
+      const worst = mostWorn(r.wear)
       const h = el('h4', 'raid-sub', tf('raidUi.atCheckpoint', { n: String(n) }))
       let pace: PaceId = r.paces[r.leg] as PaceId
       const paceText = el('p', 'small')
@@ -655,8 +667,11 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       if (w && weatherOn(w, r.at)) {
         notes.append(el('p', 'small warm-text', tf('raidUi.cpWeatherOn', { kind: weatherName(w.kind), km: num(w.at / 1000), what: weatherTurn(w.kind) })))
       } else if (w && r.at < w.to) {
+        // The forecast firms up as the day goes on (Kelbo's playtest): a new chance, and a narrower window once inside it.
+        const f = forecastAt(w, r.at)
         notes.append(el('p', 'small', tf('raidUi.cpWeatherDue', {
-          kind: weatherName(w.kind, true), word: t(`forecast.${forecastWord(w.chance)}` as StringKey), from: num(w.from / 1000), to: num(w.to / 1000),
+          kind: weatherName(w.kind, true), word: t(`forecast.${forecastWord(f.chance)}` as StringKey),
+          pct: num(f.chance * 100), was: num(w.chance * 100), from: num(f.from / 1000), to: num(f.to / 1000),
         })))
       } else if (w) {
         notes.append(el('p', 'small', tf('raidUi.cpWeatherHeld', { kind: weatherName(w.kind, true) })))
@@ -664,7 +679,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       card.replaceChildren(
         h,
         el('p', 'readout-line', tf('raidUi.cpTime', { time: clock(mine), place: tf('raidUi.cpPlace', { pos: ordinal(pos), n: String(field.length) }) })),
-        el('p', 'readout-line', tf('raidUi.cpOil', { oil: num(oil), band: oil < 0 ? t('raidUi.coldOil') : BAND_WORD[bandOf(oil, warm, red)], wear: num(wear * 100) })),
+        el('p', 'readout-line', tf('raidUi.cpOil', { oil: num(oil), band: oil < 0 ? t('raidUi.coldOil') : BAND_WORD[bandOf(oil, warm, red)] })),
+        el('p', 'readout-line', worst.damage < 0.005 ? t('raidUi.cpWornNone') : tf('raidUi.cpWorn', { part: partName(worst.part, worst.index), wear: num(worst.damage * 100) })),
         notes,
         el('p', 'small', tf('raidUi.nextPace', { n: String(n + 1) })), row, paceText, go,
       )

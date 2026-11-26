@@ -27,7 +27,7 @@
 import { CALENDAR, CAREER, CLASS_MONEY, SPONSORS, TEAMS, TIERS, UPGRADES, type Tier } from '../data/career'
 import { CLASSES, type ClassId } from '../data/classes'
 import type { TruckBuild } from '../data/kit'
-import { SLOTS } from '../data/parts'
+import { SLOTS, SPARE_IDS } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, RAIDS, type DriverId } from '../data/raids'
 import { t, tf, type StringKey } from '../data/strings'
 import { changeCost, checkBuild, findPart, partIn, shopRules, stockBuild, tidyBuild, type BuildProblem } from '../sim/build'
@@ -67,6 +67,8 @@ export function dateText(year: number, day: number): string {
 }
 
 const money = (n: number) => tf('career.money', { n: num(Math.round(n)) })
+/** True when the truck carries no spare tires, shocks or CV joints at all. */
+const carriesNoSpares = (b: TruckBuild) => SPARE_IDS.every((id) => partIn(b, 'spares').carries[id] === 0)
 const signed = (n: number) => (n < 0 ? `−${money(-n)}` : `+${money(n)}`)
 const className = (cls: ClassId) => t(CLASSES.find((c) => c.id === cls)!.name)
 const tierName = (tier: Tier) => t(`career.tier.${tier}` as StringKey)
@@ -455,6 +457,8 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
       for (const p of problems) ul.append(el('li', '', buildProblemText(p)))
       card.append(el('p', 'small', t('career.buildIt')), ul)
     } else card.append(el('p', 'small cool-text', t('career.readyToHand')))
+    // The privateer's crew can only fix what the truck carries.
+    if (career.job?.kind === 'contract' && carriesNoSpares(career.job.build)) card.append(el('p', 'small warm-text', t('career.noSparesContract')))
     const hand = button(t('career.handOver'), 'btn start-btn')
     hand.disabled = problems.length > 0
     hand.addEventListener('click', () => driveContract(career, o))
@@ -529,6 +533,8 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     if (RAIDS[nextEvent(career).raid].season === 'winter' && !partIn(store.build(), 'tires').studded) {
       lines.append(el('p', 'small warm-text', t('raidUi.winterNoStuds')))
     }
+    // No spares is allowed too, just costly: free play warns before a raid, so the career does as well (Kelbo's playtest).
+    if (carriesNoSpares(store.build())) lines.append(el('p', 'small warm-text', t('raidUi.noSparesWarn')))
     const problems = entryProblems(career, driver, store.build())
     const enter = button(t('career.enter'), 'btn start-btn')
     enter.disabled = problems.length > 0 || !startRaid

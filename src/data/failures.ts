@@ -61,7 +61,11 @@ export const FRAME_CHANNELS: readonly FrameChannel[] = [
   'frameDamageRear',
 ]
 
-/** A setting the report can jump to (`src/ui/fixes.ts`). The last two are for the shaker rig's report. */
+/**
+ * A setting the report can jump to (`src/ui/fixes.ts`). `rebound` (more) and
+ * `lighterWheels` are for the shaker rig's report; `lessRebound` is softer
+ * rebound for hot dampers.
+ */
 export type FixTarget =
   | 'damperSize'
   | 'compression'
@@ -78,6 +82,7 @@ export type FixTarget =
   | 'frame'
   | 'gussets'
   | 'rebound'
+  | 'lessRebound'
   | 'lighterWheels'
 
 /**
@@ -94,6 +99,11 @@ export interface FailureInfo {
   traceText: StringKey
   corner: readonly CornerChannel[]
   frame: readonly FrameChannel[]
+  /**
+   * Best first. The report shows the first three that make sense for this
+   * truck in this year (`fixUseful`), so a fix that needs a part not out yet
+   * makes way for the next one.
+   */
   fixes: readonly { target: FixTarget; text: StringKey }[]
 }
 
@@ -108,6 +118,8 @@ export const FAILURES: Readonly<Record<FailureKind, FailureInfo>> = {
     fixes: [
       { target: 'damperSize', text: 'fix.damperSize' },
       { target: 'compression', text: 'fix.lessCompression' },
+      // Rebound damping makes heat too: in 1985 it's the one fix the shocks on sale allow.
+      { target: 'lessRebound', text: 'fix.lessRebound' },
       { target: 'pace', text: 'fix.slower' },
     ],
   },

@@ -123,6 +123,13 @@ export const WEATHER_ROLL = {
   to: 0.8,
   /** The forecast gives a window this wide (share of the stage) with the real place somewhere in it. */
   window: 0.2,
+  /**
+   * The forecast firms up at each checkpoint (Kelbo's playtest, 26 November
+   * 2026): the chance moves this share of the way towards what will really
+   * happen once the truck is inside the window, and `ahead` times that while
+   * the window is still to come.
+   */
+  update: { inside: 0.7, ahead: 0.5 },
 } as const
 
 /** The forecast's words for its chance: below 0.5 possible, below 0.8 likely, else expected. */

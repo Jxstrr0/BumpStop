@@ -21,6 +21,7 @@
  * heavy truck bottomed out on them before their dampers faded; rough gravel
  * heats them without anything big enough to bottom on (`docs/WEAR.md`).
  */
+import type { ClassId } from './classes'
 import type { GroundId } from './ground'
 
 export type RigId = 'washboardLadder' | 'tortureLoop'
@@ -101,6 +102,18 @@ export const SHAKER = {
   washboardWavelength: 0.8,
   /** The wheels follow the posts at slow beats anyway, so wheel hop is looked for above this (Hz). */
   wheelFrom: 3,
+  /**
+   * The report's verdict (Kelbo's playtest, 26 November 2026), for each
+   * class: the body's and the wheels' biggest bounce (times the posts') turn
+   * from calm to lively at the first number and too much at the second.
+   * Stock trucks sit in the middle on both (about 4% under to 6% over their
+   * own numbers); a few more clicks of rebound make calm, a few fewer too much.
+   */
+  verdict: {
+    light4x4: { body: [1.58, 1.74], wheel: [2.06, 2.28] },
+    heavy: { body: [1.55, 1.71], wheel: [2.22, 2.45] },
+    sxs: { body: [1.52, 1.68], wheel: [1.98, 2.18] },
+  } satisfies Record<ClassId, { body: readonly [number, number]; wheel: readonly [number, number] }>,
 } as const
 
 /** The run's history for the live trace and the ghost: one sample every this many metres. */

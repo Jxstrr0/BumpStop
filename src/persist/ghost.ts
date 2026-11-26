@@ -8,6 +8,10 @@
  *   best:<class>:<rig>     your best run on that loop
  *   friend:<class>:<rig>   a ghost pasted from a friend's code
  *
+ * A career keeps its own best runs and last-run lines, filed under
+ * `career<seed>:` in front of the key (Kelbo's playtest, 26 November 2026),
+ * so free play's runs don't turn up in it. Friends' ghosts are shared.
+ *
  * Pure: no DOM, no storage.
  */
 import { CLASSES, type ClassId } from '../data/classes'
@@ -30,9 +34,31 @@ export function ghostKey(source: GhostSource, cls: ClassId, rig: RigId): string 
   return `${source}:${cls}:${rig}`
 }
 
+const SCOPE = /^(career-?\d+):/
+
+/** Where a career files its own ghosts and last-run lines; '' (free play) with no career. */
+export function careerScope(seed: number | null | undefined): string {
+  return seed === null || seed === undefined ? '' : `career${seed}`
+}
+
+/** A key filed under a scope ('' leaves it as it is). */
+export function scoped(scope: string, key: string): string {
+  return scope ? `${scope}:${key}` : key
+}
+
+/** The scope a stored key is filed under: '' for free play. */
+export function scopeOf(key: string): string {
+  return SCOPE.exec(key)?.[1] ?? ''
+}
+
+/** The key without its scope. */
+export function unscoped(key: string): string {
+  return key.replace(SCOPE, '')
+}
+
 /** Is this key one of ours (so the shop's last-run lines leave it alone)? */
 export function isGhostKey(key: string): boolean {
-  return GHOST_SOURCES.some((s) => key.startsWith(`${s}:`))
+  return GHOST_SOURCES.some((s) => unscoped(key).startsWith(`${s}:`))
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)

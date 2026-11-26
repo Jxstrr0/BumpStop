@@ -15,6 +15,7 @@
  * moves up and down under the parked truck, so the ride model itself is
  * the same one the loops drive.
  */
+import type { ClassId } from '../data/classes'
 import { SHAKER } from '../data/rigs'
 import { SIM, type RideSetup } from '../data/ride'
 import { PI, detPow, detSin } from './det'
@@ -186,6 +187,29 @@ export function shakerPeaks(points: readonly ShakerPoint[]): ShakerPeaks | null 
   }
   const wheelFrom = points.some((pt) => pt.freq >= SHAKER.wheelFrom) ? SHAKER.wheelFrom : 0
   return { body: best((pt) => pt.body, 0), wheel: best((pt) => pt.wheel, wheelFrom) }
+}
+
+/** How a sweep went: each of the body and the wheels calm, lively or too much, and the worse of the two. */
+export type ShakerGrade = 'calm' | 'lively' | 'wild'
+export interface ShakerVerdict {
+  body: ShakerGrade
+  wheel: ShakerGrade
+  overall: ShakerGrade
+}
+
+const GRADES: readonly ShakerGrade[] = ['calm', 'lively', 'wild']
+
+function grade(gain: number, [lively, wild]: readonly [number, number]): ShakerGrade {
+  return gain >= wild ? 'wild' : gain >= lively ? 'lively' : 'calm'
+}
+
+/** The verdict on a sweep's peaks for a class, from the limits in `SHAKER.verdict`. */
+export function shakerVerdict(peaks: ShakerPeaks, cls: ClassId): ShakerVerdict {
+  const limits = SHAKER.verdict[cls]
+  const body = grade(peaks.body.gain, limits.body)
+  const wheel = grade(peaks.wheel.gain, limits.wheel)
+  const overall = GRADES[Math.max(GRADES.indexOf(body), GRADES.indexOf(wheel))]!
+  return { body, wheel, overall }
 }
 
 /** A beat (Hz) as the road speed (m/s) that gives the same beat on typical washboard. */

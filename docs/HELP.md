@@ -67,9 +67,16 @@ done, in any order:
 6. **Read the results**, with a last word on what comes next.
 
 Only the step being done now opens up, with its words, a **Show me** that
-scrolls to the right button and a **What's ...?** that opens the glossary
-at the word. **Hide the guide** folds it to one button. Taking your own
-truck to the first raid, or sitting it out, puts the guide away.
+scrolls to the right button and a **What does "..." mean?** that opens the
+glossary at the word. **Hide the guide** folds it to one button. Taking your
+own truck to the first raid, or sitting it out, puts the guide away.
+
+The guide sits in the Career panel, so it's out of sight while you work on
+the build screen or in the shop. When a step ticks off there, a note pops
+up at the top of the screen (Done: the step, Now: the next one, and **Back
+to the guide**); it goes by itself after nine seconds. If the guide is on
+screen the ticked step just flashes, and a hidden guide stays quiet
+(Kelbo's playtest, 26 November 2026).
 
 How far you got (runs, the privateer's number, hidden or not) is kept in
 the browser under `bumpstop.guide`, tied to the career's seed. It isn't in
