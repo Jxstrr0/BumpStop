@@ -14,7 +14,7 @@ import { changeCost, checkBuild, minPressure, partIn, partsFor, type BuildProble
 import { FIRST_YEAR, LAST_YEAR, readLinkAxles, withSetting, writeLinkAxles, type BuildStore, type End } from './buildStore'
 import { shareBuildBlock } from './saves'
 import { truckCardBlock } from './truckCard'
-import { el, num } from './dom'
+import { el, num, oneOpenAtATime } from './dom'
 import { truckView } from './truckView'
 
 /** One slider: its setting, label, range in screen units, and how to show its value. */
@@ -236,6 +236,7 @@ export function buildPanel(store: BuildStore): HTMLElement {
     const details = el('details', 'slot')
     details.dataset.slot = slot
     details.open = open
+    oneOpenAtATime(details, 'build-parts')
     const head = el('summary')
     head.append(
       el('span', 'slot-name', t(`slot.${slot}` as StringKey)),
@@ -276,6 +277,7 @@ export function buildPanel(store: BuildStore): HTMLElement {
     const details = el('details', 'axle')
     details.dataset.end = end
     details.open = open
+    oneOpenAtATime(details, 'build-tune')
     const head = el('summary', '', t(end === 'front' ? 'build.front' : 'build.rear'))
     // A tag on each axle while they're linked, so it's clear the other end moves too.
     if (linked) head.append(' ', el('span', 'chip link-chip', t('build.linkedChip')))
