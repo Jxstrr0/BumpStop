@@ -34,7 +34,8 @@ import {
 } from '../data/career'
 import { KITS, type TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR, PARTS, SLOTS, SPARE_IDS, type SlotId } from '../data/parts'
-import { DRIVER_IDS, RAID, RAIDS, type DriverId, type PaceId, type RaidId } from '../data/raids'
+import { DRIVER_IDS, DRIVERS, RAID, RAIDS, type DriverId, type PaceId, type RaidId } from '../data/raids'
+import type { StringKey } from '../data/strings'
 import {
   changeCost, checkBuild, massAndCost, partIn, partsFor, stockBuild, tidyBuild, type BuildProblem, type BuildRules,
 } from './build'
@@ -195,6 +196,21 @@ export function isBroke(c: CareerState): boolean {
 }
 
 /** The best sponsor your reputation brings, or null. */
+/** Who this career's sponsor at a level is: each career gets one of the pair (`SPONSORS`). */
+export function sponsorName(c: CareerState, s: Sponsor): StringKey {
+  return s.names[hashString(`${c.seed}:sponsor:${s.rep}`) % s.names.length]!
+}
+
+/**
+ * The driver this career hires for a trade: each career draws its own from
+ * the trade's pool (`DRIVERS[id].pool`), so replays meet new faces. Free
+ * play (no career) has the first.
+ */
+export function driverName(c: CareerState | null, id: DriverId): StringKey {
+  const pool = DRIVERS[id].pool
+  return c ? pool[hashString(`${c.seed}:driver:${id}`) % pool.length]! : pool[0]!
+}
+
 export function sponsorOf(c: CareerState): Sponsor | null {
   let best: Sponsor | null = null
   for (const s of SPONSORS) if (c.rep >= s.rep) best = s

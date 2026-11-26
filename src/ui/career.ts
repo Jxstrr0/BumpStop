@@ -29,9 +29,9 @@ import { DRIVER_IDS, DRIVERS, RAIDS, type DriverId } from '../data/raids'
 import { t, tf, type StringKey } from '../data/strings'
 import { changeCost, checkBuild, findPart, partIn, shopRules, stockBuild, tidyBuild, type BuildProblem } from '../sim/build'
 import {
-  buyTruck, buyUpgrade, cheapestBuild, contractProblems, contractRaid, contractRules, discountOf, driveAutoStage, driverFee,
+  buyTruck, buyUpgrade, cheapestBuild, contractProblems, contractRaid, contractRules, discountOf, driveAutoStage, driverFee, driverName,
   dropContract, entryFee, entryProblems, enterOwn, eventDays, fitOwn, isBroke, longOneRoad, newCareer, nextEvent, offers, ownRules,
-  sellTruck, setContractBuild, settle, sponsorOf, sponsorPay, takeContract, truckPrice, truckValue, upgradeProblem,
+  sellTruck, setContractBuild, settle, sponsorName, sponsorOf, sponsorPay, takeContract, truckPrice, truckValue, upgradeProblem,
   type CareerState, type Contract, type EntryProblem, type LongOneStory, type NewsItem, type Settlement,
 } from '../sim/career'
 import { raidOf, standings, type RaidState } from '../sim/raid'
@@ -78,7 +78,8 @@ function partList(ids: readonly string[]): string {
   }).join(', ')
 }
 
-export function newsText(n: NewsItem): string {
+/** A news line in words. `career` names this career's sponsor (each career has its own); without one, the first of the pair. */
+export function newsText(n: NewsItem, career?: CareerState): string {
   switch (n.kind) {
     case 'result': {
       const who = t(n.job === 'own' ? 'career.news.yours' : 'career.news.contract')
@@ -97,7 +98,7 @@ export function newsText(n: NewsItem): string {
       return tf('career.news.newParts', { year: String(n.year), parts: partList(n.parts) })
     case 'sponsor': {
       const s = SPONSORS[n.sponsor]
-      return s ? tf('career.news.sponsor', { who: t(s.name), pay: money(s.pay) }) : ''
+      return s ? tf('career.news.sponsor', { who: t(career ? sponsorName(career, s) : s.names[0]!), pay: money(s.pay) }) : ''
     }
     case 'broke':
       return t('career.news.broke')
@@ -315,7 +316,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     wrap.append(line)
     const sponsor = sponsorOf(career)
     wrap.append(el('p', 'small', sponsor
-      ? tf(sponsor.discount ? 'career.sponsorWorks' : 'career.sponsor', { who: t(sponsor.name), pay: money(sponsor.pay), off: num(sponsor.discount * 100) })
+      ? tf(sponsor.discount ? 'career.sponsorWorks' : 'career.sponsor', { who: t(sponsorName(career, sponsor)), pay: money(sponsor.pay), off: num(sponsor.discount * 100) })
       : t('career.noSponsor')))
     wrap.append(roadBlock(career))
     if (isBroke(career)) {
@@ -385,7 +386,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
   function contractLine(o: Contract): string {
     return tf('career.offer', {
       n: String(o.number), cls: className(o.cls).toLowerCase(), budget: money(o.budget), fee: money(o.fee),
-      driver: t(DRIVERS[o.driver].name).toLowerCase(), win: money(o.bonus.win), podium: money(o.bonus.podium), finish: money(o.bonus.finish),
+      driver: c ? t(driverName(c, o.driver)) : t(DRIVERS[o.driver].name), win: money(o.bonus.win), podium: money(o.bonus.podium), finish: money(o.bonus.finish),
     })
   }
 
@@ -475,7 +476,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     const tier = nextEvent(career).tier
     const row = el('div', 'btn-row')
     for (const id of DRIVER_IDS) {
-      const b = button(t(DRIVERS[id].name))
+      const b = button(t(driverName(career, id)))
       b.setAttribute('aria-pressed', String(id === driver))
       b.addEventListener('click', () => {
         driver = id
@@ -487,7 +488,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     const pay = sponsorPay(career, cls)
     const lines = el('div')
     lines.append(
-      el('p', 'small', t(DRIVERS[driver].text)),
+      el('p', 'small', tf('driver.about', { trade: t(DRIVERS[driver].name), text: t(DRIVERS[driver].text) })),
       el('p', 'small', tf('career.fees', { entry: money(entryFee(career, cls)), driver: money(driverFee(career, driver, cls)) })),
     )
     if (pay > 0) lines.append(el('p', 'small', tf('career.sponsorPays', { pay: money(pay) })))
@@ -580,7 +581,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     wrap.append(
       el('p', 'career-win', t('career.finaleHead')),
       el('p', '', tf('career.finaleLead', {
-        year: String(story.year), nth: ordinal(story.seasons), cls: className(story.cls).toLowerCase(), driver: t(DRIVERS[story.driver].name).toLowerCase(),
+        year: String(story.year), nth: ordinal(story.seasons), cls: className(story.cls).toLowerCase(), driver: c ? t(driverName(c, story.driver)) : t(DRIVERS[story.driver].name).toLowerCase(),
       })),
       el('p', 'small', tf('career.finaleRecord', { raids: String(s.raids), wins: String(s.wins), podiums: String(s.podiums), contracts: String(s.contracts) })),
       el('p', 'small', tf('career.finaleTruck', { parts: partList(FINALE_SLOTS.map((slot) => story.parts[slot])) })),
@@ -675,7 +676,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     const list = el('ul', 'raid-log')
     const items = career.news.filter((n) => n.kind !== 'winner').slice(0, 10)
     if (!items.length) list.append(el('li', 'small', t('career.noNews')))
-    for (const n of items) list.append(el('li', 'small', `${n.year}: ${newsText(n)}`))
+    for (const n of items) list.append(el('li', 'small', `${n.year}: ${newsText(n, career)}`))
     const s = career.stats
     const first = career.firstLongOne
     if (first) wrap.append(el('p', 'small', tf('career.firstLongOne', { year: String(first.year), cls: className(first.cls).toLowerCase(), nth: ordinal(first.seasons) })))

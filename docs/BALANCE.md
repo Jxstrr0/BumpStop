@@ -2,7 +2,9 @@
 
 How the career's numbers were set so each class is a fair road to the Long
 One, in plain words. (The Long One was the finale's working name when this
-was written; since PR 13c it's the Whole Damn Country, id `longOne`.) The numbers live in `src/data/career.ts` (rival teams,
+was written; since PR 13c it's the Whole Damn Country, id `longOne`. The
+teams were renamed after this too: Brannigan is now the Tundra Dogs, Highbank
+Goldpan Racing and Hardpan the Ironwood Brothers.) The numbers live in `src/data/career.ts` (rival teams,
 privateers, reputation, sponsors) and `src/data/parts.ts`.
 
 ## The tools

@@ -135,27 +135,30 @@ second). It opens:
 | 0 | Regional raids, light 4x4 and side-by-side contracts, the veteran and the mechanic |
 | 5 | A second mechanic (two more bivouac hours) |
 | 8 | The charger |
-| 10 | A local sponsor (pays 1,500 a raid), a hydraulic press (cheaper repairs) |
+| 10 | A local sponsor, Two Pines Hardware or Loonlight Diner (pays 1,500 a raid), a hydraulic press (cheaper repairs) |
 | 12 | Heavy truck contracts |
 | 15 | National raids with your own truck |
 | 20 | The gravel ace |
 | 30 | A third mechanic |
-| 35 | A regional sponsor (4,000 a raid) |
+| 35 | A regional sponsor, Muskeg Tire Co. or Hoarfrost Cola (4,000 a raid) |
 | 40 | A welding bay (cheaper repairs again) |
 | 60 | The Whole Damn Country with your own truck |
-| 120 | A works deal: 8,000 a raid and a quarter off parts |
+| 120 | A works deal with Boreal Bolt & Nut or Ptarmigan Lard Oil: 8,000 a raid and a quarter off parts |
 
 Sponsors don't stack: the best one you qualify for is the one you have.
+Which of each pair a career gets comes from its seed (`sponsorName`), and
+so do the drivers it hires: one from each trade's pool of four
+(`driverName`, `docs/NAMES.md`).
 
 ## Rival teams who copy what wins
 
-Four teams (working names, `docs/NAMES.md`), each with its own habits:
+Four teams (Kelbo's names, `docs/NAMES.md`; the ids in the code are the old working names), each with its own habits:
 
 | Team | Races | Buys | Copies the winner |
 | --- | --- | --- | --- |
-| Brannigan Brothers | light 4x4 (side-by-side from 2004) | power first | often (half the time, slot by slot) |
-| Highbank Racing | light 4x4 from 1990, heavy from 1994, side-by-side from 1998 | the newest parts | sometimes |
-| Hardpan Haulage Works | heavy (light 4x4 from 2000), every raid since plan PR 13 (was national raids and the finale only) | the strongest parts | rarely |
+| Tundra Dogs (`brannigan`) | light 4x4 (side-by-side from 2004) | power first | often (half the time, slot by slot) |
+| Goldpan Racing (`highbank`) | light 4x4 from 1990, heavy from 1994, side-by-side from 1998 | the newest parts | sometimes |
+| Ironwood Brothers (`hardpan`) | heavy (light 4x4 from 2000), every raid since plan PR 13 (was national raids and the finale only) | the strongest parts | rarely |
 | Jackrabbit Sport | side-by-side (light 4x4 from 1996) | the lightest parts | sometimes |
 
 Plus three privateers per class on stock trucks. The heavy privateers are a
@@ -220,9 +223,7 @@ roads and the contracts keep changing.
 
 ## What's not here yet
 
-- **Names** for the sponsors, the drivers, the rival teams and the
-  privateers: working names until Kelbo picks (the money and the raids are
-  picked).
+- **Names** for the privateers (known by race number) and parts makers.
 
 ## The tests
 

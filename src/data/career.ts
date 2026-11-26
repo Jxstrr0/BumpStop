@@ -113,14 +113,18 @@ export interface Sponsor {
   pay: number
   /** Parts cost this much less (0.25 = a quarter off): only the works deal does this. */
   discount: number
-  name: StringKey
+  /**
+   * Who it is (Kelbo, 26 November 2026): two for each level, and each career
+   * gets one of the pair (`sponsorName` in `src/sim/career.ts`).
+   */
+  names: readonly StringKey[]
 }
 
 /** The best one you qualify for is the one you have (they don't stack). */
 export const SPONSORS: readonly Sponsor[] = [
-  { rep: 10, pay: 1500, discount: 0, name: 'sponsor.local' },
-  { rep: 35, pay: 4000, discount: 0, name: 'sponsor.regional' },
-  { rep: 120, pay: 8000, discount: 0.25, name: 'sponsor.works' },
+  { rep: 10, pay: 1500, discount: 0, names: ['sponsor.twoPines', 'sponsor.loonlight'] },
+  { rep: 35, pay: 4000, discount: 0, names: ['sponsor.muskegTire', 'sponsor.hoarfrost'] },
+  { rep: 120, pay: 8000, discount: 0.25, names: ['sponsor.boreal', 'sponsor.ptarmigan'] },
 ]
 
 // ── The shop ──

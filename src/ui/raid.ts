@@ -23,6 +23,7 @@ import { SPARE_IDS, type SpareId } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, FREE_RAID_IDS, JOBS, PACES, RAID, RAIDS, RIVALS, type DriverId, type PaceId, type RaidId, type Rival } from '../data/raids'
 import { t, tf, type StringKey } from '../data/strings'
 import { checkBuild, partIn } from '../sim/build'
+import { driverName } from '../sim/career'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
   advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isRestDay, leaveCheckpoint,
@@ -227,13 +228,14 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       const raid = RAIDS[raidId]
       raidText.textContent = `${t(raid.text)} ${tf('raidUi.stagesLine', { n: String(raid.stages.length), km: num(raid.stages.reduce((s, st) => s + stageKm(st), 0)) })}`
       studsText.hidden = raid.season !== 'winter' || partIn(store.truck().build, 'tires').studded
-      driverText.textContent = t(DRIVERS[driver].text)
+      driverText.textContent = tf('driver.about', { trade: t(DRIVERS[driver].name), text: t(DRIVERS[driver].text) })
     }
     const raidRow = picker(FREE_RAID_IDS, (id) => t(RAIDS[id].name), () => raidId, (id) => {
       raidId = id
       syncText()
     })
-    const driverRow = picker(DRIVER_IDS, (id) => t(DRIVERS[id].name), () => driver, (id) => {
+    // Free play has no career, so it's the first of each trade's pool (`driverName`).
+    const driverRow = picker(DRIVER_IDS, (id) => t(driverName(null, id)), () => driver, (id) => {
       driver = id
       syncText()
     })
