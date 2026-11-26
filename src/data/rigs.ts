@@ -1,20 +1,33 @@
 /**
- * Test loops that get faster every lap until something breaks (plan PR 2,
- * for the balance bot). These are first drafts of the shop's rigs; plan
- * PR 4 puts them on screen with live traces and the report.
+ * The shop's three rigs (plan PR 4; the two lap loops started in plan PR 2
+ * for the balance bot).
  *
- * Each lap drives the same road (the loop doesn't change), at the lap's
- * speed times each piece's `pace`: slower through the rocks, flat out on the
- * graded bits. Heat and wear carry over from lap to lap. Speeds in m/s,
- * lengths in metres.
+ * - **Shaker rig:** four posts shake the parked truck through a sweep of
+ *   speeds, to show where the body and the wheels bounce most. No damage.
+ * - **Washboard ladder:** a loop that gets 5 km/h faster every lap, to find
+ *   the speed where the dampers fade.
+ * - **Torture loop:** whoops, rocks and jumps, faster every lap, to find what
+ *   breaks: bottoming, mounts, axles, tires, the frame.
  *
- * The washboard ladder mixes in rough ground on purpose: washboard alone heats
- * dampers most at 20 to 40 km/h and less above that (see `docs/RIDE-SIM.md`),
- * so a loop of pure washboard wouldn't get hotter as it got faster.
+ * Each lap of a loop drives the same road (the loop doesn't change), at the
+ * lap's speed times each piece's `pace`: slower through the rocks, flat out
+ * on the graded bits. Heat and wear carry over from lap to lap. Speeds in
+ * m/s, lengths in metres.
+ *
+ * The washboard ladder is mostly rough gravel on purpose: washboard alone
+ * heats dampers most at 20 to 40 km/h and hardly at all above that (see
+ * `docs/RIDE-SIM.md`), so a loop of pure washboard wouldn't get hotter as it
+ * got faster. It used to have whoops for the heat, but the light 4x4 and the
+ * heavy truck bottomed out on them before their dampers faded; rough gravel
+ * heats them without anything big enough to bottom on (`docs/WEAR.md`).
  */
 import type { GroundId } from './ground'
 
 export type RigId = 'washboardLadder' | 'tortureLoop'
+
+/** Every rig in the shop, in the order the shop shows them. */
+export type ShopRigId = 'shaker' | RigId
+export const SHOP_RIGS: readonly ShopRigId[] = ['shaker', 'washboardLadder', 'tortureLoop']
 
 export interface RigPiece {
   ground: GroundId
@@ -37,12 +50,12 @@ export interface Rig {
 const KMH = 1 / 3.6
 
 export const RIGS: Readonly<Record<RigId, Rig>> = {
-  // Fade finder: long washboard plus whoops, 5 km/h faster each lap.
+  // Fade finder: a bit of washboard, then rough gravel, 5 km/h faster each lap.
   washboardLadder: {
     id: 'washboardLadder',
     pieces: [
-      { ground: 'washboard', length: 1200, pace: 1 },
-      { ground: 'whoops', length: 600, pace: 0.8 },
+      { ground: 'washboard', length: 600, pace: 1 },
+      { ground: 'rough', length: 1200, pace: 1 },
     ],
     startSpeed: 40 * KMH,
     speedStep: 5 * KMH,
@@ -62,3 +75,47 @@ export const RIGS: Readonly<Record<RigId, Rig>> = {
     maxLaps: 16,
   },
 }
+
+/**
+ * The shaker rig: all four posts move up and down together (a sine wave),
+ * stepping from slow to fast. At each step it waits for the truck to settle
+ * into the beat, then measures how far the body and each wheel move.
+ */
+export const SHAKER = {
+  /** How far each post moves up and down from the middle (m). */
+  amplitude: 0.01,
+  /** The sweep, slowest to fastest shake (Hz, bounces a second). */
+  minFreq: 0.6,
+  maxFreq: 18,
+  /** Steps in the sweep, spaced evenly on a log scale. */
+  points: 28,
+  /** Settle for this many beats, and at least this long, before measuring. */
+  settleCycles: 4,
+  settleMin: 1.5,
+  /** Beats measured at each step. */
+  measureCycles: 3,
+  /**
+   * Crest to crest of typical washboard (m), the middle of the washboard
+   * recipe's range: a shake of f Hz feels like washboard at f × this m/s.
+   */
+  washboardWavelength: 0.8,
+  /** The wheels follow the posts at slow beats anyway, so wheel hop is looked for above this (Hz). */
+  wheelFrom: 3,
+} as const
+
+/** The run's history for the live trace and the ghost: one sample every this many metres. */
+export const RIG_HISTORY_STEP = 20
+
+/** How the rigs play on screen (not the sim: these only set the pace of the show). */
+export const RIG_VIEW = {
+  /** Real seconds each lap takes at normal speed. */
+  secondsPerLap: 4,
+  /** "Fast" plays this many times quicker. */
+  fastFactor: 4,
+  /** Real seconds the shaker's sweep takes. */
+  shakerSeconds: 10,
+  /** The break replays at this share of real speed. */
+  slowMotion: 0.4,
+  /** "Skip to the end" works this long per frame (ms), so the page keeps drawing. */
+  skipBudgetMs: 24,
+} as const

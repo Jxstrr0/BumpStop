@@ -49,9 +49,14 @@ export function newRecorder(): TraceRecorder {
   }
 }
 
-/** Note this step, if a sample is due. `oilTemp` is the ride state's, per corner. */
-export function record(rec: TraceRecorder, oilTemp: readonly number[], f: StepForces, r: WearReadings, w: WearState): void {
-  if (++rec.tick < rec.every) return
+/**
+ * Note this step, if a sample is due (or always, with `now`). `oilTemp` is
+ * the ride state's, per corner. The lap runs force one last sample on the
+ * step something breaks, so the trace ends on the moment it let go, not up
+ * to a hundredth of a second before.
+ */
+export function record(rec: TraceRecorder, oilTemp: readonly number[], f: StepForces, r: WearReadings, w: WearState, now = false): void {
+  if (++rec.tick < rec.every && !now) return
   rec.tick = 0
   const k = rec.head
   rec.t[k] = w.t

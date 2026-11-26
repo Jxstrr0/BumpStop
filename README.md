@@ -15,8 +15,11 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
   works, in plain words: `docs/RIDE-SIM.md`.
 - How strong the test trucks' parts are, and how wear adds up:
   `src/data/wear.ts`. What each failure is called and where to fix it:
-  `src/data/failures.ts`. The test loops: `src/data/rigs.ts`. The balance
-  bot's checks: `src/data/balance.ts`. In plain words: `docs/WEAR.md`.
+  `src/data/failures.ts`. The balance bot's checks: `src/data/balance.ts`.
+  In plain words: `docs/WEAR.md`.
+- The shop's three rigs (and how fast they play on screen):
+  `src/data/rigs.ts`. The crew chief's notes and the report's words:
+  `src/data/strings.ts`. In plain words: `docs/RIGS.md`.
 - Colours: the top of `src/style.css`.
 - The plan: `docs/BUMP-STOP-PLAN.md`. Where it's up to: `docs/STATUS.md`.
 - Names: `docs/NAMES.md`.

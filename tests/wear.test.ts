@@ -208,9 +208,11 @@ describe('lap runs and traces', { timeout: 30_000 }, () => {
     expect(run.broken).not.toBeNull()
     const trace = run.trace!
     expect(trace.t.length).toBe(WEAR.traceRate * WEAR.traceSeconds)
-    expect(trace.t.at(-1)!).toBeLessThanOrEqual(run.broken!.t)
-    expect(run.broken!.t - trace.t.at(-1)!).toBeLessThan(1 / WEAR.traceRate + 1e-9)
-    expect(trace.t.at(-1)! - trace.t[0]!).toBeCloseTo(WEAR.traceSeconds - 1 / WEAR.traceRate, 6)
+    // The last sample is the breaking step itself (plan PR 4), so it can sit closer than the usual spacing.
+    expect(trace.t.at(-1)!).toBe(run.broken!.t)
+    const span = trace.t.at(-1)! - trace.t[0]!
+    expect(span).toBeGreaterThan(WEAR.traceSeconds - 2 / WEAR.traceRate - 1e-9)
+    expect(span).toBeLessThanOrEqual(WEAR.traceSeconds - 1 / WEAR.traceRate + 1e-9)
     const info = FAILURES[run.broken!.kind]
     const wanted = run.broken!.corner >= 0 ? [...info.corner, ...info.frame] : info.frame
     expect(Object.keys(trace.channels).sort()).toEqual([...wanted].sort())

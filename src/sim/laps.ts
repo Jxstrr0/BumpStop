@@ -1,19 +1,26 @@
 /**
- * Lap runs (plan PR 2): drive a test loop faster and faster until something
- * breaks, with heat and wear carried from lap to lap. The balance bot uses
- * this to check every class; the rigs in plan PR 4 build on it.
+ * Lap runs (plan PR 2, made step-by-step in plan PR 4): drive a test loop
+ * faster and faster until something breaks, with heat and wear carried from
+ * lap to lap.
+ *
+ * A run can go all at once (`runLaps`, for the balance bot) or a few steps
+ * at a time (`startLaps`, then `advanceLaps` as often as you like), so the
+ * rigs can show it live. Both give exactly the same result: `runLaps` is
+ * just `advanceLaps` with no limit.
  *
  * Every step runs in full detail (no sampling), because a break needs the
  * exact moment and its trace.
  */
-import type { Rig } from '../data/rigs'
-import type { RideSetup } from '../data/ride'
+import { RIG_HISTORY_STEP, type Rig, type RigPiece } from '../data/rigs'
+import { SIM, type AxleSetup, type RideSetup } from '../data/ride'
 import type { WearSetup } from '../data/wear'
 import { buildProfile, type Profile } from './ground'
-import { emptyStats, restingState, rideParams, type RideState } from './ride'
+import { emptyStats, enterSection, restingState, rideParams, stepRide, type RideParams, type RideState, type RideStats } from './ride'
 import { Rng } from './rng'
-import { breakTrace, type BreakTrace } from './trace'
-import { damageOf, driveSectionWithWear, newWearRun, type BreakEvent, type DamageSnapshot, type WearState } from './wear'
+import { breakTrace, record, type BreakTrace } from './trace'
+import { damageOf, newWearRun, stepWear, worstDamage, type BreakEvent, type DamageSnapshot, type WearRun, type WearState } from './wear'
+
+const DT = 1 / SIM.stepsPerSecond
 
 export interface LapSummary {
   /** 1 for the first lap. */
@@ -24,8 +31,29 @@ export interface LapSummary {
   peakTemp: number[]
   /** Bottom-outs this lap, all corners. */
   bottomOuts: number
+  /** Most each wheel rose from ride height this lap (m). */
+  peakCompression: number[]
   /** Damage at the end of the lap (or at the break). */
   damage: DamageSnapshot
+  /** Metres into the run at the end of the lap (or at the break). */
+  endDistance: number
+}
+
+/**
+ * The run as a few numbers every `RIG_HISTORY_STEP` metres, for the live
+ * trace and the ghost of the last run. Parallel lists, one entry per sample.
+ */
+export interface RunHistory {
+  /** Metres into the run. */
+  distance: number[]
+  /** The lap it was on (1 = first). */
+  lap: number[]
+  /** The hottest damper's oil (K). */
+  oil: number[]
+  /** The most any wheel used of its bump travel since the last sample (1 = hit the hard limit). */
+  travel: number[]
+  /** The most worn part's damage (0 to 1). */
+  wear: number[]
 }
 
 export interface LapRun {
@@ -37,6 +65,7 @@ export interface LapRun {
   /** The last few seconds before the break, or null. */
   trace: BreakTrace | null
   wear: WearState
+  history: RunHistory
 }
 
 export interface LapOptions {
@@ -46,6 +75,33 @@ export interface LapOptions {
   trace?: boolean
 }
 
+/** A lap run part-way through. Plain numbers and arrays; `advanceLaps` moves it on. */
+export interface LapRunner {
+  rig: Rig
+  p: RideParams
+  s: RideState
+  run: WearRun
+  road: Profile[]
+  /** The lap being driven (1 = first) and its speed (m/s). */
+  lap: number
+  lapSpeed: number
+  /** The piece of the loop being driven, the step it's on, and the steps it takes. */
+  piece: number
+  step: number
+  steps: number
+  /** Totals for the lap so far. */
+  stats: RideStats
+  laps: LapSummary[]
+  history: RunHistory
+  /** Metres into the run where the next history sample is due, and the biggest travel since the last. */
+  nextSample: number
+  travelPeak: number
+  /** The lap's start, metres into the run. */
+  lapStart: number
+  /** True once something broke or the last lap is done. */
+  done: boolean
+}
+
 /** The loop's road, built once: the same every lap. */
 export function rigRoad(rig: Rig, setup: RideSetup, seed: number): Profile[] {
   const root = new Rng(seed)
@@ -53,31 +109,154 @@ export function rigRoad(rig: Rig, setup: RideSetup, seed: number): Profile[] {
   return rig.pieces.map((piece, i) => buildProfile(piece.ground, piece.length + wheelbase, root.fork(`piece-${i}`)))
 }
 
-export function runLaps(setup: RideSetup, wear: WearSetup, rig: Rig, seed: number, opts: LapOptions): LapRun {
+/** One lap's length (m). */
+export function lapLength(rig: Rig): number {
+  return rig.pieces.reduce((sum, piece) => sum + piece.length, 0)
+}
+
+/** Steps to drive a whole piece at this speed, from the rear axle on its start to the front axle on its end. */
+function stepsFor(p: RideParams, profile: Profile, speed: number): number {
+  const usable = profile.length - p.setup.cgToFront - p.setup.cgToRear
+  return speed > 0 ? Math.max(0, Math.floor(usable / (speed * DT))) : 0
+}
+
+/** Put the runner at the start of piece `k` of the current lap. */
+function enterPiece(r: LapRunner, k: number): void {
+  r.piece = k
+  r.step = 0
+  const profile = r.road[k] as Profile
+  enterSection(r.s, r.p, profile)
+  r.steps = stepsFor(r.p, profile, r.lapSpeed * (r.rig.pieces[k] as RigPiece).pace)
+}
+
+function startLap(r: LapRunner, lap: number): void {
+  r.lap = lap
+  r.lapSpeed = r.rig.startSpeed + (lap - 1) * r.rig.speedStep
+  r.stats = emptyStats()
+  r.lapStart = r.run.w.distance
+  enterPiece(r, 0)
+}
+
+function endLap(r: LapRunner): void {
+  const { s, stats, run } = r
+  const peakTemp = stats.peakTemp.map((t, i) => Math.max(t, s.oilTemp[i] as number))
+  const bottomOuts = stats.bottomOuts.reduce((a, b) => a + b, 0)
+  r.laps.push({
+    lap: r.lap,
+    speed: r.lapSpeed,
+    peakTemp,
+    bottomOuts,
+    peakCompression: stats.peakCompression.slice(),
+    damage: damageOf(run.w),
+    endDistance: run.w.distance,
+  })
+}
+
+function sample(r: LapRunner): void {
+  const h = r.history
+  let hottest = 0
+  for (const t of r.s.oilTemp) if (t > hottest) hottest = t
+  h.distance.push(r.run.w.distance)
+  h.lap.push(r.lap)
+  h.oil.push(hottest)
+  h.travel.push(r.travelPeak)
+  h.wear.push(worstDamage(r.run.w))
+  r.travelPeak = 0
+}
+
+export function startLaps(setup: RideSetup, wear: WearSetup, rig: Rig, seed: number, opts: LapOptions): LapRunner {
   const p = rideParams(setup)
-  const s: RideState = restingState(opts.airTemp)
-  const run = newWearRun(wear, p, opts.trace !== false)
-  const w = run.w
-  const road = rigRoad(rig, setup, seed)
-  const laps: LapSummary[] = []
+  const r: LapRunner = {
+    rig,
+    p,
+    s: restingState(opts.airTemp),
+    run: newWearRun(wear, p, opts.trace !== false),
+    road: rigRoad(rig, setup, seed),
+    lap: 0,
+    lapSpeed: 0,
+    piece: 0,
+    step: 0,
+    steps: 0,
+    stats: emptyStats(),
+    laps: [],
+    history: { distance: [], lap: [], oil: [], travel: [], wear: [] },
+    nextSample: 0,
+    travelPeak: 0,
+    lapStart: 0,
+    done: rig.maxLaps < 1,
+  }
+  if (!r.done) {
+    startLap(r, 1)
+    sample(r)
+    r.nextSample = RIG_HISTORY_STEP
+  }
+  return r
+}
 
-  for (let lap = 1; lap <= rig.maxLaps && !w.broken; lap++) {
-    const lapSpeed = rig.startSpeed + (lap - 1) * rig.speedStep
-    const stats = emptyStats()
-    for (let k = 0; k < rig.pieces.length && !w.broken; k++) {
-      driveSectionWithWear(s, p, run, road[k] as Profile, lapSpeed * rig.pieces[k]!.pace, stats)
+/**
+ * Drive up to `maxSteps` more steps (Infinity for the rest of the run).
+ * Returns the steps taken; the run is over when `r.done` is true.
+ */
+export function advanceLaps(r: LapRunner, maxSteps: number): number {
+  let taken = 0
+  const { s, p, run } = r
+  const { w, wp, forces, readings, rec } = run
+  while (!r.done && taken < maxSteps) {
+    if (r.step >= r.steps) {
+      // This piece is done: on to the next one, or the next lap.
+      if (r.piece + 1 < r.road.length) {
+        enterPiece(r, r.piece + 1)
+      } else {
+        endLap(r)
+        if (r.lap >= r.rig.maxLaps) r.done = true
+        else startLap(r, r.lap + 1)
+      }
+      continue
     }
-    const peakTemp = stats.peakTemp.map((t, i) => Math.max(t, s.oilTemp[i] as number))
-    const bottomOuts = stats.bottomOuts.reduce((a, b) => a + b, 0)
-    laps.push({ lap, speed: lapSpeed, peakTemp, bottomOuts, damage: damageOf(w) })
+    const profile = r.road[r.piece] as Profile
+    const speed = r.lapSpeed * (r.rig.pieces[r.piece] as RigPiece).pace
+    stepRide(s, p, profile, speed, r.stats, forces)
+    stepWear(w, wp, s, p, forces, profile, speed, readings)
+    if (rec) {
+      record(rec, s.oilTemp, forces, readings, w)
+      // If it broke between samples, keep the breaking step too.
+      if (w.broken && rec.tick !== 0) record(rec, s.oilTemp, forces, readings, w, true)
+    }
+    r.step++
+    taken++
+    for (let i = 0; i < 4; i++) {
+      const use = (forces.compression[i] as number) / (p.axle[i] as AxleSetup).bumpTravel
+      if (use > r.travelPeak) r.travelPeak = use
+    }
+    if (w.distance >= r.nextSample) {
+      sample(r)
+      r.nextSample += RIG_HISTORY_STEP
+    }
+    if (w.broken) {
+      endLap(r)
+      sample(r)
+      r.done = true
+    }
   }
+  return taken
+}
 
-  const broken = w.broken
+/** The run so far as a result: what broke, on which lap, and its trace. */
+export function lapResult(r: LapRunner): LapRun {
+  const broken = r.run.w.broken
   return {
-    laps,
+    laps: r.laps,
     broken,
-    brokenLap: broken ? laps.length : 0,
-    trace: broken && run.rec ? breakTrace(run.rec, broken) : null,
-    wear: w,
+    brokenLap: broken ? r.laps.length : 0,
+    trace: broken && r.run.rec ? breakTrace(r.run.rec, broken) : null,
+    wear: r.run.w,
+    history: r.history,
   }
+}
+
+/** Drive the whole run at once. */
+export function runLaps(setup: RideSetup, wear: WearSetup, rig: Rig, seed: number, opts: LapOptions): LapRun {
+  const r = startLaps(setup, wear, rig, seed, opts)
+  advanceLaps(r, Infinity)
+  return lapResult(r)
 }

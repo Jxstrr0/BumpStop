@@ -1,14 +1,14 @@
 /**
  * The six failures as the player will read them (plan PR 2; the report
- * screen that shows them arrives in plan PR 4): a name, what its trace
- * shows, and where to fix it.
+ * screen in plan PR 4 shows them): a name, what its trace shows, and where
+ * to fix it.
  *
  * `trace` lists the channels the break's trace keeps, from the last few
  * seconds before it let go (see `src/sim/trace.ts`). Corner channels are for
  * the corner that broke; frame channels are for the whole frame.
  *
- * `fixes` are the settings the report will jump to, best first. Their
- * sliders arrive with the parts in plan PR 3.
+ * `fixes` are the settings the report jumps to, best first (at most three).
+ * `src/ui/fixes.ts` turns each into the part or slider it opens.
  */
 import type { StringKey } from './strings'
 import type { FailureKind } from './wear'
@@ -61,7 +61,7 @@ export const FRAME_CHANNELS: readonly FrameChannel[] = [
   'frameDamageRear',
 ]
 
-/** A setting the report can jump to. The slots and sliders arrive in plan PR 3. */
+/** A setting the report can jump to (`src/ui/fixes.ts`). The last two are for the shaker rig's report. */
 export type FixTarget =
   | 'damperSize'
   | 'compression'
@@ -77,6 +77,14 @@ export type FixTarget =
   | 'beadlocks'
   | 'frame'
   | 'gussets'
+  | 'rebound'
+  | 'lighterWheels'
+
+/**
+ * The report's traces turn amber at this share of a limit, for channels
+ * with no warm line of their own (damage, strength in use, joint angle).
+ */
+export const WARM_SHARE = 0.8
 
 export interface FailureInfo {
   kind: FailureKind

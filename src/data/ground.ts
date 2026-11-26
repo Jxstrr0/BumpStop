@@ -12,7 +12,7 @@
  * same bumps under both sides, 0 means each side is on its own.
  */
 
-export type GroundId = 'graded' | 'washboard' | 'whoops' | 'rocks' | 'jumps' | 'iceHeaves'
+export type GroundId = 'graded' | 'washboard' | 'rough' | 'whoops' | 'rocks' | 'jumps' | 'iceHeaves'
 
 export type Range = readonly [number, number]
 
@@ -111,6 +111,11 @@ export const GROUND: Readonly<Record<GroundId, GroundRecipe>> = {
     },
   },
 
+  // Rough gravel: short, sharp-ish chop all over, with nothing big enough to bottom on. Unlike washboard
+  // (which heats dampers most at 20 to 40 km/h), chop works the dampers harder the faster you go, so the
+  // washboard ladder uses it to find fade (plan PR 4).
+  rough: { id: 'rough', roughness: 0.055, roughnessLength: 1.5, trackLink: 0.6, sampleLength: 300 },
+
   whoops: {
     id: 'whoops',
     sampleLength: 600,
@@ -149,4 +154,4 @@ export const GROUND: Readonly<Record<GroundId, GroundRecipe>> = {
   },
 }
 
-export const GROUND_IDS: readonly GroundId[] = ['graded', 'washboard', 'whoops', 'rocks', 'jumps', 'iceHeaves']
+export const GROUND_IDS: readonly GroundId[] = ['graded', 'washboard', 'rough', 'whoops', 'rocks', 'jumps', 'iceHeaves']

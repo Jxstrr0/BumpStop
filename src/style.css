@@ -171,7 +171,6 @@ h3 { font-size: 22px; font-weight: 700; }
 .dot.warm { fill: var(--warm); }
 .dot.hot { fill: var(--hot); }
 .chart-tick, .chart-label { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
-.hot-text { fill: var(--hot); font-weight: 600; }
 .axis { margin: 4px 0 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
 .fix-list { margin: 0 0 12px; padding-left: 20px; }
 .fix-list li { margin: 4px 0; }
@@ -312,6 +311,118 @@ input[type='range'] {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* The shop: rig picker, live view and controls (plan PR 4). */
+[hidden] { display: none !important; }
+.rig-text { margin: 0 0 4px; }
+.start-btn { width: 100%; background: var(--accent); color: var(--on-accent); font-size: 17px; }
+.panel > .start-btn { margin: 12px 0 0; }
+.live { margin-top: 16px; }
+.live-head { margin: 0 0 4px; font-family: var(--mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.live-progress {
+  height: 8px;
+  margin: 0 0 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.live-fill { height: 100%; width: 0; background: var(--ink); }
+/* The four corners as seen from above: front pair on top. */
+.corners { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.corner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  min-width: 0;
+}
+.corner[data-band='hot'] { border-color: var(--hot); box-shadow: inset 0 0 0 1px var(--hot); }
+.corner-name { flex-basis: 100%; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+.corner-oil { font-family: var(--mono); font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.corner .chip { font-size: 11px; padding: 0 6px; }
+.corner-line { flex-basis: 100%; font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.frame-line { margin: 6px 0 12px; font-family: var(--mono); }
+.chip-row { margin: 8px 0; }
+.chip-btn { font-size: 13px; padding: 6px 10px; }
+.controls { margin-top: 8px; }
+.controls .btn { flex: 1 1 0; padding: 8px 6px; }
+.small-btn { font-size: 14px; }
+.cool-text { color: var(--cool); fill: var(--cool); }
+.warm-text { color: var(--warm); fill: var(--warm); }
+.hot-text { color: var(--hot); fill: var(--hot); font-weight: 600; }
+.band.plain { fill: var(--band-cool); }
+.band-word { font-weight: 600; }
+.ghost-line { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.ghost-line.dotted { stroke-dasharray: 1.5 3; }
+.wheel-line { stroke: var(--accent-text); stroke-dasharray: 7 3; }
+.posts-line { stroke: var(--muted); stroke-dasharray: 2 3; }
+.readout-line { margin: 4px 0 0; font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.chart-legend { width: 100%; height: auto; display: block; }
+
+/* The report: one screen at the end of a run. */
+.report { margin-top: 16px; padding-top: 12px; border-top: 2px solid var(--ink); }
+.report .kicker { margin-bottom: 4px; }
+.report-head { margin: 4px 0 8px; font-family: var(--ui); font-size: 19px; font-weight: 700; line-height: 1.3; }
+.report-head:focus { outline: none; }
+.report-head:focus-visible { outline: 3px solid var(--focus); }
+.report h4 { margin: 16px 0 8px; font-family: var(--head); font-size: 20px; font-weight: 700; text-transform: uppercase; }
+.cause { margin: 0 0 8px; }
+.crew { margin: 8px 0 12px; padding: 8px 12px; border-left: 4px solid var(--accent); background: var(--panel-2); border-radius: 0 4px 4px 0; }
+.crew p { margin: 0; font-style: italic; }
+.crew cite { font-size: 13px; color: var(--muted); font-style: normal; }
+.big-chart { min-height: 150px; }
+.chart-title { margin: 8px 0 2px; font-weight: 600; font-size: 15px; }
+.compare { margin: 12px 0 0; }
+.fix-buttons { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+.fix-btn {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px 8px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: var(--panel);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  box-shadow: inset 6px 0 0 var(--accent);
+  cursor: pointer;
+}
+.fix-what { font-weight: 600; }
+.fix-what::after { content: ' →'; }
+.fix-where { font-size: 13px; color: var(--muted); }
+.fix-later { margin: 0; }
+.run-again { width: 100%; }
+
+/* After a fix jump: a bar at the bottom of the screen to go back and run it again. */
+.rerun-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel);
+  border-top: 2px solid var(--ink);
+}
+.rerun-go { flex: 1; background: var(--accent); color: var(--on-accent); }
+.rerun-close { width: 44px; padding: 0; font-size: 20px; }
+
+/* The row a fix jumped to: outlined in the highlighter for a moment. */
+.jumped { outline: 3px solid var(--accent); outline-offset: 2px; animation: jumped 2.2s ease-out; border-radius: 4px; }
+@keyframes jumped {
+  from { background: var(--panel-2); }
+  to { background: transparent; }
 }
 
 /* Footer: the studio credit line (a studio piece, in Space Grotesk). */
