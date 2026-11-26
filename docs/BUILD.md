@@ -26,6 +26,15 @@ times the oil, shed 1.25 times the heat and take 10 °C more before they
 fade; heavy-duty axles are 1.5 times as strong but make the wheels 8%
 heavier.
 
+The newest parts (2017 to 2025) give the last career years something to
+buy: the Zed-Two spool-valve dampers (2017, every class; they damp by
+where the wheel is in its travel, see `docs/RIDE-SIM.md`), a twin-turbo V6
+for the light 4x4 (2017), aramid rally tires and their studded twins
+(2018), forged beadlocks (2019), a twin-turbo diesel six for the heavy
+truck (2020) and gas-charged bump stops (2023). The side-by-side got no
+new engine: its quickest team already runs at the fastest pace the rivals
+allow, and more power tipped it past what a Push run can beat.
+
 Protection and spares are only weight for now: rock hits and the bivouac
 arrive with the raids (plan PR 7). Engine power is shown but the rigs set
 their own speed; the engine's torque already changes how hard a spinning

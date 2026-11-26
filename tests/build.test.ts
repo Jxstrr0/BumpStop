@@ -95,9 +95,10 @@ describe('the stock builds', () => {
 })
 
 describe('studded tires (winter)', () => {
-  it.each(IDS)('%s: come in two casings, a little heavier than plain, and pass the studs to the wear model', (c) => {
+  it.each(IDS)('%s: come in three casings, a little heavier than plain, and pass the studs to the wear model', (c) => {
     const studded = partsFor(c, 'tires').filter((p) => p.slot === 'tires' && p.studded)
-    expect(studded.length).toBe(2)
+    // Studded rally and heavy ply from 1985, studded aramid from 2018.
+    expect(studded.length).toBe(3)
     const plain = stockBuild(c)
     const withStuds = { ...plain, parts: { ...plain.parts, tires: 'studdedRally' } }
     const a = buildTruck(plain)

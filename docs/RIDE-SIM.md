@@ -39,6 +39,32 @@ temperature the oil foams and damping drops off further. That softening is
 **fade**, and it comes from the heat, never a dice roll. The numbers are in
 `DAMPER_OIL` and each damper's settings.
 
+## Spool-valve dampers (2017 on)
+
+The Zed-Two spool-valve dampers meter their oil through ports in a sliding
+spool instead of a stack of shims, which changes two things in the sim:
+
+- **They damp by position** (`positionScale`, numbers in
+  `DamperSetup.position`). Through the middle of the travel they run at 0.9
+  of their setting. In the last 35% of the bump travel the compression
+  damping climbs, on a smooth curve, to 3.5 times its setting at the bump
+  stop, which catches a big landing before it bottoms out. In the last 35%
+  of the droop the rebound damping does the same, so the wheel doesn't slam
+  onto its limit strap. Rebound near full bump and compression near full
+  droop stay soft, so the wheel can always get back to the middle.
+- **Oil heat matters half as much** (`oilSense` 0.5): sharp-edged ports
+  pass thin and thick oil nearly the same. Hot, they keep more of their
+  damping (at 120 °C about 77% against a normal damper's 60%); on a -30 °C
+  morning they damp about 1.6 times as hard as set, against 2.6 times for a
+  normal damper. Because they keep
+  damping when hot they also keep making heat, so they run a few degrees
+  hotter than the electronic dampers late in a long run.
+
+On the torture loop with the stock settings they bottom out less than the
+electronic dampers (about 40% less on the light 4x4, 15% on the heavy truck)
+and go a lap further on both. Firmer at the ends means the tires take more of a big
+landing, so the run usually ends on a tire instead (`tests/lateParts.test.ts`).
+
 ## Long stages
 
 A 300 km stage at 500 steps a second would be millions of steps. So

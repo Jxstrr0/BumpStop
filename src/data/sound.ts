@@ -59,9 +59,12 @@ export const ENGINE_SOUNDS: Readonly<Record<string, EngineSound>> = {
   dieselFour: { firing: even(4), pulse: [1, 0.92, 0.97, 0.9], pulseWidth: 5, fuel: 'diesel', turbo: false, idle: 800, redline: 4200 },
   petrolV8: { firing: V8_FIRING, pulse: V8_BANKS, pulseWidth: 8, fuel: 'petrol', turbo: false, idle: 700, redline: 5800 },
   turboDiesel: { firing: even(4), pulse: [1, 0.94, 0.97, 0.92], pulseWidth: 5, fuel: 'diesel', turbo: true, idle: 800, redline: 4400 },
+  // A 60° V6 fires evenly, every 120°: smoother than the four, smaller than the V8.
+  twinTurboV6: { firing: even(6), pulse: [1, 0.9, 0.97, 0.92, 0.99, 0.91], pulseWidth: 8, fuel: 'petrol', turbo: true, idle: 750, redline: 6200 },
   dieselSix: { firing: even(6), pulse: [1, 0.95, 0.98, 0.94, 1, 0.96], pulseWidth: 5, fuel: 'diesel', turbo: false, idle: 600, redline: 2400 },
   turboDieselSix: { firing: even(6), pulse: [1, 0.96, 0.98, 0.95, 1, 0.97], pulseWidth: 5, fuel: 'diesel', turbo: true, idle: 600, redline: 2500 },
   dieselV8: { firing: V8_FIRING, pulse: V8_BANKS, pulseWidth: 5, fuel: 'diesel', turbo: false, idle: 550, redline: 2300 },
+  twinTurboDieselSix: { firing: even(6), pulse: [1, 0.97, 0.99, 0.96, 1, 0.98], pulseWidth: 5, fuel: 'diesel', turbo: true, idle: 600, redline: 2600 },
   // A 270° parallel twin fires at 0° and 270°, then waits 450°: the lope.
   twin: { firing: [0, 270], pulse: [1, 0.95], pulseWidth: 11, fuel: 'petrol', turbo: false, idle: 1300, redline: 7500 },
   triple: { firing: even(3), pulse: [1, 0.96, 0.93], pulseWidth: 10, fuel: 'petrol', turbo: false, idle: 1200, redline: 8000 },

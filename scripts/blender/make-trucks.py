@@ -336,7 +336,12 @@ def place(obj, parent, loc, rot=None):
 
 
 def fit_name(slot, parts, where=''):
-    """`Fit_<slot>_<part>[-<part>...]_<where>`: shown only when the build has one of those parts."""
+    """`Fit_<slot>_<part>[-<part>...]_<where>`: shown only when the build has one of those parts.
+
+    A part's TWINS (parts that look the same) are added to the name, so the
+    same mesh shows for them too.
+    """
+    parts = list(parts) + [tw for p in parts for tw in TWINS.get(p, []) if tw not in parts]
     name = f'Fit_{slot}_{"-".join(parts)}'
     return f'{name}_{where}' if where else name
 
@@ -387,13 +392,23 @@ LEAF = {
     'heavy': {'F': ['beamLeaf'], 'R': ['rearBeamLeaf']},
 }
 
-DAMPERS = ['twinTube', 'monotube', 'remoteReservoir', 'bypass', 'internalBypass', 'electronic']
+DAMPERS = ['twinTube', 'monotube', 'remoteReservoir', 'bypass', 'internalBypass', 'electronic', 'spoolValve']
 BUMP_STOPS = ['rubber', 'urethane', 'hydraulic']
 AXLES = ['standardAxles', 'heavyDutyAxles', 'chromolyAxles']
 WHEELS = ['steelWheels', 'alloyWheels', 'beadlocks']
 TIRES = ['allTerrain', 'rallyTires', 'heavyPly']
-# Studded tires (plan PR 10) use the same casing as their plain twin; the studs are too small to see.
-STUDDED = {'rallyTires': ['studdedRally'], 'heavyPly': ['studdedPly']}
+# Parts drawn exactly like another, so they share its mesh (`fit_name` adds
+# them): studded tires (plan PR 10) use the same casing as their plain twin
+# (the studs are too small to see), and most of the 2017 to 2025 parts look
+# like the part they grew out of. The spool-valve dampers get their own body.
+TWINS = {
+    'rallyTires': ['studdedRally', 'aramidRally', 'studdedAramid'],
+    'heavyPly': ['studdedPly'],
+    'beadlocks': ['forgedBeadlocks'],
+    'hydraulic': ['gasCharged'],
+    'turboDiesel': ['twinTurboV6'],
+    'turboDieselSix': ['twinTurboDieselSix'],
+}
 
 
 def corner_pos(t, c):
@@ -512,8 +527,10 @@ def kit_rim(name, t, kind):
 # its bottom eye; the game slides them past each other. The bodies get
 # bigger and busier up the price list: a plain black twin-tube, a silver
 # monotube, a remote reservoir on a hose, a fat bypass with its outside
-# tubes and blue adjusters, an internal bypass with a piggyback can, and an
-# electronic shock with its valve box and wire.
+# tubes and blue adjusters, an internal bypass with a piggyback can, an
+# electronic shock with its valve box and wire, and the spool-valve shock
+# (2017): a black body with a square valve block under its top eye, three
+# amber spool caps in a row on the block, and a piggyback can.
 
 def kit_shock_body(name, length, s, kind):
     body_len = length * 0.62
@@ -575,6 +592,18 @@ def kit_shock_body(name, length, s, kind):
         p.tube((br * 2.2, 0, -L * 0.04), (br * 2.2, 0, -L * 0.12), br * 0.85, 'Anodised', segments=12)
         p.tube((br * 2.2, 0, -L * 0.48), (br * 2.2, 0, -L * 0.54), br * 0.5, 'Anodised', segments=10)
         p.box((br * 1.1, 0, -br * 1.6), (br * 2.0, br * 0.9, br * 1.2), 'Graphite')
+    elif kind == 'spoolValve':
+        eye()
+        p.tube((0, 0, -br * 2.6), (0, 0, -L), br * 1.2, 'Graphite', segments=14)
+        p.tube((0, 0, -L * 0.9), (0, 0, -L), br * 1.28, 'Steel', segments=14)
+        # The valve block, and its three spools' caps in a row on the outside face.
+        p.box((br * 0.5, 0, -br * 1.9), (br * 3.4, br * 2.4, br * 1.6), 'Graphite', bevel=br * 0.15)
+        for k in (-1, 0, 1):
+            p.tube((br * 0.5 + k * br * 1.05, br * 1.2, -br * 1.9), (br * 0.5 + k * br * 1.05, br * 1.55, -br * 1.9),
+                   br * 0.36, 'Urethane', segments=8)
+        # The piggyback can off the block.
+        p.tube((br * 2.4, 0, -br * 2.6), (br * 2.4, 0, -L * 0.5), br * 0.8, 'Graphite', segments=12)
+        p.tube((br * 2.4, 0, -L * 0.5), (br * 2.4, 0, -L * 0.55), br * 0.86, 'Steel', segments=12)
     else:  # electronic
         eye()
         p.tube((0, 0, -br), (0, 0, -L), br * 1.2, 'Graphite', segments=16)
@@ -1141,7 +1170,7 @@ def build_truck(cls, t, materials):
         if side < 0:
             wh.rotation_euler = (0, 0, math.pi)
         for k in TIRES:
-            place(link(fit_name('tires', [k] + STUDDED.get(k, []), c), tires[k]), wh, (0, 0, 0))
+            place(link(fit_name('tires', [k], c), tires[k]), wh, (0, 0, 0))
         for k in WHEELS:
             place(link(fit_name('wheels', [k], c), rims[k]), wh, (0, 0, 0))
 
