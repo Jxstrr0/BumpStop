@@ -20,6 +20,8 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
 - The shop's three rigs (and how fast they play on screen):
   `src/data/rigs.ts`. The crew chief's notes and the report's words:
   `src/data/strings.ts`. In plain words: `docs/RIGS.md`.
+- How it sounds (engine voices, gears, how loud each sound is, the buzz
+  patterns): `src/data/sound.ts`. In plain words: `docs/SOUND.md`.
 - Colours: the top of `src/style.css`.
 - The plan: `docs/BUMP-STOP-PLAN.md`. Where it's up to: `docs/STATUS.md`.
 - Names: `docs/NAMES.md`.

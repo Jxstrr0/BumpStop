@@ -15,13 +15,20 @@
  * Each class and rig always drives the same road, so a re-run after a fix
  * shows exactly what the fix changed. The truck is copied when the run
  * starts: changing the build mid-run changes the next run, not this one.
+ *
+ * Sound (plan PR 6): each frame hands what the truck felt to the sound
+ * (`src/audio/sound.ts`), which plays the engine, the clatter, the hits and
+ * the hiss, and the break when something lets go. Sound and Buzz switches
+ * sit under the start button.
  */
+import { heatShare } from '../audio/cues'
+import { makeSound } from '../audio/sound'
 import { CLASSES, type ClassId } from '../data/classes'
 import { WARM_SHARE } from '../data/failures'
 import { RIGS, RIG_VIEW, SHAKER, SHOP_RIGS, type RigId, type RigPiece, type ShopRigId } from '../data/rigs'
 import { t, tf, type StringKey } from '../data/strings'
 import type { BuiltTruck } from '../sim/build'
-import { advanceLaps, lapLength, lapResult, startLaps, type LapRunner, type RunHistory } from '../sim/laps'
+import { advanceLaps, lapLength, lapResult, startLaps, takeFeel, type LapRunner, type RunHistory } from '../sim/laps'
 import { advanceShaker, shakerSteps, startShaker, type ShakerPoint, type ShakerRunner } from '../sim/shaker'
 import { fromCelsius, msToKmh } from '../sim/units'
 import type { BuildStore } from './buildStore'
@@ -105,6 +112,26 @@ export function shopPanel(store: BuildStore): HTMLElement {
   const start = el('button', 'btn start-btn')
   start.type = 'button'
   start.addEventListener('click', () => begin())
+
+  // --- Sound and buzz switches ---
+  const sound = makeSound()
+  const soundRow = el('div', 'btn-row chip-row sound-row')
+  const toggle = (label: StringKey, on: () => boolean, set: (on: boolean) => void) => {
+    const b = el('button', 'btn chip-btn')
+    b.type = 'button'
+    const show = () => {
+      b.textContent = tf(on() ? 'sound.on' : 'sound.off', { what: t(label) })
+      b.setAttribute('aria-pressed', String(on()))
+    }
+    b.addEventListener('click', () => {
+      set(!on())
+      show()
+    })
+    show()
+    soundRow.append(b)
+  }
+  if (sound.canPlay) toggle('sound.sound', sound.soundOn, sound.setSound)
+  if (sound.canBuzz) toggle('sound.buzz', sound.buzzOn, sound.setBuzz)
 
   // --- The live view ---
   const live = el('div', 'live')
@@ -215,6 +242,7 @@ export function shopPanel(store: BuildStore): HTMLElement {
   /** Back to the start: no run, no report. */
   function reset(): void {
     cancelAnimationFrame(raf)
+    sound.stop()
     active = null
     live.hidden = true
     reportHolder.replaceChildren()
@@ -237,15 +265,19 @@ export function shopPanel(store: BuildStore): HTMLElement {
 
   function begin(): void {
     cancelAnimationFrame(raf)
+    // Every way in here is a tap, which is when browsers let sound start.
+    sound.wake()
     const cls = store.cls()
     const truck = store.truck()
     const ghost = ghosts.get(ghostKey(cls, rig)) ?? null
     if (rig === 'shaker') {
       const runner = startShaker(truck.ride, AIR)
       active = { kind: 'shaker', cls, truck, runner, ghost: ghost?.kind === 'shaker' ? ghost.points : null, total: shakerSteps(runner), taken: 0 }
+      sound.startShaker(truck.build.parts.engine, cls)
     } else {
       const runner = startLaps(truck.ride, truck.wear, RIGS[rig], seedFor(cls, rig), { airTemp: AIR })
       active = { kind: 'laps', rig, cls, truck, runner, ghost: ghost?.kind === 'laps' ? ghost : null }
+      sound.startLaps(truck.build.parts.engine, cls)
     }
     fast = false
     skipping = false
@@ -284,9 +316,38 @@ export function shopPanel(store: BuildStore): HTMLElement {
       carry -= n
       step(a, n)
     }
+    hear(a, dt)
     drawLive(false)
     if (a.runner.done) finish(false)
     else raf = requestAnimationFrame(tick)
+  }
+
+  /** Tell the sound what the truck did this frame. */
+  function hear(a: Active, dt: number): void {
+    if (a.kind === 'shaker') {
+      const r = a.runner
+      const beat = r.freqs[Math.min(r.index, r.freqs.length - 1)] as number
+      const latest = r.points[r.points.length - 1]
+      sound.shakerFrame(dt, beat, latest ? Math.max(...latest.wheel) : 1, SHAKER.minFreq, SHAKER.maxFreq)
+      return
+    }
+    const r = a.runner
+    const piece = r.rig.pieces[r.piece] as RigPiece
+    const ride = a.truck.ride
+    let heat = -Infinity
+    for (let i = 0; i < 4; i++) {
+      const damper = (i < 2 ? ride.front : ride.rear).damper
+      heat = Math.max(heat, heatShare(r.s.oilTemp[i] as number, damper.warmFrom, damper.redLine))
+    }
+    sound.lapFrame({
+      realDt: dt,
+      skipping,
+      feel: takeFeel(r),
+      ground: piece.ground,
+      speed: r.lapSpeed * piece.pace,
+      heat,
+      heatCapacity: ride.front.damper.heatCapacity,
+    })
   }
 
   function step(a: Active, n: number): void {
@@ -416,6 +477,8 @@ export function shopPanel(store: BuildStore): HTMLElement {
     if (!a) return
     active = null
     controls.hidden = true
+    if (a.kind === 'laps' && a.runner.run.w.broken && !stopped) sound.broke(a.runner.run.w.broken.kind)
+    else sound.stop()
     drawLive(true)
     const ctx = { rig, cls: a.cls, truck: a.truck, onFix, onRunAgain: () => begin() }
     let report: HTMLElement
@@ -449,7 +512,7 @@ export function shopPanel(store: BuildStore): HTMLElement {
     if (change === 'class') reset()
   })
 
-  box.append(testing, rigRow, rigText, lastLine, start, live, reportHolder, rerun)
+  box.append(testing, rigRow, rigText, lastLine, start, soundRow, live, reportHolder, rerun)
   sync()
   return box
 }
