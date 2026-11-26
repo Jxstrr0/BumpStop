@@ -5,6 +5,7 @@
  * phone's dark mode.
  */
 import * as THREE from 'three'
+import { tierSettings } from './tiers'
 
 /** A colour from a CSS variable on the page, e.g. `--bg`. */
 export function cssColour(name: string, fallback: string): THREE.Color {
@@ -20,16 +21,44 @@ export function isDark(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
-/** A renderer sized for phones: no more than two pixels per CSS pixel. */
+/**
+ * A renderer for one 3D view, at the graphics tier in play
+ * (`src/render/tiers.ts`). Smooth edges are fixed here, when the view is
+ * made; the rest follows the tier live through `applyTier`.
+ */
 export function makeRenderer(canvas: HTMLCanvasElement): THREE.WebGLRenderer {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'low-power' })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+  const tier = tierSettings()
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: tier.antialias, alpha: false, powerPreference: 'low-power' })
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.05
+  // Always on: whether anything casts a shadow is the sun's `castShadow` (see applyTier).
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFShadowMap
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, tier.pixelRatioCap))
   return renderer
+}
+
+/**
+ * Set a view's pixels and shadows to the tier in play. Turning the sun's
+ * shadow off skips the whole shadow pass (the trucks aren't drawn twice);
+ * changing `castShadow` also makes three.js rebuild the materials to match.
+ * Returns true when the canvas needs its size set again.
+ */
+export function applyTier(renderer: THREE.WebGLRenderer, sun: THREE.DirectionalLight): boolean {
+  const tier = tierSettings()
+  const ratio = Math.min(window.devicePixelRatio || 1, tier.pixelRatioCap)
+  const resize = renderer.getPixelRatio() !== ratio
+  if (resize) renderer.setPixelRatio(ratio)
+  sun.castShadow = tier.shadows
+  sun.shadow.radius = tier.shadowBlur
+  if (sun.shadow.mapSize.x !== tier.shadowMap) {
+    sun.shadow.mapSize.set(tier.shadowMap, tier.shadowMap)
+    // The old map is the wrong size: let three.js make a new one.
+    sun.shadow.map?.dispose()
+    sun.shadow.map = null
+  }
+  return resize
 }
 
 /**
@@ -42,8 +71,9 @@ export function addLights(scene: THREE.Scene, reach: number): { sun: THREE.Direc
   scene.add(hemi)
   const sun = new THREE.DirectionalLight(0xfff3e0, 2.6)
   sun.position.set(reach * 0.6, reach * 1.2, -reach * 0.8)
-  sun.castShadow = true
-  sun.shadow.mapSize.set(1024, 1024)
+  sun.castShadow = tierSettings().shadows
+  sun.shadow.mapSize.set(tierSettings().shadowMap, tierSettings().shadowMap)
+  sun.shadow.radius = tierSettings().shadowBlur
   const s = sun.shadow.camera
   s.left = -reach
   s.right = reach

@@ -3,8 +3,9 @@
  * PR 8), then shows one screen: the "roadbook" look (plan PR 0) with the
  * career (plan PR 9), the build screen (plan PR 3), the shop's three rigs
  * and the report (plan PR 4), which test the truck, the raids (plan PR 7),
- * which race it, the saves and backups, and the help (plan PR 11). Then it
- * hides the loading screen.
+ * which race it, the saves and backups, the help (plan PR 11), and the
+ * settings (graphics and offline play, plan PR 12). Then it hides the
+ * loading screen and starts the offline worker.
  */
 import '@fontsource/space-grotesk/latin-500.css'
 import '@fontsource/big-shoulders/latin-700.css'
@@ -20,8 +21,10 @@ import { openGarage, type Garage } from './ui/garage'
 import { helpPanel } from './ui/help'
 import { bindLoadingScreen } from './ui/loading'
 import { roadbookStrip } from './ui/preview'
+import { startOffline } from './pwa/register'
 import { raidPanel } from './ui/raid'
 import { backupReminder, savesPanel } from './ui/saves'
+import { settingsPanel } from './ui/settings'
 import { shopPanel } from './ui/shop'
 
 const loading = bindLoadingScreen()
@@ -79,6 +82,7 @@ function gameScreen(app: HTMLElement, garage: Garage): void {
     raidPanel(store, garage.raid, career.raid),
     savesPanel(garage),
     help.element,
+    settingsPanel(),
     roadbookStrip(),
     el('p', 'note', t('preview.note')),
     footer(),
@@ -94,6 +98,8 @@ async function boot(): Promise<void> {
     loading.progress(0.6)
     gameScreen(app, garage)
     loading.done()
+    // Offline play (plan PR 12): a new version waits for the player, and the garage saves before it swaps in.
+    startOffline(() => garage.flush())
   } catch (err) {
     console.error(err)
     loading.fail(t('boot.failed'))

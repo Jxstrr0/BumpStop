@@ -1003,6 +1003,28 @@ const STRINGS = {
   'guide.resultsText': 'Your fee, any bonus for how they did, and the reputation it earned. Then Onward to the next raid.',
   'guide.finished': 'First job done. That’s the loop: build it, break it, tune it, prove it. Next come more contracts, then a truck of your own. The Help panel at the bottom has damper lessons and a glossary whenever you want them.',
   'boot.failed': 'Bump Stop could not start. Reload to try again.',
+
+  'settings.title': 'Settings',
+  'graphics.title': 'Graphics',
+  'graphics.lead': 'How much the 3D draws. Auto starts high and steps down if the 3D stutters on this phone.',
+  'graphics.auto': 'Auto',
+  'graphics.lite': 'Lite',
+  'graphics.full': 'Full',
+  'graphics.ultra': 'Ultra',
+  'graphics.liteText': 'No shadows, fewer trees and less dust, drawn at a lower resolution. For older phones.',
+  'graphics.fullText': 'Shadows, the whole forest and sharp edges. Most phones.',
+  'graphics.ultraText': 'Softer, sharper shadows, a deeper forest, more dust and the finest road. Fast phones and computers.',
+  'graphics.now': 'Drawing at {tier}.',
+  'graphics.nowAuto': 'Auto is drawing at {tier}.',
+  'graphics.pinned': 'Drawing at {tier} for this visit (set in the address).',
+  'graphics.reload': 'Smooth edges change the next time the game opens.',
+  'offline.title': 'Offline',
+  'offline.ready': 'Works offline: yes. This copy opens with no signal.',
+  'offline.pending': 'Works offline: getting ready. Open the game once more to finish.',
+  'offline.off': 'Works offline: not on this browser.',
+  'offline.update': 'A new version of Bump Stop is ready. Your garage is saved first.',
+  'offline.reload': 'Reload',
+  'offline.later': 'Later',
 } as const
 
 export type StringKey = keyof typeof STRINGS

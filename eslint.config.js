@@ -20,6 +20,11 @@ export default tseslint.config(
     },
   },
   {
+    // The offline worker runs in its own scope, not a page (plan PR 12).
+    files: ['src/pwa/sw.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
+  {
     files: ['scripts/**/*.{js,mjs,ts}', '*.config.{js,ts}', 'tests/**/*.ts'],
     languageOptions: { globals: globals.node },
   },

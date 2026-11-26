@@ -20,9 +20,10 @@ import type { ClassId } from '../data/classes'
 import type { FailureKind } from '../data/wear'
 import type { Profile } from '../sim/ground'
 import type { Pose } from '../sim/poses'
-import { addLights, applyLook, cssColour, isDark, makeRenderer, onLookChange } from './look'
+import { addLights, applyLook, applyTier, cssColour, isDark, makeRenderer, onLookChange } from './look'
 import { Puffs } from './particles'
 import { Forest, placePieces, stripGeometry } from './terrain'
+import { frameTime, onTierChange, tierSettings } from './tiers'
 import { TruckModel, type FittedParts, type Stance, type TruckPose } from './truckModel'
 
 export interface BreakFocus {
@@ -189,8 +190,9 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const from = first.distance - BEHIND
     const to = last.distance + AHEAD
     strip.geometry.dispose()
-    strip.geometry = stripGeometry(pieces, { from, to, origin, halfTrack: truck.track / 2, step: 0.1, night })
-    forest.plant(from, to, origin, truck.track / 2, night)
+    const tier = tierSettings()
+    strip.geometry = stripGeometry(pieces, { from, to, origin, halfTrack: truck.track / 2, step: tier.roadStep, night })
+    forest.plant(from, to, origin, truck.track / 2, night, tier.treeRows)
   }
 
   function poseAt(time: number): Pose {
@@ -286,8 +288,8 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
 
   function emitDust(p: Pose, dt: number): void {
     if (!truck || !run?.road || p.speed < 2) return
-    // More dust the faster it goes; it trails behind each wheel.
-    const chance = Math.min(1, p.speed * dt * 1.2)
+    // More dust the faster it goes (and the higher the graphics tier); it trails behind each wheel.
+    const chance = Math.min(1, p.speed * dt * 1.2 * tierSettings().dust)
     for (let i = 0; i < 4; i++) {
       if (Math.random() > chance) continue
       const c = truck.cornerPosition(i, focusPos)
@@ -370,6 +372,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     raf = 0
     const dt = Math.min(0.1, (now - lastTime) / 1000)
     lastTime = now
+    if (!ended) frameTime(dt)
     draw(dt)
     loop()
   }
@@ -393,6 +396,12 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     if (visible) loop()
   })
   watcher.observe(canvas)
+  // A new graphics tier (picked, or Auto stepping down): new pixels, shadows, road and trees.
+  const stopTier = onTierChange(() => {
+    if (applyTier(renderer, lights.sun)) resize()
+    if (clip.length) buildStrip()
+    if (!raf) draw(0)
+  })
 
   look()
   resize()
@@ -442,6 +451,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       sizer.disconnect()
       watcher.disconnect()
       stopLook()
+      stopTier()
       truck?.dispose()
       strip.geometry.dispose()
       dust.dispose()

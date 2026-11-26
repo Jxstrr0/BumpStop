@@ -35,6 +35,10 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
 - The help (the damper lessons' toy truck corner and roads:
   `src/data/lessons.ts`; the glossary's list: `src/data/glossary.ts`; every
   word of both: `src/data/strings.ts`). In plain words: `docs/HELP.md`.
+- Graphics tiers (Lite, Full, Ultra: pixels, shadows, trees, dust, road
+  detail, and when Auto steps down): `src/data/graphics.ts`. Offline play
+  and graphics in plain words: `docs/OFFLINE.md`. If the game ever acts
+  stale, open it with `?nosw` on the end of the address.
 - Colours: the top of `src/style.css`.
 - The plan: `docs/BUMP-STOP-PLAN.md`. Where it's up to: `docs/STATUS.md`.
 - Names: `docs/NAMES.md`.
