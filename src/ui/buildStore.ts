@@ -5,7 +5,7 @@
  * slot after each change (plan PR 8).
  */
 import { CLASSES, type ClassId } from '../data/classes'
-import type { TruckBuild } from '../data/kit'
+import type { AxleSettings, TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR } from '../data/parts'
 import { buildTruck, shopRules, stockBuild, tidyBuild, type BuildRules, type BuiltTruck } from '../sim/build'
 import type { TruckLog } from '../sim/logbook'
@@ -115,5 +115,42 @@ export function makeBuildStore(start?: StoreStart): BuildStore {
       changed('bench')
     },
     rules: () => (bench ? bench.rules(builds[cls]) : shopRules(cls, year)),
+  }
+}
+
+/** One end of the truck. */
+export type End = 'front' | 'rear'
+
+/**
+ * Change one tune setting. With the axles linked, both ends get the same
+ * value, so one slider tunes the whole truck; unlinked, only `end` changes.
+ * Either way the other settings keep what they had, so unlinking leaves the
+ * values where they are, ready to tune apart again.
+ */
+export function withSetting(b: TruckBuild, end: End, key: keyof AxleSettings, value: number, linked: boolean): TruckBuild {
+  if (!linked) return { ...b, [end]: { ...b[end], [key]: value } }
+  return { ...b, front: { ...b.front, [key]: value }, rear: { ...b.rear, [key]: value } }
+}
+
+/**
+ * "Link front and rear" is remembered on this phone (not in a save slot),
+ * like the other screen choices. Everything is wrapped in try, because
+ * private browsing can refuse localStorage; then it just starts unlinked.
+ */
+const LINK_KEY = 'bumpstop.linkAxles'
+
+export function readLinkAxles(storage: Pick<Storage, 'getItem'> | undefined = globalThis.localStorage): boolean {
+  try {
+    return storage?.getItem(LINK_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function writeLinkAxles(linked: boolean, storage: Pick<Storage, 'setItem'> | undefined = globalThis.localStorage): void {
+  try {
+    storage?.setItem(LINK_KEY, linked ? '1' : '0')
+  } catch {
+    // Nowhere to keep it; the toggle still works until the page reloads.
   }
 }

@@ -792,3 +792,10 @@ body.photo-open { overflow: hidden; }
 .photo-row .btn { flex: 1 1 0; }
 .photo-take { background: var(--accent); color: var(--on-accent); }
 .photo-note { margin: 6px 0 0; min-height: 1em; }
+
+/* "Link front and rear" on the build screen: a big tick box (44 px row) above the axles. */
+.link-axles { margin: 8px 0; }
+.link-label { display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 600; cursor: pointer; }
+.link-label input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
+.link-axles .small { margin: 0 0 4px; }
+.link-chip { font-family: var(--mono); font-size: 12px; text-transform: none; vertical-align: middle; color: var(--accent-text); }

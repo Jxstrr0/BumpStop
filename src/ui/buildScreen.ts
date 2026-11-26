@@ -11,13 +11,11 @@ import { KITS, TUNE, type AxleSettings } from '../data/kit'
 import { SLOTS, type Part, type SlotId } from '../data/parts'
 import { t, tf, type StringKey } from '../data/strings'
 import { changeCost, checkBuild, minPressure, partIn, partsFor, type BuildProblem, type CornerGeometry } from '../sim/build'
-import { FIRST_YEAR, LAST_YEAR, type BuildStore } from './buildStore'
+import { FIRST_YEAR, LAST_YEAR, readLinkAxles, withSetting, writeLinkAxles, type BuildStore, type End } from './buildStore'
 import { shareBuildBlock } from './saves'
 import { truckCardBlock } from './truckCard'
 import { el, num, oneOpenAtATime } from './dom'
 import { truckView } from './truckView'
-
-type End = 'front' | 'rear'
 
 /** One slider: its setting, label, range in screen units, and how to show its value. */
 interface Slider {
@@ -153,8 +151,11 @@ export function buildPanel(store: BuildStore): HTMLElement {
   reset.type = 'button'
   reset.addEventListener('click', () => store.resetClass())
 
+  // "Link front and rear": one slider sets both axles. Remembered on this phone.
+  let linked = readLinkAxles()
+
   // Pieces that refresh() updates without rebuilding, so a slider being dragged keeps its place.
-  let outputs: { end: End; slider: Slider; out: HTMLOutputElement }[] = []
+  let outputs: { end: End; slider: Slider; out: HTMLOutputElement; input: HTMLInputElement }[] = []
   let geometry: { end: End; p: HTMLElement }[] = []
 
   function refresh(): void {
@@ -212,7 +213,12 @@ export function buildPanel(store: BuildStore): HTMLElement {
     for (const p of found) problems.append(el('li', '', problemText(p, store)))
     if (found.length === 0) problems.append(el('li', 'ok', t('build.ready')))
 
-    for (const { end, slider, out } of outputs) out.textContent = slider.text(b[end][slider.key], truck[end])
+    for (const { end, slider, out, input } of outputs) {
+      out.textContent = slider.text(b[end][slider.key], truck[end])
+      // With the axles linked, the other axle's slider follows the one being dragged.
+      // (The one under the thumb is left alone so it doesn't jump.)
+      if (input !== document.activeElement) input.value = String(slider.show(b[end][slider.key]))
+    }
     for (const { end, p } of geometry) {
       const c = truck[end]
       p.textContent = tf('build.geometry', {
@@ -272,7 +278,10 @@ export function buildPanel(store: BuildStore): HTMLElement {
     details.dataset.end = end
     details.open = open
     oneOpenAtATime(details, 'build-tune')
-    details.append(el('summary', '', t(end === 'front' ? 'build.front' : 'build.rear')))
+    const head = el('summary', '', t(end === 'front' ? 'build.front' : 'build.rear'))
+    // A tag on each axle while they're linked, so it's clear the other end moves too.
+    if (linked) head.append(' ', el('span', 'chip link-chip', t('build.linkedChip')))
+    details.append(head)
     const geo = el('p', 'small geometry')
     geometry.push({ end, p: geo })
     details.append(geo)
@@ -293,14 +302,33 @@ export function buildPanel(store: BuildStore): HTMLElement {
       input.addEventListener('input', () => {
         const now = store.build()
         const value = slider.store(Number(input.value))
-        store.setBuild({ ...now, [end]: { ...now[end], [slider.key]: value } }, 'setting')
+        store.setBuild(withSetting(now, end, slider.key, value, linked), 'setting')
       })
-      outputs.push({ end, slider, out })
+      outputs.push({ end, slider, out, input })
       row.append(label, out, input)
       details.append(row)
     }
     if (!slidersFor(store).some((s) => s.key === 'rebound')) details.append(el('p', 'small', t('build.noAdjusters')))
     return details
+  }
+
+  /** The "Link front and rear" tick box, with a line saying what it does right now. */
+  function linkBlock(): HTMLElement {
+    const wrap = el('div', 'link-axles')
+    const label = el('label', 'link-label')
+    const tick = el('input')
+    tick.type = 'checkbox'
+    tick.id = 'tune-link'
+    tick.checked = linked
+    tick.addEventListener('change', () => {
+      linked = tick.checked
+      writeLinkAxles(linked)
+      // Nothing changes on the truck: unlinking keeps every value, so the ends can be tuned apart again.
+      render()
+    })
+    label.append(tick, ' ', t('build.link'))
+    wrap.append(label, el('p', 'small', t(linked ? 'build.linkOn' : 'build.linkOff')))
+    return wrap
   }
 
   /** Rebuild the class, part and tune sections, keeping open sections open and focus where it was. */
@@ -332,6 +360,7 @@ export function buildPanel(store: BuildStore): HTMLElement {
     tuneHolder.replaceChildren(
       el('h3', '', t('build.tune')),
       el('p', 'small', t('build.tuneLead')),
+      linkBlock(),
       axleBlock('front', firstTime || openEnds.has('front')),
       axleBlock('rear', openEnds.has('rear')),
     )
