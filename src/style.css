@@ -540,6 +540,24 @@ input[type='range'] {
   cursor: pointer;
 }
 
+/* ── Ghost trucks: race your best or a friend's ── */
+.ghost-race { margin: 12px 0 4px; padding: 10px 12px; background: var(--panel); border: 1px dashed var(--line); border-radius: 4px; }
+.ghost-title { margin: 0 0 6px; font-family: var(--head); font-size: 18px; text-transform: uppercase; }
+.ghost-race .chip-row { margin: 0 0 6px; }
+.ghost-line { margin: 0; }
+.ghost-share { margin-top: 8px; }
+.race-line { font-weight: 600; }
+.ghost-verdict {
+  margin: 8px 0;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 2px dashed var(--cool);
+  border-left-width: 8px;
+  border-radius: 4px;
+}
+.ghost-verdict p { margin: 0 0 4px; }
+.ghost-verdict p:last-child { margin-bottom: 0; }
+
 /* ── The career (plan PR 9b) ── */
 .career-status .readout-line { margin-bottom: 4px; }
 .career-broke {

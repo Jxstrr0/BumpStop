@@ -28,7 +28,7 @@ Each save carries a format number (`v`); when the format changes, the
 | 3 | PR 13d | Six raids a year instead of eight. The career's `next` (its place in the calendar) moves onto the new calendar: the same raid where it's still there, otherwise the next one that is (`SAVE.calendarV2`). A job already under way at a raid that left the calendar carries on and is settled at that next raid. |
 
 Added without a new format number (so it never clashes with other work on
-the save format): since 1.4.0.0 a raid keeps its truck's condition (`cond`:
+the save format): since 1.5.0.0 a raid keeps its truck's condition (`cond`:
 shock oil, bushings and springs per axle), the money spent on parts at the
 bivouacs (`spent`) and, for a career raid, the money it had for parts
 (`entry.budget`). A raid saved before that reads back with a fresh truck and
@@ -62,6 +62,14 @@ only ever read on your own phone.
 One truck (class, parts and settings) in the same format, about 400
 characters, to share a setup with a friend. Parts that don't exist in their
 version go back to stock.
+
+## Ghost codes: `BMPG1:`
+
+One ghost truck (a build and its best run on the washboard ladder or the
+torture loop) in the same format, about 500 characters, so a friend can
+race it. It holds no recording: their phone drives the run again from the
+build (`docs/RIGS.md`, Ghost trucks). Pasting a truck build code there says
+so instead of loading it.
 
 ## Backups
 

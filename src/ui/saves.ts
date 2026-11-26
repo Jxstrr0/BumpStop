@@ -26,7 +26,7 @@ import type { Garage, SaveStatus } from './garage'
 
 const className = (cls: ClassId) => t(CLASSES.find((c) => c.id === cls)!.name)
 
-function button(text: string, cls = 'btn small-btn'): HTMLButtonElement {
+export function button(text: string, cls = 'btn small-btn'): HTMLButtonElement {
   const b = el('button', cls, text)
   b.type = 'button'
   return b
@@ -71,7 +71,7 @@ function backupText(last: number | null): string {
 }
 
 /** Copy text to the clipboard. False if the browser won't (then the player copies it from the box by hand). */
-async function copyText(text: string): Promise<boolean> {
+export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text)
     return true
@@ -81,7 +81,7 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /** A read-only box showing a code, selected when tapped so it's easy to copy by hand. */
-function codeBox(label: string, id: string): { wrap: HTMLElement; box: HTMLTextAreaElement } {
+export function codeBox(label: string, id: string): { wrap: HTMLElement; box: HTMLTextAreaElement } {
   const wrap = el('div', 'code-wrap')
   const lab = el('label', 'setting-label', label)
   const box = el('textarea', 'code-box')
@@ -97,7 +97,7 @@ function codeBox(label: string, id: string): { wrap: HTMLElement; box: HTMLTextA
 }
 
 /** An input box for pasting a code. */
-function pasteBox(label: string, id: string): { wrap: HTMLElement; box: HTMLTextAreaElement } {
+export function pasteBox(label: string, id: string): { wrap: HTMLElement; box: HTMLTextAreaElement } {
   const wrap = el('div', 'code-wrap')
   const lab = el('label', 'setting-label', label)
   const box = el('textarea', 'code-box')
@@ -111,7 +111,7 @@ function pasteBox(label: string, id: string): { wrap: HTMLElement; box: HTMLText
   return { wrap, box }
 }
 
-function errorText(err: unknown): string {
+export function errorText(err: unknown): string {
   return err instanceof SaveCodeError ? t(err.key) : t('code.notValid')
 }
 
