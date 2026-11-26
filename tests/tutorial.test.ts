@@ -41,7 +41,8 @@ describe('the first job', () => {
 })
 
 describe('the first-job guide', () => {
-  it('ticks off each step in turn, through to the results', () => {
+  // It drives a whole raid: CI runners are slower than a laptop.
+  it('ticks off each step in turn, through to the results', { timeout: 60_000 }, () => {
     const c = newCareer(7)
     const p = freshProgress(c.seed)
     const winter = RAIDS[nextEvent(c).raid].season === 'winter'

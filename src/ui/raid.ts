@@ -25,7 +25,7 @@ import { t, tf, type StringKey } from '../data/strings'
 import { checkBuild, partIn } from '../sim/build'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
-  advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, leaveCheckpoint,
+  advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isRestDay, leaveCheckpoint,
   parTime, raidOf, raidTruck, stageKm, standings, startStage, 
   type IceNote, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
 } from '../sim/raid'
@@ -630,7 +630,9 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
   function bivouacScreen(): void {
     stopTimers()
     const s = state!
-    const head = el('h3', 'raid-day', tf('raidUi.bivouac', { n: String(s.stage) }))
+    // The Long One's halfway rest day (plan PR 13): a whole day in the bivouac.
+    const rest = isRestDay(s)
+    const head = el('h3', 'raid-day', rest ? t('raidUi.restDay') : tf('raidUi.bivouac', { n: String(s.stage) }))
     const jobs = bivouacJobs(s)
     const picked = new Set<Job>()
     const hoursLine = el('p', 'readout-line')
@@ -686,7 +688,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     sync()
     show(
       head,
-      el('p', 'small', tf('raidUi.bivouacLead', { hours: num(bivouacHours(s)) })),
+      el('p', 'small', tf(rest ? 'raidUi.restDayLead' : 'raidUi.bivouacLead', { hours: num(bivouacHours(s)) })),
       hoursLine, hoursBar, sparesLine,
       jobs.length ? list : el('p', 'small', t('raidUi.noJobs')),
       done, retireButton(),

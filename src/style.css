@@ -561,6 +561,11 @@ input[type='range'] {
   font-weight: 800;
   border-radius: 4px;
 }
+/* The road to the Long One and the finale (plan PR 13). */
+.career-road { margin: 4px 0; }
+.career-road p { margin: 0 0 4px; }
+.career-finale { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.career-finale p:not(.career-win) { margin: 0 0 6px; }
 .career-calendar { margin-top: 16px; border-top: 1px solid var(--line); }
 .career-calendar > summary {
   min-height: 44px;

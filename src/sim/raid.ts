@@ -290,9 +290,14 @@ export function raidSeed(state: RaidState): number {
   return state.entry.seed ?? raidOf(state).seed
 }
 
-/** Mechanic hours at each bivouac. */
+/** Is tonight the raid's rest day (plan PR 13)? Only the Long One has one, at halfway. */
+export function isRestDay(state: RaidState): boolean {
+  return state.phase === 'bivouac' && state.stage === raidOf(state).restAfter
+}
+
+/** Mechanic hours at this bivouac: a rest day gives the crew a whole day. */
 export function bivouacHours(state: RaidState): number {
-  return state.entry.hours ?? RAID.bivouacHours
+  return (state.entry.hours ?? RAID.bivouacHours) * (isRestDay(state) ? RAID.restDayHours : 1)
 }
 
 /** Who else is entered in the player's class. */

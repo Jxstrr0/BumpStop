@@ -30,9 +30,9 @@ import { t, tf, type StringKey } from '../data/strings'
 import { changeCost, checkBuild, findPart, partIn, shopRules, stockBuild, tidyBuild, type BuildProblem } from '../sim/build'
 import {
   buyTruck, buyUpgrade, cheapestBuild, contractProblems, contractRaid, contractRules, discountOf, driveAutoStage, driverFee,
-  dropContract, entryFee, entryProblems, enterOwn, eventDays, fitOwn, isBroke, newCareer, nextEvent, offers, ownRules,
+  dropContract, entryFee, entryProblems, enterOwn, eventDays, fitOwn, isBroke, longOneRoad, newCareer, nextEvent, offers, ownRules,
   sellTruck, setContractBuild, settle, sponsorOf, sponsorPay, takeContract, truckPrice, truckValue, upgradeProblem,
-  type CareerState, type Contract, type EntryProblem, type NewsItem, type Settlement,
+  type CareerState, type Contract, type EntryProblem, type LongOneStory, type NewsItem, type Settlement,
 } from '../sim/career'
 import { raidOf, standings, type RaidState } from '../sim/raid'
 import type { GlossaryId } from '../data/glossary'
@@ -67,6 +67,9 @@ export function whoName(who: string, privateer?: number): string {
   const team = Object.values(TEAMS).find((x) => who.startsWith(x.id))
   return tf('raidUi.rivalName', { team: t(team ? team.name : 'team.privateer'), n })
 }
+
+/** The parts the finale names on the winning truck. */
+const FINALE_SLOTS = ['frame', 'frontSusp', 'rearSusp', 'dampers', 'bumpStops', 'tires', 'engine'] as const
 
 function partList(ids: readonly string[]): string {
   return ids.map((id) => {
@@ -314,11 +317,36 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     wrap.append(el('p', 'small', sponsor
       ? tf(sponsor.discount ? 'career.sponsorWorks' : 'career.sponsor', { who: t(sponsor.name), pay: money(sponsor.pay), off: num(sponsor.discount * 100) })
       : t('career.noSponsor')))
-    if (career.longOne.length) wrap.append(el('p', 'small', tf('career.longOneWins', { years: career.longOne.join(', ') })))
+    wrap.append(roadBlock(career))
     if (isBroke(career)) {
       const warn = el('div', 'career-broke')
       warn.append(el('p', 'hot-text', t('career.brokeTitle')), el('p', 'small', t('career.brokeText')))
       wrap.append(warn)
+    }
+    return wrap
+  }
+
+  /**
+   * The road to the Long One (plan PR 13): the career's goal, always in
+   * sight. A bar of reputation until your own truck may enter, then a line
+   * saying it's open, then the years you won it.
+   */
+  function roadBlock(career: CareerState): HTMLElement {
+    const road = longOneRoad(career)
+    const wrap = el('div', 'career-road')
+    if (road.won.length) {
+      wrap.append(el('p', 'small', tf('career.longOneWins', { years: road.won.join(', ') })))
+    } else if (road.open) {
+      wrap.append(el('p', 'small cool-text', t('career.roadOpen')))
+    } else {
+      wrap.append(el('p', 'small', tf('career.road', { need: String(road.need), rep: String(road.rep) })))
+      // The words above carry the numbers; the bar is just a picture of them.
+      const bar = el('div', 'live-progress')
+      bar.setAttribute('aria-hidden', 'true')
+      const fill = el('div', 'live-fill')
+      fill.style.width = `${Math.min(100, (road.rep / road.need) * 100)}%`
+      bar.append(fill)
+      wrap.append(bar)
     }
     return wrap
   }
@@ -506,7 +534,8 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     const card = el('div', 'raid-card career-results')
     const head = el('h3', 'raid-sub', tf('career.resultsHead', { raid: t(RAIDS[s.raid].name) }))
     card.append(head)
-    if (s.wonLongOne) card.append(el('p', 'career-win', t('career.wonLongOne')))
+    if (s.story) card.append(finaleBlock(s.story))
+    else if (s.wonLongOne) card.append(el('p', 'career-win', t('career.wonLongOne')))
     if (s.job) {
       card.append(el('p', 'readout-line', s.pos === null ? t('career.retired') : tf('career.place', { pos: ordinal(s.pos), of: String(s.of) })))
       const ul = el('ul', 'raid-list')
@@ -541,6 +570,23 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     })
     card.append(next)
     return card
+  }
+
+  /** The finale (plan PR 13): the garage's first Long One win, and how it got there. */
+  function finaleBlock(story: LongOneStory): HTMLElement {
+    const wrap = el('section', 'career-finale')
+    wrap.setAttribute('aria-label', t('career.finaleHead'))
+    const s = story.stats
+    wrap.append(
+      el('p', 'career-win', t('career.finaleHead')),
+      el('p', '', tf('career.finaleLead', {
+        year: String(story.year), nth: ordinal(story.seasons), cls: className(story.cls).toLowerCase(), driver: t(DRIVERS[story.driver].name).toLowerCase(),
+      })),
+      el('p', 'small', tf('career.finaleRecord', { raids: String(s.raids), wins: String(s.wins), podiums: String(s.podiums), contracts: String(s.contracts) })),
+      el('p', 'small', tf('career.finaleTruck', { parts: partList(FINALE_SLOTS.map((slot) => story.parts[slot])) })),
+      el('p', 'small', t('career.finaleOn')),
+    )
+    return wrap
   }
 
   // ── Your truck ──
@@ -631,6 +677,8 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     if (!items.length) list.append(el('li', 'small', t('career.noNews')))
     for (const n of items) list.append(el('li', 'small', `${n.year}: ${newsText(n)}`))
     const s = career.stats
+    const first = career.firstLongOne
+    if (first) wrap.append(el('p', 'small', tf('career.firstLongOne', { year: String(first.year), cls: className(first.cls).toLowerCase(), nth: ordinal(first.seasons) })))
     wrap.append(list, el('p', 'small', tf('career.record', { raids: String(s.raids), wins: String(s.wins), podiums: String(s.podiums), contracts: String(s.contracts) })))
     return wrap
   }

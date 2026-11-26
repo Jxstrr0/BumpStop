@@ -82,6 +82,22 @@ export type NewsItem =
   | { kind: 'longOne'; year: number }
   | { kind: 'skipped'; year: number; raid: RaidId }
 
+/**
+ * The day the garage first won the Long One (plan PR 13): kept for the
+ * finale card and the record. Missing until then (and in older saves).
+ */
+export interface LongOneStory {
+  year: number
+  /** Seasons since the garage opened, counting the winning one (1 = the first year). */
+  seasons: number
+  cls: ClassId
+  driver: DriverId
+  /** The winning truck's parts. */
+  parts: Record<SlotId, string>
+  /** The record on the day, the Long One included. */
+  stats: CareerStats
+}
+
 export interface CareerStats {
   raids: number
   wins: number
@@ -109,6 +125,8 @@ export interface CareerState {
   news: NewsItem[]
   /** Years you won the Long One. */
   longOne: number[]
+  /** The first Long One win, for the finale (plan PR 13). */
+  firstLongOne?: LongOneStory
   stats: CareerStats
 }
 
@@ -146,9 +164,25 @@ export function eventSeed(c: CareerState): number {
   return hashString(`${c.seed}:${c.season}:${c.next}:${RAIDS[nextEvent(c).raid].seed}`) % 1_000_000
 }
 
-/** How many days the next raid takes, travel included. */
+/** How many days the next raid takes, travel and any rest day included. */
 export function eventDays(e: CalendarEvent): number {
-  return RAIDS[e.raid].stages.length + TRAVEL_DAYS
+  const raid = RAIDS[e.raid]
+  return raid.stages.length + TRAVEL_DAYS + (raid.restAfter ? 1 : 0)
+}
+
+/** How far the garage is on the road to the Long One (plan PR 13): the career's goal, shown on the status line. */
+export interface LongOneRoad {
+  /** Reputation now, and what entering your own truck takes. */
+  rep: number
+  need: number
+  /** Your own truck may enter. */
+  open: boolean
+  /** Years won so far. */
+  won: readonly number[]
+}
+
+export function longOneRoad(c: CareerState): LongOneRoad {
+  return { rep: c.rep, need: TIERS.long.rep, open: c.rep >= TIERS.long.rep, won: c.longOne }
 }
 
 /** The career's first raid, before anything has happened: the first-job guide's time (plan PR 11b). */
@@ -469,6 +503,8 @@ export interface Settlement {
   winners: Record<ClassId, string>
   copies: Extract<NewsItem, { kind: 'copied' }>[]
   wonLongOne: boolean
+  /** Set when this was the garage's first Long One win: the finale (plan PR 13). */
+  story: LongOneStory | null
 }
 
 /** What putting a raid's wear right costs, and the spares used. */
@@ -536,7 +572,7 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
   const out: Settlement = {
     raid: e.raid, job: state ? job!.kind : null, pos: null, of: 0, finished: false,
     prize: 0, fee: 0, bonus: 0, repairs: 0, spares: 0, money: 0, rep: 0,
-    winners: {} as Record<ClassId, string>, copies: [], wonLongOne: false,
+    winners: {} as Record<ClassId, string>, copies: [], wonLongOne: false, story: null,
   }
   const rng = new Rng(hashString(`${c.seed}:${c.season}:${c.next}:settle`))
   let mineCls: ClassId | null = null
@@ -570,6 +606,13 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
       if (e.tier === 'long' && pos === 1) {
         out.wonLongOne = true
         c.longOne.push(c.year)
+        if (!c.firstLongOne) {
+          c.firstLongOne = {
+            year: c.year, seasons: c.season + 1, cls, driver: job.driver,
+            parts: { ...state.entry.build.parts }, stats: { ...c.stats },
+          }
+          out.story = structuredClone(c.firstLongOne)
+        }
       }
     } else {
       out.fee = job.contract.fee
