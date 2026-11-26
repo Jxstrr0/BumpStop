@@ -188,6 +188,7 @@ export class TruckModel {
       const rest = this.hubRest[i]!
       hub.position.set(rest.x, rest.y + (p.wheelZ[i] ?? 0), rest.z)
       hub.rotation.set(0, 0, 0)
+      hub.scale.set(1, 1, 1)
       // Spin about the hub's own axle; a flopped wheel (snapped axle) leans out.
       const spin = new THREE.Quaternion().setFromAxisAngle(SPIN_AXIS, -p.distance / this.radius)
       this.wheels[i]!.quaternion.copy(spin).multiply(this.wheelRest[i]!)
@@ -206,7 +207,11 @@ export class TruckModel {
       const hub = this.hubs[corner]!
       const side = corner % 2 === 0 ? -1 : 1
       if (how === 'flop') hub.rotation.x += side * 0.35
-      if (how === 'flat') hub.position.y -= this.radius * 0.18
+      // A cut tire: the wheel drops onto the squashed rubber.
+      if (how === 'flat') {
+        hub.position.y -= this.radius * 0.12
+        hub.scale.set(1, 0.84, 1)
+      }
     }
 
     this.root.updateMatrixWorld(true)

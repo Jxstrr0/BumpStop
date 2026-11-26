@@ -19,6 +19,7 @@ import { SHAKER } from '../data/rigs'
 import { SIM, type RideSetup } from '../data/ride'
 import { PI, detPow, detSin } from './det'
 import type { Profile } from './ground'
+import { newPoseLog, notePose, type PoseLog } from './poses'
 import { emptyStats, enterSection, restingState, rideParams, stepRide, type RideParams, type RideState, type RideStats } from './ride'
 
 const DT = 1 / SIM.stepsPerSecond
@@ -50,6 +51,8 @@ export interface ShakerRunner {
   hi: number[]
   points: ShakerPoint[]
   done: boolean
+  /** The last few seconds of poses for the 3D view, if asked for (the posts' height as `ground`). */
+  poses: PoseLog | null
 }
 
 /** The beats the rig steps through, evenly spaced on a log scale. */
@@ -72,7 +75,8 @@ function resetMeasure(r: ShakerRunner): void {
   r.hi = [-Infinity, -Infinity, -Infinity, -Infinity, -Infinity, -Infinity]
 }
 
-export function startShaker(setup: RideSetup, airTemp: number): ShakerRunner {
+/** `poseSeconds`: keep that many seconds of poses for the 3D view (0 = none). */
+export function startShaker(setup: RideSetup, airTemp: number, poseSeconds = 0): ShakerRunner {
   const p = rideParams(setup)
   // Long enough for both axles plus a bit; one sample a metre is plenty, since it's flat.
   const length = Math.ceil(setup.cgToFront + setup.cgToRear + 4)
@@ -98,6 +102,7 @@ export function startShaker(setup: RideSetup, airTemp: number): ShakerRunner {
     hi: [],
     points: [],
     done: false,
+    poses: poseSeconds > 0 ? newPoseLog(poseSeconds) : null,
   }
   resetMeasure(r)
   return r
@@ -118,6 +123,7 @@ export function advanceShaker(r: ShakerRunner, maxSteps: number): number {
     stepRide(s, p, posts, 0, r.stats)
     r.time += DT
     taken++
+    if (r.poses) notePose(r.poses, s, 0, 0, 0, posts.left[0] as number, false)
 
     const settle = settleTime(freq)
     if (r.time > settle) {
