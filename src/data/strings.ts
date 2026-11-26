@@ -586,6 +586,23 @@ const STRINGS = {
   'raidUi.trouble.stuck': 'stuck',
   'raidUi.trouble.lost': 'took a wrong turn',
 
+  'code.empty': 'Paste a save code first.',
+  'code.tooLong': 'That text is far too long to be a Bump Stop save code.',
+  'code.notSave': 'That doesn\'t look like a Bump Stop save code. It should start with BMP1:',
+  'code.isBuild': 'That\'s a truck build code. Paste it under Share this build on the build screen.',
+  'code.cutOff': 'That code looks cut off. Copy the whole thing and try again.',
+  'code.damaged': 'That code is damaged or incomplete (its check letters don\'t match). Copy it again and try once more.',
+  'code.unpack': 'That code couldn\'t be unpacked. It may be damaged.',
+  'code.noUnsquash': 'This browser can\'t unpack that code. Try it in an up-to-date browser.',
+  'code.future': 'That save code was made by a newer version of Bump Stop. Reload to update the game and try again.',
+  'code.notValid': 'That code unpacked, but it isn\'t a garage Bump Stop can load.',
+  'buildCode.empty': 'Paste a build code first.',
+  'buildCode.tooLong': 'That text is far too long to be a truck build code.',
+  'buildCode.notBuild': 'That doesn\'t look like a truck build code. It should start with BMPT1:',
+  'buildCode.isSave': 'That\'s a whole save code. Load it under Saves and backups instead.',
+  'buildCode.future': 'That build code was made by a newer version of Bump Stop. Reload to update the game and try again.',
+  'buildCode.notValid': 'That code unpacked, but it isn\'t a truck build.',
+
   'footer.studio': 'Longlight Interactive',
   'boot.failed': 'Bump Stop could not start. Reload to try again.',
 } as const

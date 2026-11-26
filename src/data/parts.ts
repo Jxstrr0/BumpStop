@@ -34,6 +34,10 @@ export type SlotId =
   | 'engine'
   | 'spares'
 
+/** The era the game covers: the first and last year a build can be set to. */
+export const FIRST_YEAR = 1985
+export const LAST_YEAR = 2025
+
 export const SLOTS: readonly SlotId[] = [
   'frame',
   'frontSusp',
