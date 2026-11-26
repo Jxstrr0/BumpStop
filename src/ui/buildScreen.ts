@@ -13,6 +13,7 @@ import { t, tf, type StringKey } from '../data/strings'
 import { changeCost, checkBuild, minPressure, partIn, partsFor, type BuildProblem, type CornerGeometry } from '../sim/build'
 import { FIRST_YEAR, LAST_YEAR, type BuildStore } from './buildStore'
 import { shareBuildBlock } from './saves'
+import { truckCardBlock } from './truckCard'
 import { el, num } from './dom'
 import { truckView } from './truckView'
 
@@ -338,7 +339,8 @@ export function buildPanel(store: BuildStore): HTMLElement {
 
   store.onChange((change) => (change === 'setting' ? refresh() : render()))
   const yearNote = el('p', 'small', t('build.yearNote'))
-  box.append(benchLabel, classRow, blurb, truckView(store), yearRow, yearNote, summary, partsHolder, tuneHolder, reset, shareBuildBlock(store))
+  const view = truckView(store)
+  box.append(benchLabel, classRow, blurb, view.element, yearRow, yearNote, summary, partsHolder, tuneHolder, reset, shareBuildBlock(store), truckCardBlock(store, view.garage, view.garageNow))
   render()
   return box
 }

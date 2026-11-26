@@ -59,3 +59,8 @@ export const AUTO_TIER = {
   /** A frame longer than this is a tab switch or a stall, not the frame rate (s). */
   stallS: 0.5,
 } as const
+
+/** Photo mode (plan PR 12): how high the camera may go (radians above the ground). */
+export const PHOTO_LIFT = { min: 0.03, max: 1.35 } as const
+/** Photo mode: how close and how far, as a share of the distance it opened at. */
+export const PHOTO_ZOOM = { min: 0.35, max: 2.5 } as const

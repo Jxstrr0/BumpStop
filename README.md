@@ -39,6 +39,8 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
   detail, and when Auto steps down): `src/data/graphics.ts`. Offline play
   and graphics in plain words: `docs/OFFLINE.md`. If the game ever acts
   stale, open it with `?nosw` on the end of the address.
+- The truck card's layout and photo mode: `src/ui/truckCard.ts` and
+  `src/ui/photoMode.ts`. In plain words: `docs/PHOTOS.md`.
 - Colours: the top of `src/style.css`.
 - The plan: `docs/BUMP-STOP-PLAN.md`. Where it's up to: `docs/STATUS.md`.
 - Names: `docs/NAMES.md`.
