@@ -62,6 +62,31 @@ version go back to stock.
   download;
 - reads a backup file back in.
 
+## On screen (8b)
+
+- **Saves and backups**, a panel under the raids: the three slots (what's in
+  each, when it was saved, Open, Start a garage here, Delete with a second
+  tap), a line saying when this slot last saved, whether the browser has
+  promised to keep the saves, **Copy save code** and **Save a backup file**
+  (both count as a backup), and **Load a garage** from a pasted code or a
+  backup file (it replaces the open slot, with a second tap).
+- **Autosave** (`src/ui/garage.ts`): every change asks for a save; the slot
+  is written 1.2 seconds after the last one, and straight away when the page
+  is hidden or closed. An empty slot stays empty until something changes.
+  Opening another slot saves this one and reloads into that one. A slot that
+  can't be read is never written over. Two tabs on the same slot: the last
+  one to save wins.
+- **The raid** saves each morning, after each stage and at the end, and a
+  reload goes back to that screen (the bivouac, if it was mid-results). A
+  reload in the middle of a stage drives it again from its morning.
+- **The rig ghosts** come back after a reload, so Better/Same/Worse still
+  compares against the last run. A ghost that doesn't check out is dropped.
+- **The reminder**: a quiet bar under the title when there's progress and
+  no backup yet, or none in 14 days. Back up now jumps to Copy save code;
+  Later hides it until next time.
+- **Share this build**, at the foot of the build screen: Copy build code, or
+  paste one in to replace that class's build.
+
 ## The tests
 
 `tests/saves.test.ts`: a garage reads back as itself; a raid saved after a

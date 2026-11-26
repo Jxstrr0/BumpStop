@@ -35,8 +35,9 @@ The Raids panel sits under the shop and moves through the raid:
    why.
 7. **Final results** after the last stage, then enter another raid.
 
-"Retire from the raid" (tap twice) goes back to the entry. The raid lives in
-memory until saves (plan PR 8): a reload starts over.
+"Retire from the raid" (tap twice) goes back to the entry. The raid is saved
+each morning, after each stage and at the end (plan PR 8, `docs/SAVES.md`);
+a reload in the middle of a stage drives it again from its morning.
 
 ## A raid day
 

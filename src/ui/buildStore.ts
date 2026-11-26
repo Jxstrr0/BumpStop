@@ -1,7 +1,8 @@
 /**
  * The truck being built (plan PR 3): one build per class, the class on the
  * bench, and the year. The build screen changes it; the ride sim and the
- * break test read it. Kept in memory only: saves arrive in plan PR 8.
+ * break test read it. The garage (`src/ui/garage.ts`) saves it into the
+ * slot after each change (plan PR 8).
  */
 import { CLASSES, type ClassId } from '../data/classes'
 import type { TruckBuild } from '../data/kit'
@@ -22,14 +23,23 @@ export interface BuildStore {
   setBuild(b: TruckBuild, change: 'part' | 'setting'): void
   resetClass(): void
   onChange(fn: (change: Change) => void): void
+  /** Every class's build, for saving. */
+  builds(): Record<ClassId, TruckBuild>
+}
+
+/** Where a store starts: a saved garage's builds, class and year. */
+export interface StoreStart {
+  builds: Record<ClassId, TruckBuild>
+  cls: ClassId
+  year: number
 }
 
 export { FIRST_YEAR, LAST_YEAR }
 
-export function makeBuildStore(): BuildStore {
-  const builds = Object.fromEntries(CLASSES.map((c) => [c.id, stockBuild(c.id)])) as Record<ClassId, TruckBuild>
-  let cls: ClassId = 'light4x4'
-  let year = FIRST_YEAR
+export function makeBuildStore(start?: StoreStart): BuildStore {
+  const builds = Object.fromEntries(CLASSES.map((c) => [c.id, start ? tidyBuild(start.builds[c.id]) : stockBuild(c.id)])) as Record<ClassId, TruckBuild>
+  let cls: ClassId = start?.cls ?? 'light4x4'
+  let year = start?.year ?? FIRST_YEAR
   let built: BuiltTruck | null = null
   const listeners: ((change: Change) => void)[] = []
 
@@ -63,5 +73,6 @@ export function makeBuildStore(): BuildStore {
     onChange(fn) {
       listeners.push(fn)
     },
+    builds: () => ({ ...builds }),
   }
 }
