@@ -24,7 +24,7 @@ import { factorySetup, runLesson, type LessonClip, type LessonSetup } from '../s
 import { dampingMultiplier } from '../sim/ride'
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, lineChart, type Band } from './charts'
-import { el, num, svg } from './dom'
+import { el, num, oneOpenAtATime, svg } from './dom'
 import { fixJump, jumpTo } from './fixes'
 
 const C0 = 273.15
@@ -207,6 +207,8 @@ export function helpPanel(store: BuildStore): HelpPanel {
   lessonsBox.append(el('summary', '', t('help.lessons')))
   const glossaryBox = el('details', 'help-section')
   glossaryBox.append(el('summary', '', t('help.glossary')))
+  oneOpenAtATime(lessonsBox, 'help-sections')
+  oneOpenAtATime(glossaryBox, 'help-sections')
   box.append(lessonsBox, glossaryBox)
 
   // ── Lessons ──
