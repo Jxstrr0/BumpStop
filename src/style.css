@@ -609,3 +609,44 @@ input[type='range'] {
 .update-bar p { flex: 1 1 100%; margin: 0; font-size: 15px; line-height: 1.35; }
 .update-later { margin-left: auto; }
 .update-go { background: var(--accent); color: var(--on-accent); }
+/* The help (plan PR 11a): damper lessons and the glossary. */
+.help-pointer { margin-top: 12px; }
+.panel > .help-pointer + .btn { margin-top: 6px; }
+.help-section { border-top: 2px solid var(--ink); padding: 4px 0; }
+.help-section:last-of-type { border-bottom: 2px solid var(--ink); }
+.help-section > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-family: var(--head);
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.help-section[open] > summary { margin-bottom: 4px; }
+.lesson p { max-width: 38em; }
+.lesson-title { margin: 4px 0 8px; font-family: var(--head); font-size: 22px; }
+.lesson-title:focus { outline: none; }
+.lesson .sim-chart-title { margin-top: 8px; }
+.lesson-try { margin-top: 12px; }
+.lesson-try .small { margin-top: 0; }
+.lesson-try .btn-row { margin: 6px 0 0; }
+.lesson-nav { margin: 16px 0 0; }
+.glossary-search {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  font: 16px var(--ui);
+  color: var(--ink);
+  background: var(--panel);
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+}
+.glossary { margin: 8px 0 0; }
+.glossary dt { margin-top: 14px; font-weight: 700; font-size: 17px; }
+.glossary dt:focus { outline: none; }
+.glossary dd { margin: 2px 0 0; }
+.glossary .see-btn { display: block; width: fit-content; margin-top: 6px; }

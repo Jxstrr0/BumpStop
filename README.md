@@ -32,6 +32,9 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
 - The career (calendar, money, prize money, contracts, reputation,
   sponsors, the shop's upgrades, the rival teams and their habits):
   `src/data/career.ts`. In plain words: `docs/CAREER.md`.
+- The help (the damper lessons' toy truck corner and roads:
+  `src/data/lessons.ts`; the glossary's list: `src/data/glossary.ts`; every
+  word of both: `src/data/strings.ts`). In plain words: `docs/HELP.md`.
 - Graphics tiers (Lite, Full, Ultra: pixels, shadows, trees, dust, road
   detail, and when Auto steps down): `src/data/graphics.ts`. Offline play
   and graphics in plain words: `docs/OFFLINE.md`. If the game ever acts
