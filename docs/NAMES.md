@@ -62,7 +62,9 @@ adds four more working names in the same plain style: **Midsummer Sprint**,
 for the finale). Stages are described,
 not named ("Logging roads", "Rock country", "The old burn", "Eskers and
 washboard", "Hot haul roads", and from PR 9 "The mine roads" and "Long
-fast gravel"). The first proposals, for the record:
+fast gravel"). Winter (plan PR 10) adds **Winter Sprint** and **Winter
+Raid**, with the stages "Ice roads over the lakes", "Frost-heaved forest
+roads", "Across the big lake" and "Wind-scoured tundra". The first proposals, for the record:
 
 | Plan's working name | Proposed name (turned down) | Shape |
 | --- | --- | --- |

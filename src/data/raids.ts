@@ -34,18 +34,25 @@ export const PACES: readonly PaceId[] = ['conserve', 'steady', 'push']
 /** Each pace call scales every speed on the stage by this. */
 export const PACE_SPEED: Readonly<Record<PaceId, number>> = { conserve: 0.88, steady: 1, push: 1.12 }
 
-/** Ground a stage can be made of in summer (winter raids come in plan PR 10b). */
-export type RaidGround = Exclude<GroundId, 'iceHeaves' | 'ice' | 'snow'>
+/** Ground a raid stage can be made of: summer ground, and winter ground for winter raids (plan PR 10). */
+export type RaidGround = GroundId
 
 /**
  * Steady speeds (km/h), for an average driver in the class's stock truck.
  * Washboard is driven fast on purpose: slow over washboard is where the
  * wheels hop and the dampers cook (`docs/RIDE-SIM.md`), so drivers skim it.
+ *
+ * On ice and snow (plan PR 10) the grip sets the speed, not the dampers:
+ * these are on plain tires, with 10% in hand at the tightest corner, and
+ * studs go faster (`CORNERS` in `src/data/winter.ts`). The heavy truck is
+ * slowest on ice: it takes the longest to stop. Frost heaves are set like
+ * summer ground, just under where the stock trucks start to take damage
+ * at Push on studs (the PR 10 sweep, `docs/WINTER.md`).
  */
 export const STEADY_KMH: Readonly<Record<ClassId, Record<RaidGround, number>>> = {
-  light4x4: { graded: 85, washboard: 68, rough: 44, whoops: 27, rocks: 30, jumps: 48 },
-  heavy: { graded: 75, washboard: 62, rough: 42, whoops: 25, rocks: 48, jumps: 44 },
-  sxs: { graded: 78, washboard: 64, rough: 34, whoops: 24, rocks: 26, jumps: 35 },
+  light4x4: { graded: 85, washboard: 68, rough: 44, whoops: 27, rocks: 30, jumps: 48, iceHeaves: 58, ice: 50, snow: 62 },
+  heavy: { graded: 75, washboard: 62, rough: 42, whoops: 25, rocks: 48, jumps: 44, iceHeaves: 50, ice: 40, snow: 55 },
+  sxs: { graded: 78, washboard: 64, rough: 34, whoops: 24, rocks: 26, jumps: 35, iceHeaves: 48, ice: 48, snow: 58 },
 }
 
 export const RAID = {
@@ -60,7 +67,7 @@ export const RAID = {
   powerLimits: [0.94, 1.08],
   fastGround: ['graded', 'washboard'] as readonly RaidGround[],
   /** Ground that's hard on the truck: a hard driver goes this much faster here, a smooth one this much slower. */
-  harshGround: ['rough', 'whoops', 'rocks', 'jumps'] as readonly RaidGround[],
+  harshGround: ['rough', 'whoops', 'rocks', 'jumps', 'iceHeaves'] as readonly RaidGround[],
   hardSpeed: 0.06,
   /** After a roadside stop the driver eases off one pace call for the rest of the leg, at most this many times. */
   easeSteps: 2,
@@ -109,11 +116,11 @@ export interface Driver {
 
 export const DRIVERS: Readonly<Record<DriverId, Driver>> = {
   veteran: { id: 'veteran', name: 'driver.veteran', text: 'driver.veteranText',
-    speed: 0.97, hardness: -1, skill: ['rocks'], skillTime: 0.9, fixTime: 1 },
+    speed: 0.97, hardness: -1, skill: ['rocks', 'ice'], skillTime: 0.9, fixTime: 1 },
   charger: { id: 'charger', name: 'driver.charger', text: 'driver.chargerText',
     speed: 1.03, hardness: 1, skill: ['whoops', 'jumps'], skillTime: 0.93, fixTime: 1 },
   gravelAce: { id: 'gravelAce', name: 'driver.gravelAce', text: 'driver.gravelAceText',
-    speed: 1.01, hardness: 0, skill: ['graded', 'washboard', 'rough'], skillTime: 0.98, fixTime: 1 },
+    speed: 1.01, hardness: 0, skill: ['graded', 'washboard', 'rough', 'snow'], skillTime: 0.98, fixTime: 1 },
   mechanic: { id: 'mechanic', name: 'driver.mechanic', text: 'driver.mechanicText',
     speed: 0.99, hardness: -0.5, skill: [], skillTime: 1, fixTime: 0.7 },
 }
@@ -173,10 +180,12 @@ export const JOB_KINDS = Object.keys(JOBS) as JobKind[]
 
 // ── Raids ──
 
-export type RaidId = 'summerSprint' | 'summerRaid' | 'midsummerSprint' | 'nationalRaid' | 'autumnRaid' | 'longOne'
-export const RAID_IDS: readonly RaidId[] = ['summerSprint', 'summerRaid', 'midsummerSprint', 'nationalRaid', 'autumnRaid', 'longOne']
+export type RaidId = 'summerSprint' | 'summerRaid' | 'midsummerSprint' | 'nationalRaid' | 'autumnRaid' | 'longOne' | 'winterSprint' | 'winterRaid'
+export const RAID_IDS: readonly RaidId[] = ['summerSprint', 'summerRaid', 'midsummerSprint', 'nationalRaid', 'autumnRaid', 'longOne', 'winterSprint', 'winterRaid']
 /** The raids the free-play raid panel offers; the rest come with the career's calendar (plan PR 9). */
-export const FREE_RAID_IDS: readonly RaidId[] = ['summerSprint', 'summerRaid']
+export const FREE_RAID_IDS: readonly RaidId[] = ['summerSprint', 'summerRaid', 'winterSprint', 'winterRaid']
+
+export type Season = 'summer' | 'winter'
 
 export interface RaidSegment {
   ground: RaidGround
@@ -189,6 +198,12 @@ export interface RaidStage {
   /** Air temperature (°C). */
   airC: number
   segments: readonly RaidSegment[]
+  /**
+   * The lake ice under every ice-road stretch of the stage (plan PR 10):
+   * its thickness at the thinnest place (cm) and the speed of the wave
+   * under it (km/h). See `src/data/winter.ts`.
+   */
+  ice?: { cm: number; waveKmh: number }
 }
 
 export interface Raid {
@@ -196,7 +211,7 @@ export interface Raid {
   /** Working name (see the top of this file). */
   name: StringKey
   text: StringKey
-  season: 'summer'
+  season: Season
   /** Every entry drives the same roads, so a second go shows what a change did. */
   seed: number
   stages: readonly RaidStage[]
@@ -327,6 +342,44 @@ export const RAIDS: Readonly<Record<RaidId, Raid>> = {
       LONG_STAGES.burn, LONG_STAGES.mines, LONG_STAGES.haul, LONG_STAGES.logging,
     ],
   },
+
+  // ── Winter (plan PR 10) ──
+  // The thinnest ice is early in the winter (the Sprint); the Raid runs later, on thicker ice but longer lakes.
+  winterSprint: {
+    id: 'winterSprint',
+    name: 'raid.winterSprint.name',
+    text: 'raid.winterSprint.text',
+    season: 'winter',
+    seed: 8101,
+    stages: [
+      { tag: 'stage.iceRoads', airC: -24, ice: { cm: 44, waveKmh: 60 }, segments: route(
+        ['snow', 10], ['ice', 18], ['snow', 8], ['iceHeaves', 4], ['ice', 22], ['snow', 10], ['ice', 14], ['snow', 6]) },
+      { tag: 'stage.frostHeaves', airC: -18, segments: route(
+        ['snow', 14], ['iceHeaves', 6], ['snow', 10], ['rocks', 3], ['iceHeaves', 5], ['snow', 14],
+        ['iceHeaves', 6], ['rocks', 2], ['snow', 14], ['iceHeaves', 4], ['snow', 10]) },
+      { tag: 'stage.bigLake', airC: -28, ice: { cm: 46, waveKmh: 45 }, segments: route(
+        ['snow', 8], ['ice', 30], ['iceHeaves', 4], ['ice', 26], ['snow', 10], ['ice', 12], ['snow', 6]) },
+    ],
+  },
+  winterRaid: {
+    id: 'winterRaid',
+    name: 'raid.winterRaid.name',
+    text: 'raid.winterRaid.text',
+    season: 'winter',
+    seed: 8201,
+    stages: [
+      { tag: 'stage.iceRoads', airC: -20, ice: { cm: 55, waveKmh: 55 }, segments: route(
+        ['snow', 15], ['ice', 30], ['snow', 12], ['iceHeaves', 6], ['ice', 35], ['snow', 15], ['ice', 25], ['snow', 12]) },
+      { tag: 'stage.frostHeaves', airC: -15, segments: route(
+        ['snow', 20], ['iceHeaves', 8], ['snow', 18], ['rocks', 4], ['iceHeaves', 8], ['snow', 25], ['iceHeaves', 8],
+        ['rough', 6], ['snow', 20], ['iceHeaves', 6], ['snow', 17]) },
+      { tag: 'stage.bigLake', airC: -30, ice: { cm: 45, waveKmh: 55 }, segments: route(
+        ['snow', 10], ['ice', 45], ['iceHeaves', 5], ['ice', 40], ['snow', 12], ['ice', 30], ['snow', 13]) },
+      { tag: 'stage.tundra', airC: -22, ice: { cm: 65, waveKmh: 50 }, segments: route(
+        ['snow', 25], ['rough', 8], ['snow', 20], ['iceHeaves', 10], ['rocks', 4], ['snow', 25], ['iceHeaves', 8],
+        ['snow', 22], ['ice', 20], ['snow', 18]) },
+    ],
+  },
 }
 
 // ── Rivals ──
@@ -356,6 +409,9 @@ export interface Rival {
 
 /** A stage with this share of harsh ground is "average" for the rivals' risk. */
 export const RIVAL_HARSH_AVERAGE = 0.3
+
+/** Ice and snow count as this much harsh ground for the rivals' risk: snowbanks and ice (plan PR 10). */
+export const RIVAL_WINTER_WEIGHT = 0.3
 
 export const RIVALS: readonly Rival[] = [
   // Light 4x4

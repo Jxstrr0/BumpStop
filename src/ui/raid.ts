@@ -25,8 +25,9 @@ import { t, tf, type StringKey } from '../data/strings'
 import { checkBuild, partIn } from '../sim/build'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
-  advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, leaveCheckpoint,
-  parTime, raidOf, raidTruck, stageKm, standings, startStage, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
+  advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, leaveCheckpoint,
+  parTime, raidOf, raidTruck, stageKm, standings, startStage, 
+  type IceNote, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
 } from '../sim/raid'
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, bandOf, lineChart, type LineChart } from './charts'
@@ -99,6 +100,8 @@ function sparesList(spares: Record<SpareId, number>): string {
 
 /** One line about a roadside stop: where, what, what the crew did and the time it cost. */
 function stopText(st: Stop): string {
+  if (st.kind === 'ice') return tf('raidUi.iceStop', { km: num(st.at / 1000, 1), lost: gap(st.lost).slice(1) })
+  if (st.kind === 'slide') return tf('raidUi.slideStop', { km: num(st.at / 1000, 1), lost: gap(st.lost).slice(1) })
   const where = st.kind === 'frame' ? `, ${t(`zone.${st.zone ?? 'centre'}` as StringKey)}` : `, ${t(`corner.${st.corner}` as StringKey)}`
   const text = tf('raidUi.stopLine', {
     km: num(st.at / 1000, 1),
@@ -109,6 +112,14 @@ function stopText(st: Stop): string {
   })
   return text + (st.estimated ? t('raidUi.stopLater') : '')
 }
+
+/** One line about the ice creaking but holding. */
+function iceNoteText(n: IceNote): string {
+  return tf('raidUi.iceCreak', { km: num(n.at / 1000, 1), pct: num(n.use * 100) })
+}
+
+/** The ice band in the trace rule's colours: quiet is normal, creaking is warm, cracking is over the limit. */
+const ICE_CLASS = { quiet: 'cool-text', creaking: 'warm-text', cracks: 'hot-text' } as const
 
 function reducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -210,10 +221,12 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       return
     }
     const raidText = el('p', 'small')
+    const studsText = el('p', 'small warm-text', t('raidUi.winterNoStuds'))
     const driverText = el('p', 'small')
     const syncText = () => {
       const raid = RAIDS[raidId]
       raidText.textContent = `${t(raid.text)} ${tf('raidUi.stagesLine', { n: String(raid.stages.length), km: num(raid.stages.reduce((s, st) => s + stageKm(st), 0)) })}`
+      studsText.hidden = raid.season !== 'winter' || partIn(store.truck().build, 'tires').studded
       driverText.textContent = t(DRIVERS[driver].text)
     }
     const raidRow = picker(FREE_RAID_IDS, (id) => t(RAIDS[id].name), () => raidId, (id) => {
@@ -247,7 +260,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       morningScreen()
     })
     show(
-      el('h3', 'raid-sub', t('raidUi.pickRaid')), raidRow, raidText,
+      el('h3', 'raid-sub', t('raidUi.pickRaid')), raidRow, raidText, studsText,
       el('h3', 'raid-sub', t('raidUi.pickDriver')), driverRow, driverText,
       truckLines, enter,
     )
@@ -325,6 +338,22 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     }
     row(total, t('raidUi.finish'), 'rb-cp')
 
+    // Lake ice: how it reads for this truck at each pace call.
+    const iceBox = el('div')
+    if (spec.ice) {
+      const list = el('ul', 'raid-list')
+      for (const p of PACES) {
+        const r = iceAtPace(spec, truck, s.entry.driver, p)!
+        list.append(el('li', ICE_CLASS[r.band], tf('raidUi.iceLine', { pace: t(`pace.${p}` as StringKey), pct: num(r.use * 100), word: t(`raidUi.ice.${r.band}` as StringKey) })))
+      }
+      iceBox.append(
+        el('h4', 'raid-sub', t('raidUi.iceHead')),
+        el('p', 'small', tf('raidUi.iceFacts', { cm: num(spec.ice.cm), t: num(truck.mass / 1000, 1) })),
+        list,
+        el('p', 'small', t('raidUi.iceNote')),
+      )
+    }
+
     const settings = el('p', 'small', store.cls() === s.entry.build.cls ? t('raidUi.settingsNote') : t('raidUi.otherClass'))
     let pace: PaceId = 'steady'
     const paceText = el('p', 'small')
@@ -341,7 +370,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     })
     show(
       head, facts,
-      el('h4', 'raid-sub', t('raidUi.roadbook')), book,
+      el('h4', 'raid-sub', t('raidUi.roadbook')), book, iceBox,
       el('h4', 'raid-sub', t('raidUi.condition')), conditionList(s),
       el('p', 'small', tf('raidUi.sparesLine', { list: sparesList(s.spares) })), settings,
       el('h4', 'raid-sub', t('raidUi.paceCall')), paceRow, paceText, start, retireButton(),
@@ -384,6 +413,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     let chartLen = -1
     let shownTo = 0
     let logged = 0
+    let creaks = 0
 
     /** Draw the trace up to `upTo` metres (rebuilt when the sim adds to it). */
     function draw(upTo: number): void {
@@ -416,6 +446,9 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       fill.style.width = `${Math.min(100, (upTo / totalM) * 100)}%`
       // Stops come into the log as the highlight passes them.
       while (logged < r.stops.length && (r.stops[logged] as Stop).at <= upTo + 1) addStop(r.stops[logged++] as Stop)
+      while (creaks < r.iceNotes.length && (r.iceNotes[creaks] as IceNote).at <= upTo + 1) {
+        log.append(el('li', 'warm-text', iceNoteText(r.iceNotes[creaks++] as IceNote)))
+      }
     }
 
     function addStop(st: Stop): void {
@@ -533,7 +566,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       card.replaceChildren(
         h,
         el('p', 'readout-line', tf('raidUi.cpTime', { time: clock(mine), place: tf('raidUi.cpPlace', { pos: ordinal(pos), n: String(field.length) }) })),
-        el('p', 'readout-line', tf('raidUi.cpOil', { oil: num(oil), band: BAND_WORD[bandOf(oil, warm, red)], wear: num(wear * 100) })),
+        el('p', 'readout-line', tf('raidUi.cpOil', { oil: num(oil), band: oil < 0 ? t('raidUi.coldOil') : BAND_WORD[bandOf(oil, warm, red)], wear: num(wear * 100) })),
         notes,
         el('p', 'small', tf('raidUi.nextPace', { n: String(n + 1) })), row, paceText, go,
       )
@@ -579,6 +612,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       for (const st of rec.stops) stops.append(el('li', 'hot-text', stopText(st)))
       lines.append(stops)
     }
+    for (const n of rec.iceNotes ?? []) lines.append(el('p', 'small warm-text', iceNoteText(n)))
     if (rec.limped) lines.append(el('p', 'small hot-text', t('raidUi.limped')))
     const next = button(t(s.phase === 'done' ? 'raidUi.toFinal' : 'raidUi.toBivouac'), 'btn start-btn')
     next.addEventListener('click', () => (s.phase === 'done' ? finalScreen() : bivouacScreen()))

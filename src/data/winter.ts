@@ -22,6 +22,51 @@
  *   off onto thick ice and takes the shore track (plan PR 10b).
  */
 
+/**
+ * Grip and corners on winter ground (plan PR 10b).
+ *
+ * The fastest a truck can take a corner follows the square root of the grip.
+ * On every piece of winter ground there's one tightest corner, and Steady on
+ * plain tires takes it with `margin` in hand (10%). Push is 12% faster, so on
+ * plain tires the truck slides wide into the snowbank there: no harm done,
+ * but the crew digs it out (`digOut`) and the driver eases off one pace call.
+ * The corner sits somewhere between `from` and `to` of the way along.
+ *
+ * Studs grip harder (`studGrip` on each ground), which raises the corner
+ * speed by `sqrt(studGrip ÷ grip)`: 22% on ice, 10% on snow and frost heaves.
+ * Drivers use only part of that to go faster (`studSpeed`, a quarter power:
+ * about 10% on ice and 5% on snow) and keep the rest in hand, so with studs
+ * Push stays on the road. On summer ground studs change nothing.
+ */
+export const CORNERS = {
+  margin: 1.1,
+  /** Corner speed follows grip to this power: the square root. */
+  gripPower: 0.5,
+  /** How much faster drivers go on studs: grip ratio to this power. */
+  studSpeed: 0.25,
+  from: 0.15,
+  to: 0.85,
+  /** Digging the truck out of the snowbank (s). */
+  digOut: 20 * 60,
+} as const
+
+/**
+ * When the ice cracks under a truck on a raid (plan PR 10b). The truck
+ * drives to the thinnest place on the stretch, somewhere between `thinFrom`
+ * and `thinTo` of the way along (the roadbook doesn't say where), and if the
+ * ice can't hold it there it cracks. Nobody goes through: the crew backs off
+ * onto thick ice (`backOff` seconds) and takes the shore track, packed snow
+ * the rest of the way, `shoreLength` times as far as the ice would have been.
+ */
+export const ICE_ROAD = {
+  thinFrom: 0.2,
+  thinTo: 0.8,
+  /** Backing off and finding the shore track (s). */
+  backOff: 30 * 60,
+  shoreGround: 'snow',
+  shoreLength: 1.6,
+} as const
+
 /** One stretch of lake ice: how thick it is at its thinnest, and how fast the wave under it runs. */
 export interface IceSheet {
   /** Ice thickness at the thinnest place on the stretch (m). */

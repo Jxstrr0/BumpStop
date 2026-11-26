@@ -105,6 +105,75 @@ must stay under about 18 km/h (`safeSpeed` works that out), or come lighter
 Nobody ever goes through: when the ice cracks the crew backs off onto thick
 ice and takes the shore track (PR 10b).
 
+## Winter raids (plan PR 10b)
+
+Two winter raids join the Raids panel, both with working names:
+
+| Raid | Stages | Air | Lake ice |
+| --- | --- | --- | --- |
+| Winter Sprint (early winter) | 3: ice roads over the lakes, frost-heaved forest roads, across the big lake; about 90 km a day | -18 to -28 °C | 44 and 46 cm |
+| Winter Raid (late winter) | 4: the same three, longer, then the wind-scoured tundra; 140 to 170 km a day | -15 to -30 °C | 45 to 65 cm |
+
+The rules are in `src/sim/raid.ts`, the numbers in `src/data/winter.ts`
+(`CORNERS`, `ICE_ROAD`) and `src/data/raids.ts`.
+
+### Steady speeds on winter ground (km/h)
+
+| Ground | Light 4x4 | Heavy truck | Side-by-side |
+| --- | --- | --- | --- |
+| Frost heaves | 58 | 50 | 48 |
+| Ice road | 50 | 40 | 48 |
+| Packed snow | 62 | 55 | 58 |
+
+Frost heaves are set the way the summer speeds were, just under where the
+stock truck starts to suffer. Ice and snow are set by grip instead (below).
+
+### Corners and the snowbank
+
+The fastest a truck can take a corner follows the square root of the grip.
+Each piece of winter ground has one tightest corner, somewhere between 15%
+and 85% of the way along. Steady on plain tires takes it with 10% in hand.
+Push is 12% faster, so on plain tires the truck slides wide into the
+snowbank there. Nobody is hurt and nothing breaks, but the crew spends 20
+minutes digging it out and the driver eases off one pace call for the rest
+of the leg, so it happens once a leg at most.
+
+Studs raise the corner speed by the square root of their extra grip (22% on
+ice, 10% on snow and frost heaves). Drivers use only part of it to go faster
+(about 10% on ice and 5% on snow) and keep the rest in hand, so with studs
+Push stays on the road. On summer ground studs change nothing.
+
+### Ice on a raid
+
+The roadbook gives each stage's ice thickness and the speed of the wave
+under it, and the morning screen reads the ice for your truck at each pace
+call (Normal: quiet, Warm: booms and creaks, Over the limit: it cracks).
+The truck drives to the thinnest place on each stretch of ice, somewhere
+between 20% and 80% of the way along (the roadbook doesn't say where):
+
+- **Creaking:** noted in the log, nothing more. It's the warning.
+- **Cracks:** the truck stops. The crew backs off onto thick ice (30
+  minutes) and takes the shore track, packed snow 1.6 times as far, for the
+  rest of that stretch, and the driver eases off one pace call.
+
+### What the stock trucks did (Winter Sprint, gravel ace, light spares kit)
+
+| | Plain tires, Steady | Plain, Push | Studs, Steady | Studs, Push |
+| --- | --- | --- | --- | --- |
+| Light 4x4 | 4.95 h, 2nd | 7.9 h, last (9 slides) | 4.6 h, 1st | 4.1 h, 1st |
+| Heavy truck | 5.8 h, 3rd | 8.9 h (slides, cracked ice) | 7.1 h (cracked ice 3 times on day 1) | 7.0 h (cracked ice) |
+| Side-by-side | 5.3 h, 3rd | 8.2 h, last (9 slides) | 4.95 h, 2nd | 4.4 h, 1st |
+
+So studs are worth fitting, Push without them is a trap, and the heavy
+truck on early-winter ice has to call Conserve on the ice legs (6.1 h on
+studs, no cracks). Studs at Push are harder on the truck on the frost
+heaves and frozen rocks (about 40% worst wear on the light 4x4 on day 2),
+because stiff cold oil is harsh on sharp edges. Nothing faded.
+
+Rivals don't fade in winter either: that kind of trouble becomes a
+snowbank. Winter ground counts as 0.3 of harsh ground for their chance of
+trouble.
+
 ## Tests
 
 - `tests/ride.test.ts`: summer damping unchanged; about 2.6 times as stiff
@@ -119,3 +188,10 @@ ice and takes the shore track (PR 10b).
   before cracking, and the safe speed.
 - `tests/build.test.ts`: two studded tires per class, heavier than plain, and
   the studs reach the wear model.
+- `tests/winterRaid.test.ts`: studs are faster only on winter ground; plain
+  Steady makes the tightest corner and plain Push doesn't, while studded
+  Push does; a slide happens once a leg at most; the light classes never
+  crack the ice; a heavy truck at Push cracks it and takes the shore track
+  while Conserve holds (and creaks) and finishes sooner; no rival fades in
+  winter; and on the Winter Sprint, studs at Push are clean and quickest
+  while plain Push is slower than plain Steady.

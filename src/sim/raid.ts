@@ -19,23 +19,31 @@
  * 5. **Results:** stage time, place in class and overall, against the
  *    rivals (`rivals.ts`).
  *
+ * Winter raids (plan PR 10) run on ice, snow and frost heaves in the cold.
+ * Studded tires go faster on that ground. On an ice-road stretch the truck
+ * drives to the thinnest place, and if the ice can't hold it at that speed
+ * it cracks: the crew backs off and takes the shore track (`ICE_ROAD`).
+ *
  * Everything in `RaidState` is plain numbers and strings, so saves (plan PR
  * 8) can keep a raid in progress. A `StageRun` (a stage being driven) is
  * not saved: a stage is short, so a reload starts it again.
  */
 import type { ClassId } from '../data/classes'
+import { GROUND, WINTER_GROUND } from '../data/ground'
 import { KITS } from '../data/kit'
 import { SPARE_IDS, type SpareId } from '../data/parts'
 import {
-  CLASS_WORK, DRIVERS, JOB_KINDS, JOBS, PACE_SPEED, PACES, RAID, RAIDS, ROADSIDE, STEADY_KMH,
+  CLASS_WORK, DRIVERS, RIVAL_WINTER_WEIGHT, JOB_KINDS, JOBS, PACE_SPEED, PACES, RAID, RAIDS, ROADSIDE, STEADY_KMH,
   type DriverId, type JobKind, type JobPart, type PaceId, type Raid, type RaidGround, type RaidId, type RaidStage, type Rival,
 } from '../data/raids'
 import type { TruckBuild } from '../data/kit'
+import { CORNERS, ICE_ROAD, type IceSheet } from '../data/winter'
 import { buildTruck, partIn, type BuiltTruck } from './build'
 import { detExp, detLog, detPow } from './det'
 import { clipRecorder, type Clip } from './highlight'
+import { iceReading, type IceBand } from './ice'
 import { rivalsIn, rivalStages, type RivalStage } from './rivals'
-import { hashString } from './rng'
+import { hashString, Rng } from './rng'
 import { runStage } from './stage'
 import { fromCelsius } from './units'
 import { newFatigue, newWearState, worstDamage, type BreakEvent, type Fatigue, type WearState } from './wear'
@@ -61,16 +69,28 @@ export interface Stop {
   leg: number
   /** Metres from the start of the stage. */
   at: number
-  kind: BreakEvent['kind']
+  /** What broke, or 'ice' when the ice cracked under the truck, or 'slide' when it slid into a snowbank. */
+  kind: BreakEvent['kind'] | 'ice' | 'slide'
   /** The corner (0 to 3), or -1 for the frame. */
   corner: number
   zone: BreakEvent['zone']
   /** Seconds lost. */
   lost: number
-  /** Fitted a spare, bodged it, let the dampers cool, or limped on (too many stops). */
-  fix: 'spare' | 'bodge' | 'cool'
+  /** Fitted a spare, bodged it, let the dampers cool, backed off cracking ice onto the shore track, or dug it out. */
+  fix: 'spare' | 'bodge' | 'cool' | 'shore' | 'dig'
   /** True if the long-stage maths worked out the break rather than the sim driving that moment. */
   estimated: boolean
+}
+
+/** The ice booming and creaking under the truck at the thinnest place of a stretch: close, but it held. */
+export interface IceNote {
+  leg: number
+  /** Which piece of ground in the leg. */
+  seg: number
+  /** Metres from the start of the stage. */
+  at: number
+  /** The load against what the ice holds there (0.85 to 1). */
+  use: number
 }
 
 /** One stage, done. */
@@ -84,6 +104,8 @@ export interface StageRecord {
   /** True if a leg ended limping after too many stops. */
   limped: boolean
   rivals: RivalStage[]
+  /** Where the ice creaked (winter; missing in saves from before PR 10). */
+  iceNotes?: IceNote[]
 }
 
 export type RaidPhase = 'morning' | 'bivouac' | 'done'
@@ -125,6 +147,9 @@ export interface StageRun {
   segDone: number
   /** Restarts on this piece after a stop, for its road seed. */
   restarts: number
+  /** On the shore track after the ice cracked on this piece. */
+  shore: boolean
+  iceNotes: IceNote[]
   /** Pace call for each leg so far. */
   paces: PaceId[]
   /** Pace calls eased off after stops on this leg, and stops on this leg. */
@@ -164,10 +189,27 @@ export function powerFactor(truck: BuiltTruck): number {
   return Math.min(RAID.powerLimits[1], Math.max(RAID.powerLimits[0], k))
 }
 
+/** How much more grip the truck's tires have here than plain tires (1 on summer ground or without studs). */
+function gripRatio(truck: BuiltTruck, ground: RaidGround): number {
+  const g = GROUND[ground]
+  return truck.wear.front.tire.studded ? g.studGrip / g.grip : 1
+}
+
+/** Studded tires grip harder on winter ground, so the driver goes a little faster there (1 elsewhere). */
+export function studFactor(truck: BuiltTruck, ground: RaidGround): number {
+  return detPow(gripRatio(truck, ground), CORNERS.studSpeed)
+}
+
+/** The fastest the truck can take the tightest corner on this winter ground (m/s), or Infinity on summer ground. */
+export function cornerSpeed(truck: BuiltTruck, ground: RaidGround): number {
+  if (!WINTER_GROUND.includes(ground)) return Infinity
+  return STEADY_KMH[truck.build.cls][ground] * KMH * CORNERS.margin * detPow(gripRatio(truck, ground), CORNERS.gripPower)
+}
+
 /** The speed the driver takes a piece of ground at, on this pace call (m/s). */
 export function groundSpeed(truck: BuiltTruck, driver: DriverId, ground: RaidGround, pace: PaceId, power = powerFactor(truck)): number {
   const d = DRIVERS[driver]
-  let v = STEADY_KMH[truck.build.cls][ground] * KMH * PACE_SPEED[pace] * d.speed
+  let v = STEADY_KMH[truck.build.cls][ground] * KMH * PACE_SPEED[pace] * d.speed * studFactor(truck, ground)
   if (RAID.harshGround.includes(ground)) v *= 1 + RAID.hardSpeed * d.hardness
   if (RAID.fastGround.includes(ground)) v *= power
   return v
@@ -210,15 +252,31 @@ export function stageLegs(cls: ClassId, stage: RaidStage): Leg[] {
   return legs
 }
 
-/** Share of a stage on harsh ground (0 to 1). */
+/**
+ * Share of a stage on ground that makes trouble for the rivals (0 to 1):
+ * the harsh ground, and in winter the ice and snow too (snowbanks).
+ */
 export function harshShare(stage: RaidStage): number {
   const total = stage.segments.reduce((sum, s) => sum + s.km, 0)
-  const harsh = stage.segments.filter((s) => RAID.harshGround.includes(s.ground)).reduce((sum, s) => sum + s.km, 0)
+  const weight = (g: RaidGround) => (RAID.harshGround.includes(g) ? 1 : WINTER_GROUND.includes(g) ? RIVAL_WINTER_WEIGHT : 0)
+  const harsh = stage.segments.reduce((sum, s) => sum + s.km * weight(s.ground), 0)
   return total > 0 ? harsh / total : 0
 }
 
 export function stageKm(stage: RaidStage): number {
   return stage.segments.reduce((sum, s) => sum + s.km, 0)
+}
+
+/** The stage's lake ice in SI units, or null if it has no ice road. */
+export function iceSheet(stage: RaidStage): IceSheet | null {
+  return stage.ice ? { thickness: stage.ice.cm / 100, waveSpeed: stage.ice.waveKmh * KMH } : null
+}
+
+/** How the ice reads for this truck and driver at a pace call, before any stop eases it off; null without ice. */
+export function iceAtPace(stage: RaidStage, truck: BuiltTruck, driver: DriverId, pace: PaceId): { use: number; band: IceBand } | null {
+  const sheet = iceSheet(stage)
+  if (!sheet) return null
+  return iceReading(truck.mass, groundSpeed(truck, driver, 'ice', pace), sheet)
 }
 
 // ── Entering ──
@@ -290,6 +348,8 @@ export function startStage(state: RaidState, truck: BuiltTruck, pace: PaceId): S
     seg: 0,
     segDone: 0,
     restarts: 0,
+    shore: false,
+    iceNotes: [],
     paces: [pace],
     eased: 0,
     legStops: 0,
@@ -302,7 +362,7 @@ export function startStage(state: RaidState, truck: BuiltTruck, pace: PaceId): S
     stops: [],
     trace: { distance: [0], oil: [airTemp], wear: [worstDamage(state.wear)] },
     clips: [],
-    rivals: rivalStages(cls, legs.map((l) => l.par), stageKm(spec), harshShare(spec), raidSeed(state) * 100 + state.stage, raidField(state)),
+    rivals: rivalStages(cls, legs.map((l) => l.par), stageKm(spec), harshShare(spec), raidSeed(state) * 100 + state.stage, raidField(state), raid.season === 'winter'),
     status: 'driving',
     late: false,
   }
@@ -337,17 +397,41 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     // Too many stops: limp to the checkpoint, gently, with no more trouble.
     limp(run, seg.ground, remaining)
   } else {
-    const speed = groundSpeed(run.truck, driver, seg.ground, currentPace(run))
+    // Winter: does the ice hold at its thinnest place, and does the truck make the tightest corner?
+    // If not, drive only as far as the first of them.
+    let ground = seg.ground
+    if (ground === 'ice' && run.shore) ground = ICE_ROAD.shoreGround
+    const speed = groundSpeed(run.truck, driver, ground, currentPace(run))
+    let length = remaining
+    let hazard: 'ice' | 'slide' | null = null
+    const sheet = iceSheet(run.spec)
+    if (ground === 'ice' && sheet) {
+      const reading = iceReading(run.truck.mass, speed, sheet)
+      const thin = placeOn(state, run, 'ice', ICE_ROAD.thinFrom, ICE_ROAD.thinTo) * seg.length
+      if (reading.band === 'cracks' && run.segDone < thin) {
+        length = thin - run.segDone
+        hazard = 'ice'
+      } else if (reading.band === 'creaking' && run.segDone <= thin && !run.iceNotes.some((n) => n.leg === run.leg && n.seg === run.seg)) {
+        run.iceNotes.push({ leg: run.leg, seg: run.seg, at: run.at + (thin - run.segDone), use: reading.use })
+      }
+    }
+    if (speed > cornerSpeed(run.truck, ground)) {
+      const corner = placeOn(state, run, 'corner', CORNERS.from, CORNERS.to) * seg.length
+      if (run.segDone < corner && corner - run.segDone < length) {
+        length = corner - run.segDone
+        hazard = 'slide'
+      }
+    }
     const seed = hashString(`${raidSeed(state)}:${run.stage}:${run.leg}:${run.seg}:${run.restarts}`)
     const res = runStage(
       run.truck.ride,
-      { airTemp: run.airTemp, oilTemp: run.oil, segments: [{ ground: seg.ground, length: remaining, speed }] },
+      { airTemp: run.airTemp, oilTemp: run.oil, segments: [{ ground, length, speed }] },
       seed,
       'sampled',
       run.truck.wear,
       { wear: run.wear, clips: clipRecorder(run.clips, run.leg, run.at) },
     )
-    const driven = Math.min(remaining, res.distance)
+    const driven = Math.min(length, res.distance)
     for (let k = 1; k < res.trace.distance.length; k++) {
       run.trace.distance.push(run.at + (res.trace.distance[k] as number))
       run.trace.oil.push(res.trace.oil[k] as number)
@@ -355,11 +439,16 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     }
     run.oil = res.endTemp.slice()
     run.wear = res.wear!.state
-    run.time += (driven / speed) * lineFactor(driver, seg.ground)
+    // The shore track is longer than the ice road it stands in for.
+    run.time += (driven / speed) * lineFactor(driver, ground) * (ground !== seg.ground ? ICE_ROAD.shoreLength : 1)
     run.at += driven
     run.segDone += driven
     const broken = res.wear!.broken
-    if (broken && run.segDone < seg.length - 1) {
+    if (hazard && !broken && driven >= length - 1) {
+      if (hazard === 'ice') iceCracks(run)
+      else slideOff(run)
+      run.restarts++
+    } else if (broken && run.segDone < seg.length - 1) {
       roadsideFix(state, run, broken)
       run.restarts++
     } else if (broken) {
@@ -372,6 +461,7 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     run.seg++
     run.segDone = 0
     run.restarts = 0
+    run.shore = false
   }
   if (run.time > closingTime(run)) {
     run.late = true
@@ -379,6 +469,38 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     return
   }
   if (run.seg >= leg.segments.length) endLeg(run)
+}
+
+/**
+ * Where something sits on this piece of ground (the ice's thinnest place, or
+ * the tightest corner), as a share of the way along: the same every time
+ * for the same raid.
+ */
+function placeOn(state: RaidState, run: StageRun, what: string, from: number, to: number): number {
+  return new Rng(hashString(`${raidSeed(state)}:${run.stage}:${run.leg}:${run.seg}:${what}`)).range(from, to)
+}
+
+/** A winter stop with nothing broken: lose the time, let the oil cool, ease off. */
+function winterStop(run: StageRun, kind: 'ice' | 'slide', fix: 'shore' | 'dig', lost: number): void {
+  coolFor(run, lost)
+  run.time += lost
+  run.stops.push({ leg: run.leg, at: run.at, kind, corner: -1, zone: null, lost, fix, estimated: false })
+  run.legStops++
+  run.eased = Math.min(RAID.easeSteps, run.eased + 1)
+  run.trace.distance.push(run.at)
+  run.trace.oil.push(Math.max(...run.oil))
+  run.trace.wear.push(worstDamage(run.wear))
+}
+
+/** The ice cracked under the truck: back off onto thick ice and take the shore track for the rest of this stretch. */
+function iceCracks(run: StageRun): void {
+  winterStop(run, 'ice', 'shore', ICE_ROAD.backOff)
+  run.shore = true
+}
+
+/** Too fast for the grip at the tightest corner: wide into the snowbank, and dug out. */
+function slideOff(run: StageRun): void {
+  winterStop(run, 'slide', 'dig', CORNERS.digOut)
 }
 
 function limp(run: StageRun, ground: RaidGround, distance: number): void {
@@ -409,6 +531,7 @@ export function leaveCheckpoint(run: StageRun, pace: PaceId): void {
   run.seg = 0
   run.segDone = 0
   run.restarts = 0
+  run.shore = false
   run.eased = 0
   run.legStops = 0
   run.paces.push(pace)
@@ -515,6 +638,7 @@ export function finishStage(state: RaidState, run: StageRun): StageRecord {
     late: run.late,
     limped: run.limped,
     rivals: run.rivals,
+    iceNotes: run.iceNotes.slice(),
   }
   state.results.push(record)
   state.wear = structuredClone(run.wear)
