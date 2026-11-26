@@ -409,7 +409,10 @@ export function driveSectionWithWear(
   for (let n = 0; n < steps && !w.broken; n++) {
     stepRide(s, p, profile, speed, stats, forces)
     stepWear(w, wp, s, p, forces, profile, speed, readings)
-    if (rec) record(rec, s.oilTemp, forces, readings, w)
+    if (rec) {
+      record(rec, s.oilTemp, forces, readings, w)
+      if (w.broken && rec.tick !== 0) record(rec, s.oilTemp, forces, readings, w, true)
+    }
   }
   return stats
 }

@@ -5,7 +5,7 @@ import { runStage, type StageSpec } from '../src/sim/stage'
 import { fromCelsius } from '../src/sim/units'
 
 const AIR = fromCelsius(20)
-const SPEED: Record<GroundId, number> = { graded: 24, washboard: 20, rocks: 14, whoops: 15, jumps: 18, iceHeaves: 20 }
+const SPEED: Record<GroundId, number> = { graded: 24, washboard: 20, rough: 20, rocks: 14, whoops: 15, jumps: 18, iceHeaves: 20 }
 const sum = (a: number[]) => a.reduce((x, y) => x + y)
 const mean = (a: number[]) => sum(a) / a.length
 

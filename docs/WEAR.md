@@ -39,8 +39,9 @@ Each has its own cause in the physics, its own trace and its own fixes
 While the truck runs, `src/sim/trace.ts` keeps the last 3 seconds of every
 channel, 100 samples a second, overwriting the oldest. When something
 breaks, it cuts out the channels that failure's trace needs, for the corner
-(or frame) that broke. The report in plan PR 4 draws them; for now the
-preview page's break test shows the main one.
+(or frame) that broke. The report (plan PR 4, `docs/RIGS.md`) draws them.
+The lap runs keep one extra sample on the very step something breaks, so
+the trace ends on the moment it let go.
 
 ## The test mules' parts
 
@@ -63,9 +64,9 @@ with heat and wear carried over. Every step runs in full detail, because a
 break needs its exact moment and trace. The two loops in `src/data/rigs.ts`
 are first drafts of the shop's rigs:
 
-- **Washboard ladder:** 1.2 km of washboard and 600 m of whoops, from 40 km/h,
-  5 km/h faster each lap. The whoops are there because washboard alone heats
-  dampers most at 20 to 40 km/h (see `docs/RIDE-SIM.md`).
+- **Washboard ladder:** 600 m of washboard and 1.2 km of rough gravel, from
+  40 km/h, 5 km/h faster each lap (plan PR 4; it had whoops at first, see
+  `docs/RIGS.md`).
 - **Torture loop:** whoops, a rock garden, a graded bit and jumps, from
   30 km/h.
 
@@ -107,9 +108,10 @@ it on a phone from the Actions tab.
 - **A heavy truck slamming its hard stops cuts tires.** The force of the
   hit goes through the tire into the rocks. The bot's "short bump stops"
   build uses a milder cut for the heavy truck so it finds the bottoming.
-- **On the washboard ladder, the light and heavy mules bottom out on the
-  whoops before their dampers fade.** Plan PR 4 should tune the ladder (fewer
-  or smaller whoops) so it finds fade, as its name says.
+- **On the washboard ladder, the light and heavy mules bottomed out on the
+  whoops before their dampers faded.** Plan PR 4 swapped the whoops for
+  rough gravel, and now every stock build fades first there
+  (`docs/RIGS.md`).
 - **Tire pressure is a setting now** (plan PR 3): the tire's stiffness comes
   from its pressure (`docs/BUILD.md`). The bot still lowers the stiffness
   directly; the trace can show the pressure once the rigs use builds (plan

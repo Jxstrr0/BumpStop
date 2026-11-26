@@ -61,7 +61,9 @@ match the wheels' own bounce and they hop and heat up most. Faster, the
 wheels skim and the dampers do less work, until the general roughness of the
 road takes over again. Big features (whoops, jumps, frost heaves) are the
 other way round: faster always means hotter. The washboard ladder rig in
-plan PR 4 should be designed with that in mind.
+plan PR 4 was designed with that in mind: it's mostly rough gravel now
+(`docs/RIGS.md`), and the shaker rig finds the same wheel hop, at about
+21 to 28 km/h on washboard.
 
 ## Tests
 

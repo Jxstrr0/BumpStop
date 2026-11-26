@@ -1,7 +1,7 @@
 /**
  * The look preview's roadbook strip (plan PR 0): plain SVG with sample
  * notes, so the look can be judged on a phone. The trace that used to sit
- * beside it now runs on the real ride sim (`rideCheck.ts`).
+ * beside it became the rigs in plan PR 4 (`shop.ts`).
  */
 import { t, type StringKey } from '../data/strings'
 import { el, num, svg } from './dom'

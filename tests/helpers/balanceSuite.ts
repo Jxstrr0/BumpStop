@@ -23,6 +23,8 @@ export function balanceSuite(cls: ClassId): void {
         expect(run.brokenLap).toBeGreaterThan(1)
         expect(breakKmh(run)).toBeGreaterThanOrEqual(lo)
         expect(breakKmh(run)).toBeLessThanOrEqual(hi)
+        // The ladder is the fade finder (plan PR 4): the stock build's dampers give up before anything else.
+        if (rig === 'washboardLadder') expect(run.broken?.kind, `${cls} on the ladder: ${say(run)}`).toBe('fade')
       }
     }, BOT_TIMEOUT)
 
