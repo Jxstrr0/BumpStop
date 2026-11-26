@@ -32,6 +32,10 @@ Live at https://bumpstop.longlight.games/ (once the address is set up).
 - The career (calendar, money, prize money, contracts, reputation,
   sponsors, the shop's upgrades, the rival teams and their habits):
   `src/data/career.ts`. In plain words: `docs/CAREER.md`.
+- Balance across the three classes (how the rival teams' pace, the
+  reputation and the parts were set, and the career bot that checks them):
+  `docs/BALANCE.md`. The bot and the other slow checks live in
+  `scripts/harness/` and run by hand, not on every pull request.
 - The help (the damper lessons' toy truck corner and roads:
   `src/data/lessons.ts`; the glossary's list: `src/data/glossary.ts`; every
   word of both: `src/data/strings.ts`). In plain words: `docs/HELP.md`.

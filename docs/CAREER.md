@@ -122,7 +122,11 @@ because the rivals' budgets grow and better parts come out.
 
 ## Reputation
 
-Results earn reputation (half as much for a contract). It opens:
+Results earn reputation (half as much for a contract): a regional raid
+gives 1 to finish, 2 for a podium and 4 for a win; a national raid 2, 4 and
+7; the Long One 3, 8 and 15 (`TIERS`). A podium at every raid opens the
+Long One in the third or fourth season (plan PR 13 slowed it from the
+second). It opens:
 
 | Reputation | What opens |
 | --- | --- |
@@ -137,7 +141,7 @@ Results earn reputation (half as much for a contract). It opens:
 | 35 | A regional sponsor (4,000 a raid) |
 | 40 | A welding bay (cheaper repairs again) |
 | 60 | The Long One with your own truck |
-| 80 | A works deal: 8,000 a raid and a quarter off parts |
+| 120 | A works deal: 8,000 a raid and a quarter off parts |
 
 Sponsors don't stack: the best one you qualify for is the one you have.
 
@@ -149,10 +153,12 @@ Four teams (working names, `docs/NAMES.md`), each with its own habits:
 | --- | --- | --- | --- |
 | Brannigan Brothers | light 4x4 (side-by-side from 2004) | power first | often (half the time, slot by slot) |
 | Highbank Racing | light 4x4 from 1990, heavy from 1994, side-by-side from 1998 | the newest parts | sometimes |
-| Hardpan Haulage Works | heavy (light 4x4 from 2000), national raids and the Long One only | the strongest parts | rarely |
+| Hardpan Haulage Works | heavy (light 4x4 from 2000), every raid since plan PR 13 (was national raids and the Long One only) | the strongest parts | rarely |
 | Jackrabbit Sport | side-by-side (light 4x4 from 1996) | the lightest parts | sometimes |
 
-Plus three privateers per class on stock trucks.
+Plus three privateers per class on stock trucks. The heavy privateers are a
+little quicker than the others (their trucks rarely break). How these numbers were
+set: `docs/BALANCE.md`.
 
 Each team has a truck for each class it races, made from real parts. Every
 new year it upgrades the slots on its list in its own way, inside a budget

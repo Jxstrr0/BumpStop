@@ -48,8 +48,11 @@ which is `load ÷ rate − preload`, measured up from full droop.
   travel left before the bump stop.
 - Droop = the sag, or the limit strap if that's shorter.
 - Preload lifts the truck: more bump travel, less droop.
-- The axle or CV joint runs straight at a fixed place in the stroke, so its
-  angle at ride height follows the sag too.
+- The axle or CV joint runs straight at a fixed height above full droop, so
+  its angle at ride height follows the sag too. That height is the same for
+  every suspension part (plan PR 13): longer travel only adds angle at the
+  ends of the stroke, so the 1990s wishbones and trailing arms aren't a trap
+  on their factory settings.
 
 This is what the balance bot asked for in `docs/WEAR.md`.
 
