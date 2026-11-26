@@ -77,6 +77,9 @@ faster, so it doesn't hit any harder.
 | Rock garden | 30 | 48 | 26 |
 | Jumps | 48 | 44 | 35 |
 
+Winter ground (frost heaves, ice road, packed snow) has its own speeds, set
+by grip: see `docs/WINTER.md`.
+
 They came from a sweep: each stock truck on 10 km of each ground, 20 to
 80 km/h, 20 °C. What it showed:
 
@@ -105,7 +108,9 @@ They came from a sweep: each stock truck on 10 km of each ground, 20 to
 | The gravel ace | 1.01 | neither | graded, washboard and rough (2% less time) | normal |
 | The mechanic | 0.99 | fairly smooth | nothing special | 30% quicker |
 
-Harsh ground is rough gravel, whoops, rocks and jumps. Driver fees and
+Harsh ground is rough gravel, whoops, rocks, jumps and frost heaves. In
+winter the veteran is good on ice roads too, and the gravel ace on packed
+snow. Driver fees and
 drivers wanting better trucks arrive with the career and money (plan PR 9).
 
 ## Roadside fixes
@@ -169,10 +174,13 @@ real trucks and habits that change.
 | --- | --- | --- |
 | Summer Sprint | 3: logging roads, rock country, the old burn | about 100 km a day |
 | Summer Raid | 5: logging roads, eskers, rock country, hot haul roads, the old burn | 160 to 190 km a day |
+| Winter Sprint | 3: ice roads, frost heaves, the big lake | about 90 km a day |
+| Winter Raid | 4: ice roads, frost heaves, the big lake, the tundra | 140 to 170 km a day |
 
-Both are summer raids: winter, ice and cold oil come in plan PR 10. Every
-entry drives the same roads (each raid has a fixed seed), so a second go
-shows what a change did.
+The winter raids (plan PR 10b) bring cold oil, studs, corners you can slide
+off and lake ice that can crack under a heavy truck: `docs/WINTER.md`.
+Every entry drives the same roads (each raid has a fixed seed), so a second
+go shows what a change did.
 
 ## Highlights for the 3D
 
@@ -210,8 +218,8 @@ kit, the most the bivouac could fix each night):
 
 The career (`docs/CAREER.md`) adds four raids to the data: Midsummer
 Sprint (3 stages), the National Raid (7), the Autumn Raid (5) and the Long
-One (14). The free-play panel still offers the first two raids only
-(`FREE_RAID_IDS`). A career raid's entry also carries three things a
+One (14). The free-play panel offers the two summer raids and the two winter
+raids (`FREE_RAID_IDS`). A career raid's entry also carries three things a
 free-play raid leaves out: `seed` (this year's roads, so the same raid is a
 new road each year), `field` (the rival teams with the trucks they have
 that year, from `src/sim/teams.ts`) and `hours` (the garage's mechanic

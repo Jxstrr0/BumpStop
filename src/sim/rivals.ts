@@ -38,9 +38,10 @@ export function rivalsIn(cls: ClassId): Rival[] {
  * @param km the stage's length.
  * @param harsh the share of the stage on harsh ground (0 to 1).
  * @param field who's entered: the free-play rivals by default, or the career's teams (`teams.ts`).
+ * @param winter a winter stage: nobody's dampers fade.
  */
 export function rivalStages(
-  cls: ClassId, legPar: readonly number[], km: number, harsh: number, seed: number, field: readonly Rival[] = rivalsIn(cls),
+  cls: ClassId, legPar: readonly number[], km: number, harsh: number, seed: number, field: readonly Rival[] = rivalsIn(cls), winter = false,
 ): RivalStage[] {
   const par = legPar.reduce((a, b) => a + b, 0)
   const close = par * RAID.closeAfter
@@ -53,7 +54,9 @@ export function rivalStages(
     if (rng.chance(chance)) {
       const leg = rng.int(0, legs.length - 1)
       const lost = rng.range(rival.delay[0], rival.delay[1]) * 3600 * CLASS_WORK[cls]
-      const kind = rival.trouble[rng.int(0, rival.trouble.length - 1)] as RivalTrouble
+      let kind = rival.trouble[rng.int(0, rival.trouble.length - 1)] as RivalTrouble
+      // Nothing fades in the cold: in winter that trouble is a snowbank instead.
+      if (winter && kind === 'fade') kind = 'stuck'
       legs[leg] = (legs[leg] as number) + lost
       trouble = { kind, leg, lost }
     }
