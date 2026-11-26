@@ -53,8 +53,8 @@ This goes through the build store's bench (`setBench` in
 
 ## The shape of it
 
-You start on day 100 of 1985: a two-person garage with 8,000 in the bank
-and no truck. Every year has six raids (`CALENDAR`), and at each one the
+You start on day 15 of 1985: a two-person garage with 8,000 in the bank
+and no truck. Every year has eight raids, two of them in winter (`CALENDAR`), and at each one the
 garage does **one job**:
 
 1. **A prep contract.** A privateer brings a class, a budget and a driver.
@@ -73,10 +73,12 @@ Then the career moves on by days to the next raid. After the last raid of
 the year (the Long One) a new year starts: new parts come out, and the
 rival teams buy for it.
 
-## The calendar (all summer for now)
+## The calendar
 
 | Day | Raid (working name) | Stages | Size |
 | --- | --- | --- | --- |
+| 40 | Winter Sprint | 3 | regional |
+| 75 | Winter Raid | 4 | regional |
 | 130 | Summer Sprint | 3 | regional |
 | 158 | Summer Raid | 5 | regional |
 | 186 | National Raid | 7 | national |
@@ -84,9 +86,10 @@ rival teams buy for it.
 | 244 | Autumn Raid | 5 | national |
 | 268 | The Long One | 14 | the long one |
 
-A raid takes a day a stage plus two days of travel. Winter raids join the
-calendar with plan PR 10 (cold oil and ice); that's also when the career's
-very first job can become the plan's three-stage winter raid. The National
+A raid takes a day a stage plus two days of travel. A career starts on day
+15 of 1985, so its first job is the three-stage Winter Sprint, as the plan
+has it. The two winter raids (plan PR 10) bring cold oil, studs, snowbanks
+and lake ice (`docs/WINTER.md`); rivals don't fade in winter. The National
 Raid, the Autumn Raid and the Long One share a set of long stages (logging
 roads, eskers, rock country, haul roads, the old burn, the mine roads and
 long fast gravel), each on its own roads.
@@ -194,7 +197,6 @@ roads and the contracts keep changing.
 
 ## What's not here yet
 
-- **Winter raids** (plan PR 10).
 - **Names** for the money, the raids, the sponsors, the drivers and the
   privateers: all working names until Kelbo picks.
 

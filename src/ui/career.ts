@@ -24,7 +24,7 @@ import type { TruckBuild } from '../data/kit'
 import { SLOTS } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, RAIDS, type DriverId } from '../data/raids'
 import { t, tf, type StringKey } from '../data/strings'
-import { changeCost, checkBuild, findPart, shopRules, stockBuild, tidyBuild, type BuildProblem } from '../sim/build'
+import { changeCost, checkBuild, findPart, partIn, shopRules, stockBuild, tidyBuild, type BuildProblem } from '../sim/build'
 import {
   buyTruck, buyUpgrade, cheapestBuild, contractProblems, contractRaid, contractRules, discountOf, driveAutoStage, driverFee,
   dropContract, entryFee, entryProblems, enterOwn, eventDays, fitOwn, isBroke, newCareer, nextEvent, offers, ownRules,
@@ -459,6 +459,10 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves): CareerPanel
     lines.append(el('p', 'readout-line', tf('career.entryTotal', { n: money(fees - pay) })))
     const prizes = TIERS[tier].prizes.map((p) => money(p * CLASS_MONEY[cls])).join(' · ')
     lines.append(el('p', 'small', tf('career.prizes', { list: prizes })))
+    // A winter raid on plain tires is allowed, just slower: say so before the fees are paid.
+    if (RAIDS[nextEvent(career).raid].season === 'winter' && !partIn(store.build(), 'tires').studded) {
+      lines.append(el('p', 'small warm-text', t('raidUi.winterNoStuds')))
+    }
     const problems = entryProblems(career, driver, store.build())
     const enter = button(t('career.enter'), 'btn start-btn')
     enter.disabled = problems.length > 0 || !startRaid
@@ -633,7 +637,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves): CareerPanel
         tf('career.calendarLine', { date: dateText(career.year, e.day), raid: t(RAIDS[e.raid].name), stages: String(RAIDS[e.raid].stages.length), tier: tierName(e.tier), rep: String(TIERS[e.tier].rep) }))
       list.append(li)
     })
-    wrap.append(list, el('p', 'small', t('career.winterLater')))
+    wrap.append(list)
     return wrap
   }
 

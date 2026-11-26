@@ -61,8 +61,11 @@ describe('starting a career', () => {
     expect(Object.keys(c.teams.highbank)).toEqual([])
   })
 
-  it('has about six raids a year, in order, with the Long One last', () => {
-    expect(CALENDAR.length).toBe(6)
+  it('has eight raids a year, in order: the Winter Sprint first and the Long One last', () => {
+    expect(CALENDAR.length).toBe(8)
+    expect(CALENDAR[0]!.raid).toBe('winterSprint')
+    expect(RAIDS.winterSprint.stages.length).toBe(3)
+    expect(CALENDAR.filter((e) => RAIDS[e.raid].season === 'winter').map((e) => e.raid)).toEqual(['winterSprint', 'winterRaid'])
     for (let i = 1; i < CALENDAR.length; i++) expect(CALENDAR[i]!.day).toBeGreaterThan(CALENDAR[i - 1]!.day + RAIDS[CALENDAR[i - 1]!.raid].stages.length)
     expect(CALENDAR.at(-1)!.raid).toBe('longOne')
     expect(RAIDS.longOne.stages.length).toBe(14)
@@ -184,7 +187,7 @@ describe('your own truck', () => {
     expect(entryProblems(c, 'gravelAce').map((p) => p.kind)).toEqual(['driverRep'])
     const bench = { ...c.own!, parts: { ...c.own!.parts, bumpStops: 'urethane' } }
     expect(entryProblems(c, 'veteran', bench).map((p) => p.kind)).toEqual(['parts'])
-    skipTo(c, 1985, 2)
+    skipTo(c, 1985, CALENDAR.findIndex((e) => e.raid === 'nationalRaid'))
     expect(nextEvent(c).tier).toBe('national')
     expect(entryProblems(c, 'veteran').map((p) => p.kind)).toEqual(['rep'])
     c.rep = TIERS.national.rep
@@ -247,7 +250,7 @@ describe('the Long One', () => {
     const c = newCareer(11)
     c.money = 200_000
     buyTruck(c, 'light4x4')
-    skipTo(c, 1985, 5)
+    skipTo(c, 1985, CALENDAR.findIndex((e) => e.raid === 'longOne'))
     expect(nextEvent(c).raid).toBe('longOne')
     expect(entryProblems(c, 'veteran').map((p) => p.kind)).toEqual(['rep'])
     c.rep = TIERS.long.rep

@@ -3,7 +3,7 @@
  * privateers' trucks for money, then enters its own truck, then wins
  * sponsors and a works deal, and one day wins the Long One.
  *
- * - **The calendar:** about six raids a year (`CALENDAR`). At each one the
+ * - **The calendar:** eight raids a year, two in winter (`CALENDAR`). At each one the
  *   garage does one job: a prep contract, its own entry, or nothing. Time
  *   moves by days: from one raid to the next.
  * - **Prep contracts:** a privateer brings a class, a budget and a driver.
@@ -492,7 +492,7 @@ function rivalsOnly(c: CareerState, cls: ClassId): string[] {
   const sums = new Map<string, number>()
   raid.stages.forEach((spec, k) => {
     const legs = stageLegs(cls, spec)
-    const res = rivalStages(cls, legs.map((l) => l.par), stageKm(spec), harshShare(spec), eventSeed(c) * 100 + k, field)
+    const res = rivalStages(cls, legs.map((l) => l.par), stageKm(spec), harshShare(spec), eventSeed(c) * 100 + k, field, raid.season === 'winter')
     for (const r of res) sums.set(r.id, (sums.get(r.id) ?? 0) + r.time)
   })
   return [...sums].sort((a, b) => a[1] - b[1]).map(([id]) => id)
