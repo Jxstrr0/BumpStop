@@ -141,7 +141,7 @@ export const FORECAST_WORDS = [
 
 /** How the 3D highlight looks in each weather: fog colour (light, dark) and how near it closes in (m). */
 export const WEATHER_LOOK: Readonly<Record<WeatherId | 'clear', { light: number; dark: number; near: number; far: number }>> = {
-  clear: { light: 0xdfe4e3, dark: 0x151922, near: 40, far: 140 },
+  clear: { light: 0xdfe4e3, dark: 0x151922, near: 55, far: 260 },
   thaw: { light: 0xc9cdcb, dark: 0x1d2126, near: 25, far: 100 },
   whiteout: { light: 0xf2f4f5, dark: 0x6d727a, near: 4, far: 38 },
   dust: { light: 0xcdb48c, dark: 0x5a4a35, near: 6, far: 48 },

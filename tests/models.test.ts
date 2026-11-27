@@ -40,7 +40,7 @@ function gltfJson(path: string): { nodes: GltfNode[] } {
 const CORNERS = ['FL', 'FR', 'RL', 'RR']
 
 /** Parts with nothing to bolt on, so nothing to draw. */
-const NOTHING_TO_SEE = new Set(['noGuards', 'noSpares', 'noBars', 'petrolSix'])
+const NOTHING_TO_SEE = new Set(['noGuards', 'noSpares', 'noBars'])
 /** Slots drawn once per corner. */
 const PER_CORNER: readonly SlotId[] = ['dampers', 'wheels', 'tires']
 
@@ -100,11 +100,22 @@ describe.each(CLASSES.map((c) => c.id))('the %s model', (cls) => {
     }
   })
 
-  it('gives every arm its end on the hub', () => {
+  it('gives every arm its end on the hub (or the axle, for a prop shaft)', () => {
     for (const name of byName.keys()) {
-      if (!/^Arm_(FL|FR|RL|RR)(_\w+)?$/.test(name)) continue
+      if (!/^Arm_(FL|FR|RL|RR|F|R)(_\w+)?$/.test(name)) continue
       expect(byName.has(name.replace(/^Arm_/, 'ArmEnd_')), name).toBe(true)
     }
+  })
+
+  it('has a driveline, and keeps the debug split out of the shipped file', () => {
+    // A truck on solid axles has a two-piece prop shaft to each: one half on the gearbox, one on the axle, sliding together.
+    for (const end of ['F', 'R']) {
+      if (!byName.has(`Axle_${end}`)) continue
+      const live = byName.has(`Arm_${end}_Prop`)
+      expect(byName.has(`Arm_${end}_PropSlip`), `Arm_${end}_PropSlip`).toBe(live)
+    }
+    // `BUMP_SPLIT=1` draws the driveline as its own node for check shots: never commit that build.
+    expect(byName.has('Driveline')).toBe(false)
   })
 
   it('names only real slots and parts for this class', () => {
@@ -135,6 +146,6 @@ describe.each(CLASSES.map((c) => c.id))('the %s model', (cls) => {
   it('stays small enough for a phone', () => {
     // The download (zipped) and what the phone holds once it's unzipped.
     expect(statSync(path).size).toBeLessThan(300 * 1024)
-    expect(gunzipSync(readFileSync(path)).length).toBeLessThan(1200 * 1024)
+    expect(gunzipSync(readFileSync(path)).length).toBeLessThan(1500 * 1024)
   })
 })

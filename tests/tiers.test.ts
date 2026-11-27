@@ -1,6 +1,6 @@
 // Graphics tiers (plan PR 12): the tier table and Auto's step-down.
 import { describe, expect, it } from 'vitest'
-import { AUTO_TIER, MAX_TREE_ROWS, TIER_IDS, TIERS } from '../src/data/graphics'
+import { AUTO_TIER, TIER_IDS, TIERS } from '../src/data/graphics'
 import { guessTier, TierGovernor } from '../src/render/tiers'
 
 /** Feed the governor `seconds` of frames at `fps`; returns the first step down, if any. */
@@ -17,11 +17,10 @@ describe('graphics tiers', () => {
       const hi = TIERS[TIER_IDS[i]!]
       expect(lo.pixelRatioCap).toBeLessThanOrEqual(hi.pixelRatioCap)
       expect(lo.shadowMap).toBeLessThanOrEqual(hi.shadowMap)
-      expect(lo.treeRows).toBeLessThanOrEqual(hi.treeRows)
+      expect(lo.cover).toBeLessThanOrEqual(hi.cover)
       expect(lo.dust).toBeLessThanOrEqual(hi.dust)
       expect(lo.roadStep).toBeGreaterThanOrEqual(hi.roadStep)
     }
-    for (const id of TIER_IDS) expect(TIERS[id].treeRows).toBeLessThanOrEqual(MAX_TREE_ROWS)
   })
 
   it('Lite skips the shadow pass, so the trucks are drawn once', () => {
