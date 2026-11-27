@@ -10,7 +10,12 @@
  * snapped axle, a shock torn off its mount, smoke off a cooked damper, a
  * jolt for a bottom-out or a cracked frame.
  *
- * On the shaker rig the truck stands on four posts on the shop floor.
+ * On the shaker rig the truck stands on four hydraulic posts in the team's
+ * workshop.
+ *
+ * Round the road is Birchland (the scenery pass): the land from
+ * `terrain.ts`, the forest and roadside from `scenery.ts`, and the sky from
+ * `sky.ts`. A rig's loop has a start line; a raid stage doesn't.
  *
  * A ghost truck (your best run, or a friend's) can drive the loop with you:
  * a pale, see-through copy posed from its own clip of the same moments.
@@ -22,6 +27,7 @@
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
 import { PHOTO_LIFT } from '../data/graphics'
+import { LAND, LAND_COLOUR, SHAKER_FLOOR, SKY } from '../data/scenery'
 import type { FailureKind } from '../data/wear'
 import { WEATHER_LOOK, type WeatherId } from '../data/weather'
 import type { Profile } from '../sim/ground'
@@ -29,7 +35,9 @@ import type { Pose } from '../sim/poses'
 import { GHOST_LOOK } from '../data/rigs'
 import { addLights, applyLook, applyTier, cssColour, isDark, makeRenderer, onLookChange } from './look'
 import { Puffs } from './particles'
-import { Forest, placePieces, stripGeometry } from './terrain'
+import { loadKit, plant, Props, Wires, type Kit } from './scenery'
+import { Sky, SKY_RADIUS, SUN_DIRECTION } from './sky'
+import { buildGround, isWinter, placePieces, wholeRows, type Ground } from './terrain'
 import { frameTime, onTierChange, tierSettings } from './tiers'
 import { TruckModel, type FittedParts, type Stance, type TruckPose } from './truckModel'
 
@@ -64,6 +72,8 @@ export interface RunSetup {
   wheelbase: number
   /** A ghost truck of the same class to race, or null. */
   ghost?: { stance: Stance; parts: FittedParts } | null
+  /** The road is a rig's loop, driven lap after lap: it gets a start line, and the same scenery every lap. */
+  loop?: boolean
 }
 
 /** Photo mode's camera and moment (plan PR 12). */
@@ -143,35 +153,66 @@ function lerpPose(a: Pose, b: Pose, u: number): Pose {
 export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   const renderer = makeRenderer(canvas)
   const scene = new THREE.Scene()
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 400)
+  // The far limit is past the sky's bowl.
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, SKY_RADIUS * 1.2)
   const lights = addLights(scene, 8)
   scene.fog = new THREE.Fog(0xffffff, 40, 140)
 
-  // The road strip (rebuilt per clip) and the forest.
+  // Outdoors: the road strip and the land (rebuilt per clip), a lake's water, the scenery and the sky.
+  const outdoors = new THREE.Group()
   const roadMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: false })
   const strip = new THREE.Mesh(new THREE.BufferGeometry(), roadMat)
   strip.receiveShadow = true
-  scene.add(strip)
-  const forest = new Forest()
-  scene.add(forest.group)
+  // The land is drawn in flat facets, like the trees and rocks standing on it.
+  const landMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, flatShading: true })
+  const hills = new THREE.Mesh(new THREE.BufferGeometry(), landMat)
+  const waterMat = new THREE.MeshStandardMaterial({ roughness: 0.18, metalness: 0 })
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), waterMat)
+  water.rotation.x = -Math.PI / 2
+  const sky = new Sky()
+  const wires = new Wires()
+  outdoors.add(strip, hills, water, wires.lines, sky.group)
+  scene.add(outdoors)
+  let ground: Ground | null = null
+  // The scenery kit arrives a moment after the first truck does.
+  let props: Props | null = null
 
-  // The shaker rig's shop floor and four posts.
+  // The shaker rig: the workshop, its floor, and four hydraulic posts with a pan under each wheel.
   const shop = new THREE.Group()
   const shopFloorMat = new THREE.MeshStandardMaterial({ roughness: 0.95 })
-  const shopFloor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), shopFloorMat)
+  const shopFloor = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), shopFloorMat)
   shopFloor.rotation.x = -Math.PI / 2
-  shopFloor.position.y = -0.3
+  shopFloor.position.y = SHAKER_FLOOR
   shopFloor.receiveShadow = true
   shop.add(shopFloor)
-  const postMat = new THREE.MeshStandardMaterial({ color: 0x5b5d61, metalness: 0.6, roughness: 0.4 })
+  const shopMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, side: THREE.DoubleSide })
+  // Each post: a base bolted to the floor and a pan that follows the wheel.
   const posts = [0, 1, 2, 3].map(() => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 0.6), postMat)
-    m.castShadow = true
-    m.receiveShadow = true
-    shop.add(m)
-    return m
+    const post = { base: new THREE.Group(), pan: new THREE.Group() }
+    shop.add(post.base, post.pan)
+    return post
   })
   scene.add(shop)
+
+  /** Build what's made from the scenery kit: the workshop, the posts, the far hills and the clouds. */
+  function useKit(kit: Kit): void {
+    if (props) return
+    props = new Props(kit)
+    outdoors.add(props.group)
+    sky.setKit(kit)
+    const room = kit.get('Shop')
+    if (room) shop.add(new THREE.Mesh(room, shopMat))
+    for (const post of posts) {
+      for (const [name, into] of [['ShakerBase', post.base], ['ShakerPan', post.pan]] as const) {
+        const g = kit.get(name)
+        if (!g) continue
+        const mesh = new THREE.Mesh(g, shopMat)
+        mesh.castShadow = true
+        mesh.receiveShadow = true
+        into.add(mesh)
+      }
+    }
+  }
 
   const dust = new Puffs(160, 0xc8b89a)
   const smoke = new Puffs(70, 0xe8e8e8)
@@ -212,16 +253,34 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const dark = isDark()
     // A pale northern sky by day; a deep blue one for night stages. Weather greys it, whitens it or browns it.
     const w = WEATHER_LOOK[weather]
-    const sky = new THREE.Color(dark ? w.dark : w.light)
-    scene.background = sky
+    const haze = new THREE.Color(dark ? w.dark : w.light)
     const fog = scene.fog as THREE.Fog
-    fog.color.copy(sky)
-    fog.near = w.near
-    fog.far = w.far
+    fog.color.copy(haze)
+    if (run && !run.road) {
+      // Indoors on the shaker rig: no haze, and the workshop's own gloom past the open side.
+      scene.background = cssColour('--panel-2', '#ece8dc').multiplyScalar(dark ? 0.5 : 0.8)
+      fog.near = 200
+      fog.far = 800
+    } else {
+      scene.background = haze
+      fog.near = w.near
+      fog.far = w.far
+    }
+    sky.setLook(weather, dark)
+    // Still water takes the colour of the sky above it.
+    waterMat.color.setHex(dark ? LAND_COLOUR.waterNight : LAND_COLOUR.water).lerp(new THREE.Color(dark ? SKY[weather].zenithDark : SKY[weather].zenith), 0.3)
     shopFloorMat.color.copy(cssColour('--panel-2', '#ece8dc'))
-    dust.setColour(dark ? 0x6b6457 : 0xc8b89a)
+    // The workshop's lights are dimmer on a night stage.
+    shopMat.color.setScalar(dark ? 0.5 : 1)
+    dustColour()
     smoke.setColour(dark ? 0x9a9a9a : 0xeeeeee)
     if (clip.length) buildStrip()
+  }
+  /** Dust off gravel; a white spray off snow and ice. */
+  function dustColour(): void {
+    const snow = !!run?.road && isWinter(run.road)
+    if (isDark()) dust.setColour(snow ? 0x8e99a8 : 0x6b6457)
+    else dust.setColour(snow ? 0xf2f5f8 : 0xc8b89a)
   }
   const stopLook = onLookChange(look)
 
@@ -242,21 +301,37 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     origin = first.distance
     const night = isDark()
     if (!run.road) {
-      strip.visible = false
-      forest.group.visible = false
+      outdoors.visible = false
       shop.visible = true
+      ground = null
       return
     }
     shop.visible = false
-    strip.visible = true
-    forest.group.visible = true
+    outdoors.visible = true
     const pieces = placePieces(run.road, run.wheelbase, first.piece, first.distance, first.x)
-    const from = first.distance - BEHIND
-    const to = last.distance + AHEAD
-    strip.geometry.dispose()
+    const { from, to } = wholeRows(first.distance - BEHIND, last.distance + AHEAD)
     const tier = tierSettings()
-    strip.geometry = stripGeometry(pieces, { from, to, origin, halfTrack: truck.track / 2, step: tier.roadStep, night })
-    forest.plant(from, to, origin, truck.track / 2, night, tier.treeRows)
+    // A loop's length: each piece's road overlaps the next by a wheelbase.
+    const lap = run.loop ? run.road.reduce((sum, p) => sum + p.length - run!.wheelbase, 0) : 0
+    const winter = isWinter(run.road)
+    dustColour()
+    strip.geometry.dispose()
+    hills.geometry.dispose()
+    ground = buildGround({ pieces, halfTrack: truck.track / 2, winter, lap }, { from, to, origin, step: tier.roadStep, night })
+    strip.geometry = ground.strip
+    hills.geometry = ground.hills
+    // One sheet of water under the whole left side: it shows wherever the land dips below it. Frozen over in winter.
+    const far = LAND.columns[LAND.columns.length - 1]!
+    water.scale.set(ground.to - ground.from, far - LAND.seam, 1)
+    water.position.set((ground.from + ground.to) / 2 - origin, LAND.water, -(far + LAND.seam) / 2)
+    waterMat.roughness = winter ? 0.7 : 0.18
+    if (winter) waterMat.color.setHex(LAND_COLOUR.ice).multiplyScalar(night ? 0.45 : 1)
+    if (props) {
+      // Nothing tall between the cameras and the truck: the side-on camera stands 2.2 truck lengths out.
+      const lane = 2.2 * truck.length + 4
+      const poles = plant(props, ground, { from, to, origin, lane, cover: tier.cover, night, loop: !!run.loop, wheelbase: run.wheelbase })
+      wires.set(poles, night)
+    }
   }
 
   function poseAt(time: number): Pose {
@@ -351,10 +426,17 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       camPos.x += Math.sin(performance.now() * 0.09) * k
       camPos.y += Math.sin(performance.now() * 0.13) * k
     }
+    aim(tx)
+  }
+
+  /** Point the camera from `camPos` at `camTarget`, keeping it above the ground, and bring the sun and sky along. */
+  function aim(tx: number): void {
+    if (ground) camPos.y = Math.max(camPos.y, ground.at(camPos.x + origin, camPos.z) + 0.3)
     camera.position.copy(camPos)
     camera.lookAt(camTarget)
-    lights.sun.position.set(tx + 8, 14, -10)
+    lights.sun.position.set(tx, 0, 0).addScaledVector(SUN_DIRECTION, 19)
     lights.sun.target.position.set(tx, 0, 0)
+    sky.follow(camPos)
   }
 
   /** Show the break itself, the moment it happens. */
@@ -415,9 +497,11 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const pose: TruckPose = { z: p.z, pitch: p.pitch, roll: p.roll, wheelZ: p.wheelZ, distance: p.distance }
     t.pose(pose)
     if (!run?.road) {
+      // Each pan sits under its wheel and rides up and down with the post; the base stays bolted to the floor.
       for (let i = 0; i < 4; i++) {
         const c = t.cornerPosition(i, focusPos)
-        posts[i]!.position.set(c.x, p.ground - 0.15, c.z)
+        posts[i]!.pan.position.set(c.x, p.ground, c.z)
+        posts[i]!.base.position.set(c.x, 0, c.z)
       }
     }
     return run?.road ? tx : 0
@@ -452,10 +536,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       Math.max(0.15, camTarget.y + Math.sin(lift) * d),
       camTarget.z - Math.cos(photo.turn) * Math.cos(lift) * d,
     )
-    camera.position.copy(camPos)
-    camera.lookAt(camTarget)
-    lights.sun.position.set(tx + 8, 14, -10)
-    lights.sun.target.position.set(tx, 0, 0)
+    aim(tx)
     renderer.render(scene, camera)
   }
 
@@ -556,6 +637,12 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     },
     async setRun(next) {
       const mine = ++ticket
+      // The scenery kit too. If it can't be fetched the truck still drives, on bare land.
+      if (!props) {
+        const kit = await loadKit().catch(() => null)
+        if (mine !== ticket) return
+        if (kit) useKit(kit)
+      }
       if (truck?.cls !== next.cls) {
         const model = await TruckModel.load(next.cls)
         if (mine !== ticket) return
@@ -582,7 +669,12 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
           ghost.breakCorner(null)
         }
       }
+      const indoors = !next.road
+      const wasIndoors = !!run && !run.road
       run = next
+      clip = []
+      // Indoors and outdoors have different air (haze, background).
+      if (indoors !== wasIndoors) look()
       truck.stance = next.stance
       truck.fit(next.parts)
       truck.breakCorner(null)
@@ -697,6 +789,15 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       truck?.dispose()
       ghost?.dispose()
       strip.geometry.dispose()
+      hills.geometry.dispose()
+      roadMat.dispose()
+      landMat.dispose()
+      water.geometry.dispose()
+      waterMat.dispose()
+      shopMat.dispose()
+      props?.dispose()
+      wires.dispose()
+      sky.dispose()
       dust.dispose()
       smoke.dispose()
       renderer.dispose()

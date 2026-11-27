@@ -24,7 +24,7 @@ export function cacheName(hash: string): string {
 /**
  * The files to fetch when the worker installs, from every path in dist/
  * (forward slashes, relative). Everything the game needs is small (the three
- * zipped trucks are about 600 KB together), so it all goes in up front,
+ * zipped trucks and the scenery are about 940 KB together), so it all goes in up front,
  * models included: a truck you've never looked at still shows with no
  * signal. Left out: the worker itself, the CNAME file, source maps and the
  * older `.woff` fonts (every phone that runs the game reads `.woff2`).

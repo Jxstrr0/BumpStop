@@ -9,8 +9,8 @@ cabin, out on the lake ice.
   `vite.config.ts`) copies it to `dist/sw.js` with two lines in front: this
   build's cache name and the list of files to keep.
 - **What it keeps** (`src/pwa/precache.ts`): every built file, the three
-  zipped trucks included (about 600 KB together), so a truck you've never
-  looked at still shows offline. Left out: the worker itself, `CNAME`,
+  zipped trucks and the scenery included (about 940 KB together), so a truck
+  you've never looked at still shows offline, in its landscape. Left out: the worker itself, `CNAME`,
   source maps and the older `.woff` fonts.
 - **Cache names** start `bumpstop-` plus 10 characters of a hash of every
   kept file, so any change to the game makes a new cache. The worker only

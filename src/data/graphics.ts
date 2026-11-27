@@ -27,8 +27,8 @@ export interface TierSettings {
   shadowMap: number
   /** How far the shadow's edge is blurred (shadow map pixels; more costs more). */
   shadowBlur: number
-  /** Rows of trees each side of the road (up to MAX_TREE_ROWS). */
-  treeRows: number
+  /** Share of the scenery planted round the road: trees, rocks, grass (1 is the whole table in `src/data/scenery.ts`). */
+  cover: number
   /** Share of the dust the wheels throw up. */
   dust: number
   /** Metres between rows of the road strip (finer shows small washboard better). */
@@ -36,13 +36,10 @@ export interface TierSettings {
 }
 
 export const TIERS: Record<TierId, TierSettings> = {
-  lite: { pixelRatioCap: 1, antialias: false, shadows: false, shadowMap: 512, shadowBlur: 1, treeRows: 1, dust: 0.4, roadStep: 0.15 },
-  full: { pixelRatioCap: 2, antialias: true, shadows: true, shadowMap: 1024, shadowBlur: 1, treeRows: 3, dust: 1, roadStep: 0.1 },
-  ultra: { pixelRatioCap: 3, antialias: true, shadows: true, shadowMap: 2048, shadowBlur: 3, treeRows: 4, dust: 1.4, roadStep: 0.07 },
+  lite: { pixelRatioCap: 1, antialias: false, shadows: false, shadowMap: 512, shadowBlur: 1, cover: 0.3, dust: 0.4, roadStep: 0.15 },
+  full: { pixelRatioCap: 2, antialias: true, shadows: true, shadowMap: 1024, shadowBlur: 1, cover: 0.85, dust: 1, roadStep: 0.1 },
+  ultra: { pixelRatioCap: 3, antialias: true, shadows: true, shadowMap: 2048, shadowBlur: 3, cover: 1.3, dust: 1.4, roadStep: 0.07 },
 }
-
-/** The forest is made with room for this many rows. */
-export const MAX_TREE_ROWS = 4
 
 /** Auto's frame-rate watcher (see TierGovernor in src/render/tiers.ts). */
 export const AUTO_TIER = {

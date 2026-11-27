@@ -32,10 +32,10 @@
  * 3 rear right.
  */
 import * as THREE from 'three'
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { ClassId } from '../data/classes'
 import { KITS } from '../data/kit'
 import type { SlotId } from '../data/parts'
+import { loadGlb } from './glb'
 
 const CORNERS = ['FL', 'FR', 'RL', 'RR'] as const
 
@@ -99,31 +99,13 @@ function shown(o: THREE.Object3D): boolean {
 /** The part in each slot, as a build lists them (`TruckBuild.parts`). */
 export type FittedParts = Readonly<Partial<Record<SlotId, string>>>
 
-const loader = new GLTFLoader()
 const cache = new Map<ClassId, Promise<THREE.Group>>()
-
-/**
- * The models are zipped (gzip) to about a fifth of their size, and the
- * browser unzips them itself. If a server has already unzipped the file on
- * the way (its first bytes are then "glTF"), it's used as it is.
- */
-async function fetchModel(url: string): Promise<ArrayBuffer> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`Couldn't load ${url}: ${res.status}`)
-  const bytes = await res.arrayBuffer()
-  const head = new Uint8Array(bytes, 0, 2)
-  if (head[0] !== 0x1f || head[1] !== 0x8b) return bytes
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
-  return new Response(stream).arrayBuffer()
-}
 
 /** Load a class's model once; each call after that gets a fresh copy to pose. */
 async function loadScene(cls: ClassId): Promise<THREE.Group> {
   let p = cache.get(cls)
   if (!p) {
-    // Relative to the page, so it works at the site's root and under a sub-path.
-    const url = new URL(`./models/truck-${cls}.glb.gz`, document.baseURI).href
-    p = fetchModel(url).then((bytes) => loader.parseAsync(bytes, '')).then((gltf) => gltf.scene)
+    p = loadGlb(`truck-${cls}`)
     cache.set(cls, p)
     // A failed load (offline, say) shouldn't stick: try again next time.
     p.catch(() => cache.delete(cls))
@@ -189,11 +171,13 @@ export class TruckModel {
     const tops = new Map<string, THREE.Object3D>()
     const lows = new Map<string, THREE.Object3D>()
     // Arms: Arm_FL_<what>, each pointing at its ArmEnd_FL_<what> on the hub.
+    // A solid axle's prop shaft is two more (Arm_F_Prop on the body, pointing
+    // at the axle, and Arm_F_PropSlip on the axle, pointing back at the body).
     const armNodes: THREE.Object3D[] = []
     scene.traverse((o) => {
       const m = /^Mount(Top|Low)_(FL|FR|RL|RR)(?:_([A-Za-z0-9-]+))?$/.exec(o.name)
       if (m) (m[1] === 'Top' ? tops : lows).set(`${m[2]}|${m[3] ?? ''}`, o)
-      if (/^Arm_(FL|FR|RL|RR)(_\w+)?$/.test(o.name)) armNodes.push(o)
+      if (/^Arm_(FL|FR|RL|RR|F|R)(_\w+)?$/.test(o.name)) armNodes.push(o)
     })
     this.shocks = CORNERS.map((c) => {
       const mounts: Mounts[] = []

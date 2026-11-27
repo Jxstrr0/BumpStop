@@ -108,6 +108,10 @@ KIT_MATERIALS = {
     'Board': ('#FBFAF5', 0.0, 0.7, 0),
     'Magenta': ('#FF4FB2', 0.05, 0.45, 0),
     'Seat': ('#3A3B41', 0.0, 0.85, 0),
+    # The driveline: cast iron for engine blocks (a shade lighter than the
+    # frame, so it reads against it) and heat-browned steel for exhausts.
+    'Cast': ('#565B63', 0.25, 0.55, 0),
+    'Pipe': ('#8A6E5C', 0.3, 0.6, 0),
 }
 
 
@@ -743,6 +747,15 @@ class Build:
         self.groups = {}
         self.tops = {}
         self.rig_parts = {}
+        # The driveline: where each solid axle's pinion is, and where the
+        # transfer case's two outputs are (see "The driveline" below).
+        self.pinions = {}
+        self.outputs = {}
+        # The driveline is drawn into the body's own mesh (no extra draw
+        # calls). Set BUMP_SPLIT=1 to give it a node of its own, `Driveline`,
+        # for looking at it without the body while working on the models;
+        # don't commit models built that way.
+        self.drive = Part('Driveline') if os.environ.get('BUMP_SPLIT') else self.shell
 
     def layouts(self, key):
         """The layouts at one end ('F' or 'R'), stock first."""
@@ -1060,8 +1073,13 @@ def independent_extras(b, key, kind, group):
             'Graphite', segments=16, centre=(x, 0.0, zc), closed=False)
     for sd in (-1, 1):
         p.tube((x, sd * 0.08 * s, zc), (x, sd * 0.17 * s, zc), 0.045 * s, 'Graphite', segments=10)
+    # The pinion's nose and a prop shaft to the transfer case. Both ends are
+    # bolted to the frame here, so the shaft doesn't move.
     towards = -1 if key == 'F' else 1
-    p.tube((x + towards * 0.12 * s, 0.0, zc + 0.02), (x + towards * 0.7 * s, 0.0, zc + 0.12 * s), 0.03 * s, 'Steel')
+    nose = V((x + towards * 0.24 * s, 0.0, zc + 0.02))
+    p.tube((x + towards * 0.1 * s, 0.0, zc), tuple(nose), 0.075 * s, 'Graphite', segments=10, r2=0.05 * s)
+    if key in b.outputs:
+        fixed_prop(p, nose, b.outputs[key], s)
     rail_y, rail_low = 0.45, 0.54
     if kind == 'wishbone':
         # Crossmembers under the lower arm bushings, dropped from the rails.
@@ -1259,10 +1277,13 @@ def build_truck(cls, t, materials):
         for sd in (-1, 1):
             axle.lathe([(0.0, -0.06 * s), (0.07 * s, -0.03 * s), (0.07 * s, 0.03 * s), (0.0, 0.06 * s)], 'Graphite',
                        segments=12, centre=(0, sd * half, 0), closed=False)
+        # The pinion's nose, pointing at the transfer case, and the flange its
+        # prop shaft bolts to (the shaft itself is added with the driveline).
         towards = -1 if key == 'F' else 1
-        axle.tube((towards * 0.1 * s, off, 0.02), (towards * 0.7 * s, off, 0.12 * s), 0.03 * s, 'Steel')
-        axle.lathe([(0.0, -0.02 * s), (0.045 * s, 0.0), (0.0, 0.02 * s)], 'Steel', segments=10,
-                   centre=(towards * 0.7 * s, off, 0.12 * s), closed=False, axis='X')
+        axle.tube((towards * 0.08 * s, off, 0.0), (towards * 0.25 * s, off, 0.015 * s), 0.08 * s, 'Graphite',
+                  segments=10, r2=0.05 * s)
+        axle.tube((towards * 0.25 * s, off, 0.015 * s), (towards * 0.275 * s, off, 0.018 * s), 0.06 * s, 'Steel',
+                  segments=10)
         if key == 'F':
             # The steering tie rod in front of the beam.
             axle.tube((0.16 * s, -half + 0.05, -0.03 * s), (0.16 * s, half - 0.05, -0.03 * s), 0.018 * s, 'Steel')
@@ -1274,6 +1295,7 @@ def build_truck(cls, t, materials):
             group = empty(fit_name('frontSusp' if key == 'F' else 'rearSusp', axle_parts, 'Axle' + key), None, (0, 0, 0))
         axle_obj = place(axle.finish(materials), group, (x, 0, r))
         b.axles[key] = (axle_obj, half)
+        b.pinions[key] = (axle_obj, V((x, 0, r)), V((x + towards * 0.31 * s, off, r + 0.02 * s)))
 
         # The axle parts: housings and diff covers get beefier with the price.
         for k in AXLES:
@@ -1354,6 +1376,8 @@ def build_truck(cls, t, materials):
             if kd in ('wishbone', 'trailingArm'):
                 independent_extras(b, key, kd, b.rig(key, kd))
 
+    if b.drive is not b.shell:
+        b.add(b.drive)
     shell = b.shell.finish(materials)
     place(shell, b.body, (0, 0, 0))
 
@@ -1381,6 +1405,221 @@ def build_truck(cls, t, materials):
         f.write(gzip.compress(raw, compresslevel=9, mtime=0))
     os.remove(path)
     print(f'wrote {path}.gz ({os.path.getsize(path + ".gz") // 1024} KB, {len(raw) // 1024} KB unzipped)')
+
+
+# --- The driveline -------------------------------------------------------------
+# What turns the wheels: the engine's block and sump, the gearbox, the
+# transfer case and the prop shafts out to the diffs, plus the exhaust. It
+# all sits between the frame rails, inboard of the springs and shocks, so
+# the suspension stays in plain view from the side.
+#
+# A prop shaft to a solid axle has to follow the axle up and down, so it is
+# two arms the game already knows how to move (see `Arm_...` at the top):
+#
+#     Arm_F_Prop       on the body, from the transfer case, pointing at the
+#                      axle's pinion (ArmEnd_F_Prop, on the axle)
+#     Arm_F_PropSlip   on the axle, from the pinion, pointing back at the
+#                      transfer case (ArmEnd_F_PropSlip, on the body)
+#
+# The thin one slides inside the fat one, like a real shaft's slip joint, so
+# the shaft gets longer and shorter as the axle moves without either arm
+# having to stretch. (F is the front axle, R the rear.)
+
+def pipe_run(p, points, rad, mat, segments=8):
+    """A pipe through a list of points; each length runs a little into the
+    next, so the bends close up."""
+    pts = [V(q) for q in points]
+    for a, c in zip(pts, pts[1:]):
+        d = (c - a).normalized()
+        p.tube(tuple(a - d * rad * 0.4), tuple(c + d * rad * 0.4), rad, mat, segments=segments)
+
+
+def u_joint(p, at, along, s):
+    """A universal joint on a shaft running `along`: a collar and the cross."""
+    at, d = V(at), V(along).normalized()
+    side = d.cross(V((0, 0, 1))).normalized()
+    up = d.cross(side)
+    p.tube(tuple(at - d * 0.035 * s), tuple(at + d * 0.035 * s), 0.042 * s, 'Graphite', segments=8)
+    p.tube(tuple(at - side * 0.052 * s), tuple(at + side * 0.052 * s), 0.016 * s, 'Steel', segments=6)
+    p.tube(tuple(at - up * 0.052 * s), tuple(at + up * 0.052 * s), 0.016 * s, 'Steel', segments=6)
+
+
+def fixed_prop(p, a, e, s):
+    """A prop shaft between two points that never move apart (both on the body)."""
+    a, e = V(a), V(e)
+    d = (e - a).normalized()
+    p.tube(tuple(a + d * 0.05 * s), tuple(e - d * 0.05 * s), 0.028 * s, 'Steel', segments=10)
+    u_joint(p, a + d * 0.04 * s, d, s)
+    u_joint(p, e - d * 0.04 * s, d, s)
+
+
+def moving_prop(b, key, parent, output):
+    """The two-piece prop shaft from the transfer case's `output` (on the
+    body, under `parent`) to the solid axle's pinion at end `key`."""
+    s = b.s
+    axle_obj, axle_at, pinion = b.pinions[key]
+    output = V(output)
+    rel = pinion - output
+    d, length = rel.normalized(), rel.length
+    # The body's half: the fat tube, with the slip joint's seal at its open end.
+    part = Part(f'Arm_{key}_Prop')
+    u_joint(part, d * 0.04 * s, d, s)
+    part.tube(tuple(d * 0.06 * s), tuple(d * length * 0.56), 0.032 * s, 'Steel', segments=10)
+    part.tube(tuple(d * (length * 0.56 - 0.035 * s)), tuple(d * length * 0.56), 0.039 * s, 'Graphite', segments=10)
+    place(part.finish(b.materials), parent, tuple(output))
+    empty(f'ArmEnd_{key}_Prop', axle_obj, tuple(pinion - axle_at))
+    # The axle's half: the thin splined shaft that slides inside it.
+    part = Part(f'Arm_{key}_PropSlip')
+    u_joint(part, -d * 0.04 * s, d, s)
+    part.tube(tuple(-d * 0.06 * s), tuple(-d * length * 0.62), 0.021 * s, 'Chrome', segments=8)
+    place(part.finish(b.materials), axle_obj, tuple(pinion - axle_at))
+    empty(f'ArmEnd_{key}_PropSlip', parent, tuple(output))
+
+
+def gear_case(p, x0, x1, section, mat, bevel=0.012):
+    """A cast housing: the same outline (a list of (y, z) points) from x0 to x1."""
+    p.convex([(x, y, z) for x in (x0, x1) for (y, z) in section], mat, bevel=bevel)
+
+
+def pickup_driveline(b):
+    """The light 4x4: a straight six over the front axle, leaning back a
+    little, a gearbox, and a transfer case that drops to the left, where
+    both diffs are. The exhaust runs down the right, inside the rail."""
+    t, s, r, p = b.t, b.s, b.r, b.drive
+    off = 0.12 * s
+    lean = 0.07  # radians the engine and gearbox lean back
+    tilt = Matrix.Rotation(-lean, 3, 'Y')
+    nose = V((1.92, 0, 0.9))
+    back = V((-math.cos(lean), 0, -math.sin(lean)))
+    up = V((-math.sin(lean), 0, math.cos(lean)))
+
+    def at(along, lift=0.0, y=0.0):
+        """A point `along` the crankshaft's line from the engine's nose, `lift` above it."""
+        return tuple(nose + back * along + up * lift + V((0, y, 0)))
+
+    # The block (its top is hidden under the bonnet), the sump ahead of the
+    # axle, where the diff can't reach it at full bump, and an oil filter.
+    p.box(at(0.42, 0.02), (0.84, 0.36, 0.3), 'Cast', rot=tilt, bevel=0.02)
+    p.box(at(0.2, -0.2), (0.38, 0.26, 0.15), 'Cast', rot=tilt, bevel=0.03)
+    p.tube(at(0.2, -0.275), at(0.2, -0.3), 0.02, 'Chrome', segments=6)
+    p.tube(at(0.36, -0.04, 0.18), at(0.36, -0.04, 0.3), 0.045, 'Urethane', segments=10)
+    # The crank pulley, the fan and the radiator behind the grille.
+    p.tube(at(-0.01), at(-0.05), 0.09, 'Graphite', segments=12)
+    p.tube(at(-0.05, 0.12), at(-0.07, 0.12), 0.17, 'Graphite', segments=12)
+    p.box((2.1, 0, 0.9), (0.05, 0.62, 0.36), 'Alloy', bevel=0.01)
+    p.box((2.1, 0, 0.7), (0.07, 0.66, 0.05), 'Graphite')
+    # Bellhousing and gearbox, resting on the frame's cross member.
+    p.tube(at(0.84), at(1.0), 0.19, 'Alloy', segments=12, r2=0.13)
+    p.tube(at(1.0), at(1.5), 0.12, 'Alloy', segments=10, r2=0.1)
+    for along in (1.12, 1.3):
+        p.tube(at(along), at(along + 0.02), 0.128, 'Alloy', segments=10)
+    p.box((0.6, 0, 0.695), (0.1, 0.18, 0.03), 'Rubber')
+    # The transfer case: in from the gearbox at the top, out to both prop
+    # shafts lower down on the left.
+    out_z = 0.53
+    gear_case(p, 0.1, 0.43, [(-0.1, 0.86), (0.1, 0.88), (0.25, 0.64), (0.24, 0.46), (0.06, 0.44), (-0.09, 0.66)], 'Alloy')
+    for x0, x1 in ((0.43, 0.46), (0.07, 0.1)):
+        p.tube((x0, off, out_z), (x1, off, out_z), 0.06, 'Steel', segments=10)
+    b.outputs = {'F': V((0.47, off, out_z)), 'R': V((0.06, off, out_z))}
+    for key in ('F', 'R'):
+        moving_prop(b, key, b.rig(key, 'axle'), b.outputs[key])
+
+    # The exhaust: down from the manifold on the right of the block, over the
+    # cross members, through a silencer, and over the rear axle. Each engine
+    # adds its own tailpipe from there (see the engine parts).
+    y = -0.3
+    pipe_run(p, [(1.45, -0.19, 0.92), (1.15, y + 0.03, 0.8), (0.75, y, 0.74), (0.45, y, 0.74), (0.3, y, 0.64)], 0.028, 'Pipe')
+    p.tube((0.3, y, 0.63), (-0.3, y, 0.63), 0.08, 'Pipe', segments=12)
+    for x in (0.3, -0.3):
+        p.tube((x, y, 0.63), (x + (0.03 if x > 0 else -0.03), y, 0.63), 0.05, 'Pipe', segments=12)
+    pipe_run(p, [(-0.3, y, 0.64), (-0.45, y, 0.74), EXHAUST_END], 0.028, 'Pipe')
+    for x in (0.0, -1.0):
+        p.tube((x, y, 0.72), (x, y - 0.1, 0.68), 0.008, 'Graphite', segments=4)
+
+    # The fuel tank, strapped between the rails behind the rear axle.
+    p.box((-1.95, 0.08, 0.6), (0.56, 0.5, 0.17), 'Graphite', bevel=0.03)
+    for x in (-1.8, -2.1):
+        p.box((x, 0.08, 0.6), (0.03, 0.51, 0.18), 'Steel')
+    # Body mounts: the rubber blocks the cab and the bed sit on.
+    for x in (0.95, 0.2, -0.45, -0.95, -2.15):
+        for sd in (-1, 1):
+            p.tube((x, sd * 0.45, 0.7), (x, sd * 0.45, 1.0), 0.04, 'Graphite', segments=8)
+            p.tube((x, sd * 0.45, 0.83), (x, sd * 0.45, 0.87), 0.055, 'Rubber', segments=8)
+
+
+# Where the light 4x4's shared exhaust ends, behind the rear axle; each
+# engine's own tailpipe starts here.
+EXHAUST_END = (-1.78, -0.3, 0.74)
+
+
+def cabover_driveline(b):
+    """The heavy truck: a big diesel under the cab, a gearbox behind it, and
+    a transfer case of its own in the middle of the frame, with a prop shaft
+    to each axle."""
+    t, s, r, p = b.t, b.s, b.r, b.drive
+    off = 0.12 * s
+    crank = 1.38
+    # The block, with its sump ahead of the front axle, and an oil filter.
+    p.box((2.25, 0, 1.5), (1.25, 0.52, 0.62), 'Cast', bevel=0.03)
+    p.box((2.52, 0, 1.1), (0.36, 0.38, 0.22), 'Cast', bevel=0.04)
+    p.tube((2.2, 0.26, 1.3), (2.2, 0.4, 1.3), 0.07, 'Urethane', segments=10)
+    # Bellhousing and gearbox, resting on a cross member.
+    p.tube((1.625, 0, crank), (1.45, 0, crank), 0.3, 'Alloy', segments=14, r2=0.22)
+    p.tube((1.45, 0, crank), (0.78, 0, crank), 0.2, 'Alloy', segments=12, r2=0.17)
+    for x in (1.3, 1.05):
+        p.tube((x, 0, crank), (x - 0.03, 0, crank), 0.21, 'Alloy', segments=12)
+    # A short shaft back to the transfer case, which drops to the left.
+    out_z = 0.8
+    fixed_prop(p, (0.78, 0, crank), (0.5, 0, crank - 0.02), s * 0.8)
+    gear_case(p, 0.08, 0.5, [(-0.15, 1.5), (0.15, 1.52), (0.38, 1.0), (0.36, 0.7), (0.05, 0.67), (-0.17, 1.02)], 'Alloy',
+              bevel=0.02)
+    for x0, x1 in ((0.5, 0.54), (0.04, 0.08)):
+        p.tube((x0, off, out_z), (x1, off, out_z), 0.09, 'Steel', segments=10)
+    b.outputs = {'F': V((0.55, off, out_z)), 'R': V((0.03, off, out_z))}
+    for key in ('F', 'R'):
+        moving_prop(b, key, b.body, b.outputs[key])
+    # The cab sits on four mounts, and the service box on two bearers along
+    # the rails.
+    for x in (3.0, 1.62):
+        for sd in (-1, 1):
+            p.box((x, sd * 0.5, 1.35), (0.16, 0.14, 0.27), 'Graphite', bevel=0.02)
+            p.box((x, sd * 0.5, 1.38), (0.19, 0.17, 0.05), 'Rubber')
+    side_pair(p, -1.08, 0.5, 1.33, (3.7, 0.1, 0.22), 'Graphite', bevel=0.012)
+    # Air tanks for the brakes, across the frame behind the transfer case.
+    for x in (-0.38, -0.62):
+        p.tube((x, -0.4, 1.02), (x, 0.4, 1.02), 0.1, 'Steel', segments=12)
+        for sd in (-1, 1):
+            p.tube((x, sd * 0.3, 1.02), (x, sd * 0.33, 1.02), 0.105, 'Graphite', segments=12)
+
+
+def buggy_driveline(b):
+    """The side-by-side: the engine sits over the rear wheels and drives a
+    gearcase between them; a thin prop shaft runs forward under the floor to
+    a small diff between the front wheels."""
+    t, s, r, p = b.t, b.s, b.r, b.drive
+    fx, rx = t['cg_front'], -t['cg_rear']
+    z0 = r + 0.02 * s  # the half-shafts' height
+    # The front diff, with a tube out to each half-shaft's inner joint.
+    p.lathe([(0.0, -0.09 * s), (0.075 * s, -0.07 * s), (0.092 * s, 0.0), (0.075 * s, 0.07 * s), (0.0, 0.09 * s)], 'Alloy',
+            segments=14, centre=(fx, 0, z0), closed=False)
+    for sd in (-1, 1):
+        p.tube((fx, sd * 0.07 * s, z0), (fx, sd * 0.29 * s, z0), 0.032 * s, 'Graphite', segments=8)
+        p.tube((fx, sd * 0.27 * s, z0), (fx, sd * 0.31 * s, z0), 0.05 * s, 'Steel', segments=10)
+    p.tube((fx - 0.06, 0, z0), (fx - 0.2, 0, z0), 0.045, 'Alloy', segments=10, r2=0.032)
+    # The rear gearcase under the engine, with a cup for each half-shaft.
+    gear_case(p, rx - 0.17, rx + 0.2, [(-0.15, 0.5), (0.15, 0.5), (0.17, 0.34), (0.1, 0.27), (-0.1, 0.27), (-0.17, 0.34)], 'Alloy',
+              bevel=0.02)
+    for sd in (-1, 1):
+        p.tube((rx + 0.02 * s, sd * 0.15, z0), (rx + 0.02 * s, sd * 0.2 * s, z0), 0.05 * s, 'Steel', segments=10)
+    p.tube((rx + 0.2, 0, z0), (rx + 0.28, 0, z0), 0.045, 'Alloy', segments=10, r2=0.032)
+    # The prop shaft, dipping under the floor, with a bearing where it bends.
+    low = 0.374
+    pts = [V((fx - 0.2, 0, z0)), V((0.93, 0, low)), V((-0.93, 0, low)), V((rx + 0.28, 0, z0))]
+    for a, e in zip(pts, pts[1:]):
+        d = (e - a).normalized()
+        p.tube(tuple(a), tuple(e), 0.017, 'Steel', segments=8)
+        u_joint(p, a + d * 0.03, d, s * 0.7)
+    u_joint(p, pts[-1] - V((0.03, 0, 0)), V((1, 0, 0)), s * 0.7)
 
 
 # --- Bodies -----------------------------------------------------------------
@@ -1536,6 +1775,7 @@ def pickup(b):
     for sd in (-1, 1):
         body.tube((xf - 0.66, sd * 0.6, top + 0.04), (xf - 0.66, sd * 0.6, top), 0.012, 'Graphite', segments=6)
 
+    pickup_driveline(b)
     pickup_frames(b, sill)
     pickup_bolt_ons(b, sill, w, xb, xf, top, xr)
 
@@ -1608,10 +1848,11 @@ def pickup_bolt_ons(b, sill, w, xb, xf, top, xr):
         p.convex([(2.36, 0.5, 0.86), (2.36, -0.5, 0.86), (1.8, 0.45, 0.5), (1.8, -0.45, 0.5),
                   (2.36, 0.5, 0.86 + th), (2.36, -0.5, 0.86 + th), (1.8, 0.45, 0.5 + th), (1.8, -0.45, 0.5 + th)],
                  'Steel', bevel=0.006)
-        p.box((1.0, 0, 0.5), (1.6, 0.86, th), 'Steel', bevel=0.005)
-        for x in (1.6, 1.1, 0.6):
+        # The gearbox plate: under the transfer case, hung from the rails.
+        p.box((0.28, 0, 0.42), (0.9, 0.8, th), 'Steel', bevel=0.005)
+        for x in (0.66, -0.1):
             for sd in (-1, 1):
-                p.tube((x, sd * 0.3, 0.49), (x, sd * 0.3, 0.52), 0.012, 'Graphite', segments=6)
+                p.tube((x, sd * 0.38, 0.42), (x, sd * 0.43, 0.56), 0.014, 'Graphite', segments=6)
         if heavy:
             for sd in (-1, 1):
                 y = sd * (w / 2 + 0.02)
@@ -1650,11 +1891,22 @@ def pickup_bolt_ons(b, sill, w, xb, xf, top, xr):
 
     # The engine shows on the outside: the V8 has a bonnet scoop and twin
     # pipes, the diesels a snorkel, the turbo diesel an intercooler too.
+    # (The block, gearbox and the rest of the exhaust are the same for all:
+    # see pickup_driveline.)
+    # Every engine has its own tailpipe, from where the shared exhaust ends
+    # behind the rear axle: the six a single pipe under the bumper, the V8
+    # one out to each corner, the diesels a side exit behind the wheel.
+    p = b.fit('engine', ['petrolSix'])
+    pipe_run(p, [EXHAUST_END, (-2.2, -0.3, 0.66), (xr - 0.02, -0.3, 0.64)], 0.028, 'Pipe')
+    p.tube((xr - 0.02, -0.3, 0.64), (xr - 0.12, -0.3, 0.64), 0.035, 'Chrome', segments=10)
+    b.add(p)
     p = b.fit('engine', ['petrolV8'])
     p.convex([(1.6, 0.26, 1.42), (1.6, -0.26, 1.42), (1.25, 0.3, 1.47), (1.25, -0.3, 1.47),
               (1.55, 0.22, 1.5), (1.55, -0.22, 1.5), (1.25, 0.26, 1.58), (1.25, -0.26, 1.58)], 'Graphite', bevel=0.012)
     p.box((1.57, 0, 1.47), (0.02, 0.4, 0.07), 'Rubber')
     for sd in (-1, 1):
+        pipe_run(p, [EXHAUST_END, (-2.05, sd * 0.3 - 0.0, 0.8), (-2.25, sd * 0.55, sill - 0.12), (xr - 0.02, sd * 0.55, sill - 0.12)],
+                 0.028, 'Pipe')
         p.tube((xr - 0.02, sd * 0.55, sill - 0.12), (xr - 0.12, sd * 0.55, sill - 0.12), 0.035, 'Chrome', segments=10)
     b.add(p)
     for k in ('dieselFour', 'turboDiesel'):
@@ -1667,7 +1919,8 @@ def pickup_bolt_ons(b, sill, w, xb, xf, top, xr):
         p.convex([(xf - 0.55, y - 0.06, top + 0.18), (xf - 0.55, y + 0.1, top + 0.18), (xf - 0.75, y - 0.06, top + 0.18),
                   (xf - 0.75, y + 0.1, top + 0.18), (xf - 0.52, y - 0.05, top + 0.34), (xf - 0.52, y + 0.09, top + 0.34),
                   (xf - 0.72, y - 0.05, top + 0.3), (xf - 0.72, y + 0.09, top + 0.3)], 'Graphite', bevel=0.015)
-        p.tube((rx - 0.5, -0.6, 0.62), (rx - 0.5, -0.6 - 0.25, 0.56), 0.03, 'Steel', segments=8)
+        pipe_run(p, [EXHAUST_END, (rx - 0.44, -0.3, 0.5), (rx - 0.5, -0.6, 0.5)], 0.028, 'Pipe')
+        p.tube((rx - 0.5, -0.6, 0.5), (rx - 0.5, -0.6 - 0.25, 0.48), 0.03, 'Steel', segments=8)
         if k == 'turboDiesel':
             p.box((2.25, 0, 1.0), (0.04, 0.8, 0.12), 'Alloy', bevel=0.01)
             for sd in (-1, 1):
@@ -1788,6 +2041,7 @@ def cabover(b):
             body.tube((x - 0.02, sd * 0.82, 1.02), (x + 0.02, sd * 0.82, 1.02), 0.29, 'Graphite', segments=16)
         body.tube((0.95, sd * 0.82, 1.18), (0.95, sd * 0.82, 1.28), 0.06, 'Graphite', segments=8)
 
+    cabover_driveline(b)
     cabover_frames(b)
     cabover_bolt_ons(b, sill, w, xb, xf, top, xr)
 
@@ -1836,7 +2090,11 @@ def cabover_bolt_ons(b, sill, w, xb, xf, top, xr):
         p.convex([(xf + 0.3, 0.6, 1.25), (xf + 0.3, -0.6, 1.25), (xf - 0.6, 0.55, 0.88), (xf - 0.6, -0.55, 0.88),
                   (xf + 0.3, 0.6, 1.25 + th), (xf + 0.3, -0.6, 1.25 + th), (xf - 0.6, 0.55, 0.88 + th),
                   (xf - 0.6, -0.55, 0.88 + th)], 'Steel', bevel=0.01)
-        p.box((1.1, 0, 0.9), (1.8, 0.95, th), 'Steel', bevel=0.008)
+        # The belly plate under the transfer case, hung from the rails.
+        p.box((0.3, 0, 0.6), (1.0, 0.92, th), 'Steel', bevel=0.008)
+        for x in (0.7, -0.1):
+            for sd in (-1, 1):
+                p.tube((x, sd * 0.43, 0.6), (x, sd * 0.47, 0.95), 0.022, 'Graphite', segments=6)
         if heavy:
             # Tank guards, side under-run bars and diff guards.
             for sd in (-1, 1):
@@ -1881,6 +2139,9 @@ def cabover_bolt_ons(b, sill, w, xb, xf, top, xr):
             p.tube((xb - 0.1, y, 1.5), (xb - 0.1, y, top + 0.35), 0.06, 'Chrome', segments=12)
             p.tube((xb - 0.1, y, 2.0), (xb - 0.1, y, 2.6), 0.085, 'Steel', segments=12)
             p.tube((xb - 0.1, y, top + 0.35), (xb - 0.04, y, top + 0.45), 0.06, 'Chrome', segments=12, r2=0.065)
+            # The pipe from the block, over the rail and out to the foot of the stack.
+            pipe_run(p, [(1.95, sd * 0.27, 1.32), (1.6, sd * 0.42, 1.32), (1.4, sd * 0.9, 1.36), (xb - 0.1, y, 1.52)], 0.055,
+                     'Pipe')
         if k != 'dieselSix':
             y = w / 2 - 0.12
             p.tube((xb - 0.15, y, 1.6), (xb - 0.15, y, top - 0.1), 0.12, 'Graphite', segments=14)
@@ -1977,7 +2238,10 @@ def buggy(b):
             p_in, p_out = sd * 0.62, sd * 0.95
             body.arch(x, b.r, 0.66, 0.69, min(p_in, p_out), max(p_in, p_out), 50, 130, 'Trim', segs=10)
     # The engine bay, a rear deck, rear lamps and number boards.
-    body.box((-1.15, 0, floor + 0.32), (0.75, 0.95, 0.5), 'Graphite', bevel=0.02)
+    body.box((-1.15, 0, floor + 0.32), (0.75, 0.74, 0.5), 'Cast', bevel=0.02)
+    # The belt cover on the engine's front face, behind the seats.
+    body.tube((-0.775, -0.14, floor + 0.3), (-0.74, -0.14, floor + 0.3), 0.15, 'Alloy', segments=12)
+    body.tube((-0.775, 0.16, floor + 0.36), (-0.74, 0.16, floor + 0.36), 0.11, 'Alloy', segments=12)
     body.box((-1.15, 0, floor + 0.585), (0.78, 0.98, 0.03), 'Paint', bevel=0.01)
     for k in range(5):
         body.box((-0.95 - k * 0.08, 0, floor + 0.605), (0.035, 0.7, 0.012), 'Graphite')
@@ -1987,6 +2251,7 @@ def buggy(b):
     body.box((1.2, 0, 0.97), (0.7, 0.16, 0.01), 'Magenta')
     lamp_bar(body, -1.56, floor + 0.62, 0.6, 3, 0.6, face=-1)
 
+    buggy_driveline(b)
     buggy_frames(b, hoop_x, roof_front, roof_back, roof_z, tw, floor)
     buggy_bolt_ons(b, floor, tw)
 
@@ -2044,9 +2309,10 @@ def buggy_bolt_ons(b, floor, tw):
     for k in ('skidPlates', 'fullArmour'):
         heavy = k == 'fullArmour'
         p = b.fit('protection', [k])
-        p.box((0.0, 0, floor - 0.035), (2.4, 1.1, 0.015 if not heavy else 0.025), 'Steel', bevel=0.005)
-        p.convex([(1.72, 0.45, 0.5), (1.72, -0.45, 0.5), (1.3, 0.5, floor - 0.03), (1.3, -0.5, floor - 0.03),
-                  (1.72, 0.45, 0.515), (1.72, -0.45, 0.515), (1.3, 0.5, floor - 0.015), (1.3, -0.5, floor - 0.015)],
+        # Under the floor and the prop shaft, between the two diffs.
+        p.box((0.0, 0, floor - 0.08), (2.0, 1.1, 0.015 if not heavy else 0.025), 'Steel', bevel=0.005)
+        p.convex([(1.72, 0.45, 0.5), (1.72, -0.45, 0.5), (1.3, 0.5, floor - 0.08), (1.3, -0.5, floor - 0.08),
+                  (1.72, 0.45, 0.515), (1.72, -0.45, 0.515), (1.3, 0.5, floor - 0.065), (1.3, -0.5, floor - 0.065)],
                  'Steel', bevel=0.004)
         if heavy:
             for sd in (-1, 1):
