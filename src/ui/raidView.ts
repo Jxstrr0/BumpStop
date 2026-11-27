@@ -21,6 +21,7 @@ import type { TrackView } from '../render/trackView'
 import { el } from './dom'
 import { photoMode } from './photoMode'
 import { swingCamera } from './swingCamera'
+import { followTruckLook, truckLook, truckLookToggle } from './truckLook'
 import { stanceOf } from './truckView'
 
 /** Slow motion for a clip that ends on a break (share of true speed). */
@@ -72,6 +73,9 @@ export function raidView(onFail: () => void = () => {}): RaidView {
   // The swing-around camera (v1.19): drag the picture to look round the truck as it drives.
   const swing = swingCamera(box, canvas, () => view)
   caption.after(swing.hint, swing.button)
+  // Truck, X-ray or Both (v1.27): one pick for every 3D view.
+  swing.hint.after(truckLookToggle())
+  followTruckLook((look) => view?.setLook(look))
   let loading: Promise<TrackView | null> | null = null
   let failed = false
   let poses: Pose[][] = []
@@ -82,7 +86,11 @@ export function raidView(onFail: () => void = () => {}): RaidView {
   function load(): Promise<TrackView | null> {
     // The catch covers both ways it can go wrong: the 3D code not arriving, and the phone refusing WebGL when the view is made.
     loading ??= import('../render/trackView')
-      .then(({ createTrackView }) => (view = createTrackView(canvas)))
+      .then(({ createTrackView }) => {
+        view = createTrackView(canvas)
+        view.setLook(truckLook())
+        return view
+      })
       .catch((err: unknown) => fail(err))
     return loading
   }

@@ -1451,3 +1451,44 @@ body:has(.tab-page:not([hidden]) .live.full) { overflow: hidden; }
 .jump-row-what { margin-top: 4px !important; }
 .jump-row-vs { margin-top: 4px !important; color: var(--muted); }
 .jump-compare { font-weight: 600; }
+
+/* ── Truck, X-ray or Both (v1.27.0.0) ──
+   Three buttons joined into one strip, under every 3D view (and over it when
+   it's full page). The one in play wears the highlighter and a bar along its
+   foot, so it isn't colour alone. */
+.look-toggle {
+  display: inline-flex;
+  margin: 8px 8px 0 0;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: var(--panel-2);
+  vertical-align: top;
+}
+.look-btn {
+  min-width: 44px;
+  min-height: 40px;
+  padding: 4px 12px;
+  font: 600 14px/1.2 var(--ui);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.look-btn + .look-btn { border-left: 2px solid var(--ink); }
+.look-btn[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); box-shadow: inset 0 -4px 0 var(--ink); }
+.look-btn:focus-visible { outline: 3px solid var(--cool); outline-offset: -5px; }
+/* The build screen's truck: the strip sits under the picture, by the how-to line. */
+.truck-view .look-toggle { margin: 8px 0 4px; }
+/* Full page it sits over the picture with the camera and photo buttons, on the paper glass. */
+.live.full .rig-view:not(.photo-on) .look-toggle {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto 0 0;
+  background: var(--glass);
+  pointer-events: auto;
+}
+/* At a raid checkpoint the card has the room; the strip comes back when the stage drives on. */
+.raid-live.full.at-checkpoint .rig-view:not(.photo-on) .look-toggle { display: none; }
+/* Photo mode has its own strip in the bar under the picture. */
+.photo-on > .look-toggle { display: none; }
+.photo-bar .look-toggle { margin: 0 0 6px; }

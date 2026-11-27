@@ -147,15 +147,16 @@ describe.each(MODELS)('the $cls model ($build)', ({ cls, build }) => {
     }
   })
 
-  it('has a driveline, and keeps the debug split out of the shipped file', () => {
+  it('has a driveline of its own, on the body, for the X-ray view', () => {
     // A truck on solid axles has a two-piece prop shaft to each: one half on the gearbox, one on the axle, sliding together.
     for (const end of ['F', 'R']) {
       if (!byName.has(`Axle_${end}`)) continue
       const live = byName.has(`Arm_${end}_Prop`)
       expect(byName.has(`Arm_${end}_PropSlip`), `Arm_${end}_PropSlip`).toBe(live)
     }
-    // `BUMP_SPLIT=1` draws the driveline as its own node for check shots: never commit that build.
-    expect(byName.has('Driveline')).toBe(false)
+    // The engine and gearbox are their own node, so the X-ray view (v1.27) can hide the body and keep them.
+    expect(byName.has('Driveline')).toBe(true)
+    expect(byName.get('Driveline')!.mesh, 'Driveline draws something').toBeDefined()
   })
 
   it('names only real slots and parts for this class', () => {

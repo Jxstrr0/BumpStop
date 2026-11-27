@@ -152,3 +152,25 @@ export const NIGHT_LOOK = {
   /** Headlamps sit this share of the way up the body. */
   headlampHeight: 0.4,
 } as const
+
+/**
+ * The truck's look in the 3D views (Kelbo asked, 27 November 2026): Truck
+ * (as built), X-ray (the body off, so the frame, the engine and gearbox, and
+ * the suspension stand on their own) or Both (the body see-through over them).
+ * One pick for every 3D view, remembered by the phone.
+ */
+export type TruckLook = 'truck' | 'xray' | 'both'
+export const TRUCK_LOOKS: readonly TruckLook[] = ['truck', 'xray', 'both']
+
+export const SEE_THROUGH = {
+  /**
+   * What counts as "the body" and goes in X-ray: the shell (cab, bed,
+   * panels, glass and lamps) and these bolt-ons on it. The frame, the
+   * driveline, guards, bars, bump stops and everything that moves stay.
+   */
+  bodySlots: ['lightBar', 'spots', 'spares', 'recovery'],
+  /** How solid the body is in Both (0 invisible, 1 solid); where panels overlap it adds up. */
+  opacity: 0.22,
+  /** The windows are dark already, so they go fainter still. */
+  glassOpacity: 0.1,
+} as const

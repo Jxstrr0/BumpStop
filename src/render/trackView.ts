@@ -32,7 +32,7 @@
  */
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
-import { PHOTO_LIFT, SWING, TRACK_CAMERA } from '../data/graphics'
+import { PHOTO_LIFT, SWING, TRACK_CAMERA, type TruckLook } from '../data/graphics'
 import { LAND, LAND_COLOUR, SHAKER_FLOOR, SKY } from '../data/scenery'
 import type { FailureKind } from '../data/wear'
 import { WEATHER_LOOK, type WeatherId } from '../data/weather'
@@ -156,6 +156,8 @@ export interface TrackView {
   setGrime(g: Grime | null): void
   /** Night (night stages, after 1.20): the dark, and the build's lamps lighting the road; null for daylight. */
   setNight(lamps: NightLamps | null): void
+  /** Truck, X-ray or Both: the body as built, taken off, or see-through (v1.27). Ghost trucks follow it too. */
+  setLook(look: TruckLook): void
   /** The view as it stands, drawn with its longer side `longSide` pixels and copied onto a plain canvas. */
   snapshot(longSide: number): HTMLCanvasElement | null
   dispose(): void
@@ -299,6 +301,8 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   let ticket = 0
   // Photo mode: the player's camera, the distance it started at, and what to do once it ends.
   let photo: PhotoControls | null = null
+  /** Truck, X-ray or Both, for every truck this view loads. */
+  let truckLook: TruckLook = 'truck'
   let photoDistance = 1
   let waiting: { clip: readonly Pose[]; o: ClipOptions } | 'stop' | null = null
   // The swing-around camera, while the player has it.
@@ -822,6 +826,13 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     setGrime(g) {
       truck?.setGrime(g)
     },
+    setLook(next) {
+      if (next === truckLook) return
+      truckLook = next
+      truck?.setLook(next)
+      ghost?.setLook(next)
+      if (!raf) draw(0)
+    },
     setNight(next) {
       if (JSON.stringify(next) === JSON.stringify(night)) return
       night = next
@@ -843,6 +854,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
         lamps = null
         truck?.dispose()
         truck = model
+        truck.setLook(truckLook)
         scene.add(truck.root)
         fitLamps()
       }
@@ -855,6 +867,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
         ghost?.dispose()
         ghost = model
         ghost.ghostly(new THREE.Color(GHOST_LOOK.tint), GHOST_LOOK.opacity, GHOST_LOOK.mix)
+        ghost.setLook(truckLook)
         scene.add(ghost.root)
       }
       if (ghost) {
