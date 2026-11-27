@@ -45,6 +45,10 @@ right-hand edge when they're full page), **Photo mode** freezes the clip where i
 - **Done** (or Escape) goes back. The run or the raid kept going while the
   photo was framed; the view picks up with the newest clip.
 
+If the player had swung the camera round (the swing-around camera, see
+`docs/3D.md`), photo mode starts from that view, and the swing camera
+carries on after **Done**.
+
 The sliders keep photo mode usable without dragging. Limits are in
 `src/data/graphics.ts` (`PHOTO_LIFT`, `PHOTO_ZOOM`). Code: `src/ui/photoMode.ts`
 (the controls), `photoStart`/`photoSet`/`photoEnd`/`snapshot` in
