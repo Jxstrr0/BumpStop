@@ -1,5 +1,5 @@
 /**
- * The jump ramp's report (v1.20, Kelbo picked it, 27 November 2026). From
+ * The jump ramp's report (v1.21, Kelbo picked it, 27 November 2026). From
  * the top:
  *
  * 1. What happened: it took every jump, or what let go and on which jump.

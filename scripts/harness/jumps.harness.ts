@@ -1,5 +1,5 @@
 /**
- * The jump ramp (v1.20): every landing's score for the stock trucks, and
+ * The jump ramp (v1.21): every landing's score for the stock trucks, and
  * for a few tunes, so the scoring can be checked by eye.
  *
  *   npx vitest run --config vitest.harness.config.ts jumps --silent=false

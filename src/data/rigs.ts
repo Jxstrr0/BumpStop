@@ -8,7 +8,7 @@
  *   the speed where the dampers fade.
  * - **Torture loop:** whoops, rocks and jumps, faster every lap, to find what
  *   breaks: bottoming, mounts, axles, tires, the frame.
- * - **Jump ramp** (v1.20, Kelbo picked it, 27 November 2026): one tabletop
+ * - **Jump ramp** (v1.21, Kelbo picked it, 27 November 2026): one tabletop
  *   jump a lap, 5 km/h faster each time, with every landing scored: how
  *   level it came down, the bump stops, bottoming and bounces.
  *

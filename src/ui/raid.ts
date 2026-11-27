@@ -39,6 +39,7 @@ import { checkBuild, partIn } from '../sim/build'
 import { conditionEffect, wornTruck } from '../sim/condition'
 import { groundsToCheck } from '../sim/paceCheck'
 import { driverName } from '../sim/career'
+import { raidGrime } from '../sim/grime'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
   advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isCondPart, isRestDay, isUnderPart, leaveCheckpoint,
@@ -714,7 +715,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
           endLeg()
           return
         }
-        view3d.show(i, r.weather && weatherOn(r.weather, c.at) ? r.weather.kind : null)
+        // The truck as muddy, snowy and dented as the raid has made it by this moment.
+        view3d.show(i, r.weather && weatherOn(r.weather, c.at) ? r.weather.kind : null, raidGrime(s, r, c.at))
         const span = c.poses[c.poses.length - 1]!.t - c.poses[0]!.t
         duration = c.broken ? span / BREAK_RATE + BREAK_HOLD : span
         clipStart = performance.now()
