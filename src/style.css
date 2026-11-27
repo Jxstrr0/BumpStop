@@ -1212,3 +1212,88 @@ body:has(.tab-page:not([hidden]) .live.full) { overflow: hidden; }
   .live.full .end-bar .controls { flex: 0 0 auto; flex-wrap: nowrap; }
   .live.full .end-bar .controls > .btn { flex: 0 0 auto; padding-left: 14px; padding-right: 14px; white-space: nowrap; }
 }
+
+/* ── The raid stage, full page (v1.18.0.0) ──
+   The same whole page for a raid's stage highlight (Kelbo asked): the leg
+   along the top, the hottest oil and the most worn part under it, the last
+   two things that happened and the skip button at the bottom. A checkpoint
+   comes up from the bottom as a card. It shares `.live.full` with the test
+   track above; only what's different is here. */
+.raid-live { margin-top: 8px; }
+/* In the page the chart says all this, so the two gauges are for the full page only. */
+.raid-gauges { display: none; }
+.raid-live.full {
+  grid-template-columns: var(--edge-l) minmax(0, 200px) minmax(6px, 1fr) minmax(0, 200px) var(--edge-r);
+  grid-template-rows: auto auto 1fr auto auto;
+  grid-template-areas:
+    'top top top top top'
+    '.   fl  .   fr  .'
+    '.   mid mid mid .'
+    '.   log log log .'
+    'bar bar bar bar bar';
+  column-gap: 0;
+}
+.raid-live.full .rig-view:not(.photo-on) { margin: 0; }
+/* The last two lines of the log (a stop, the ice creaking, the weather turning), each on its own slip. */
+.raid-live.full .raid-log {
+  grid-area: log;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.raid-live.full .raid-log li { margin: 0; padding: 2px 8px; background: var(--glass); border-radius: 4px; }
+.raid-live.full .raid-log li:nth-last-child(n + 3) { display: none; }
+/* The foot: the skip button on a bar, or the checkpoint card, which scrolls if the screen is short. */
+.raid-live.full .raid-foot {
+  grid-area: bar;
+  position: relative;
+  z-index: 1;
+  max-height: 64vh;
+  overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+.raid-live.full .raid-foot:has(> .btn:not([hidden])) {
+  padding: 8px var(--edge-r) 8px var(--edge-l);
+  background: var(--glass);
+  border-top: 2px solid var(--ink);
+}
+.raid-live.full .raid-foot > .btn { display: block; width: 100%; max-width: 360px; margin: 0 auto; }
+.raid-live.full .raid-card:not(:empty) { margin: 0 var(--edge-r) 8px var(--edge-l); }
+.raid-live.full .raid-card .btn-row { margin-bottom: 8px; }
+
+/* At a checkpoint the card has the room under the lap line: the gauges step aside (the card says the same
+   things), the log's slips go top left, the photo button top right, and the card never grows over them. */
+.raid-live.full.at-checkpoint {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'top top top top top'
+    '.   mid mid mid .';
+}
+.raid-live.full.at-checkpoint .raid-gauges .corner { display: none; }
+.raid-live.full.at-checkpoint .rig-view:not(.photo-on) { align-items: flex-start; align-content: flex-start; justify-content: flex-end; }
+.raid-live.full.at-checkpoint .raid-log { grid-area: 2 / 2 / 3 / 5; align-self: start; max-width: calc(100% - 132px); }
+.raid-live.full.at-checkpoint .raid-foot { grid-area: 2 / 1 / 3 / -1; align-self: end; max-height: calc(100% - 58px); }
+
+/* A wide screen: the card's numbers on the left, the pace call and "Drive on" on the right. */
+@media (min-aspect-ratio: 5/4) {
+  .raid-live.full .raid-foot:has(> .btn:not([hidden])) { padding-top: 4px; padding-bottom: 4px; }
+  .raid-live.full .raid-card:not(:empty) {
+    columns: 2;
+    column-gap: 20px;
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 8px 12px;
+  }
+  .raid-live.full .raid-card > * { break-inside: avoid; }
+  .raid-live.full .raid-card > .raid-sub { column-span: all; }
+  /* "Pace call for leg 2" starts the right-hand column (the fourth child from the end). */
+  .raid-live.full .raid-card > .small:nth-last-child(4) { break-before: column; margin-top: 0; }
+}

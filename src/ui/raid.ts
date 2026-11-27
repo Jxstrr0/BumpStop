@@ -10,6 +10,12 @@
  *    break in slow motion), with the live trace of the hottest oil or the
  *    most worn part filling in along the stage, and each stop as it comes.
  *    At each checkpoint: the clock, the place in class, and the next pace call.
+ *    Like the test track, the stage takes the whole page (Kelbo asked, 27
+ *    November 2026): the 3D highlight fills the screen above the tabs, with
+ *    the leg, the hottest oil and the most worn part over it, the last stops
+ *    and the skip button along the bottom, and the checkpoint as a card that
+ *    comes up from the bottom. "Traces" drops back to the page with the trace
+ *    (the same remembered pick as the test track, `fullPage.ts`).
  * 4. **Results:** the day's times and the overall standings.
  * 5. **The bivouac:** pick jobs for the night within the hours and spares.
  * 6. **Final results** after the last stage.
@@ -41,11 +47,12 @@ import {
 } from '../sim/raid'
 import { forecastAt, forecastWord, weatherOn, type StageWeather } from '../sim/weather'
 import type { BuildStore } from './buildStore'
-import { BAND_WORD, bandOf, lineChart, type LineChart } from './charts'
+import { BAND_WORD, bandOf, lineChart, type Band, type LineChart } from './charts'
 import { el, num, showTabFor } from './dom'
 import { jumpTo } from './fixes'
 import { paceCheckBlock } from './paceCheck'
 import { BREAK_RATE, raidView } from './raidView'
+import { readFullPage, writeFullPage } from './fullPage'
 
 const C0 = 273.15
 /** Clips shown per leg: about half a minute of highlight. */
@@ -271,7 +278,9 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
   let run: StageRun | null = null
   let timer = 0
   let raf = 0
-  const view3d = raidView()
+  /** What to do if the 3D can't start: the stage on screen sets this, to go back to the page. */
+  let onViewFail: () => void = () => {}
+  const view3d = raidView(() => onViewFail())
   /** Hand the garage a copy, so a stage driven after this can't change what's saved. */
   const saveRaid = () => saves?.onRaid(state ? structuredClone(state) : null)
 
@@ -549,6 +558,35 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     const progress = el('div', 'live-progress')
     const fill = el('div', 'live-fill')
     progress.append(fill)
+    // Full page or in the page with the trace: one button swaps between them, the same pick as the test track's.
+    let full = readFullPage()
+    const sizeBtn = button('', 'btn chip-btn size-btn')
+    const stage = el('div', 'live raid-live')
+    const layout = () => {
+      const on = full && view3d.works()
+      stage.classList.toggle('full', on)
+      sizeBtn.hidden = !view3d.works()
+      sizeBtn.textContent = t(on ? 'shop.traces' : 'shop.fullPage')
+    }
+    sizeBtn.addEventListener('click', () => {
+      full = !full
+      writeFullPage(full)
+      layout()
+      if (!full) stage.scrollIntoView({ behavior: 'auto', block: 'start' })
+    })
+    onViewFail = layout
+    // Full page there's no chart, so the two things it traces sit over the picture: the hottest oil and the most worn part.
+    const gauge = (label: string) => {
+      const cell = el('div', 'corner')
+      const value = el('span', 'corner-oil')
+      const chip = el('span', 'chip cool')
+      cell.append(el('span', 'corner-name', label), value, chip)
+      return { cell, value, chip }
+    }
+    const oilGauge = gauge(t('raidUi.gaugeOil'))
+    const wearGauge = gauge(t('raidUi.gaugeWear'))
+    const gauges = el('div', 'corners raid-gauges')
+    gauges.append(oilGauge.cell, wearGauge.cell)
     let channel: 'oil' | 'wear' = 'oil'
     const chTitle = el('h4', 'sim-chart-title')
     const chartHolder = el('div', 'sim-chart')
@@ -602,6 +640,20 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       readout.textContent = value
       chart.svg.setAttribute('aria-label', tf('raidUi.alt', { channel: t(channel === 'oil' ? 'raidUi.chOil' : 'raidUi.chWear').toLowerCase(), value }))
       fill.style.width = `${Math.min(100, (upTo / totalM) * 100)}%`
+      // The two gauges read the same trace at the same place.
+      let n = 0
+      while (n < tr.distance.length && (tr.distance[n] as number) <= upTo) n++
+      n = Math.max(1, n)
+      const oilNow = (tr.oil[n - 1] as number) - C0
+      const wearNow = (tr.wear[n - 1] as number) * 100
+      const set = (g: typeof oilGauge, text: string, band: Band) => {
+        g.value.textContent = text
+        g.chip.className = `chip ${band}`
+        g.chip.textContent = BAND_WORD[band]
+        g.cell.dataset.band = band
+      }
+      set(oilGauge, `${num(oilNow)} °C`, bandOf(oilNow, warm, red))
+      set(wearGauge, `${num(wearNow)}%`, bandOf(wearNow, 50, 100))
       // Stops come into the log as the highlight passes them.
       while (logged < r.stops.length && (r.stops[logged] as Stop).at <= upTo + 1) addStop(r.stops[logged++] as Stop)
       while (creaks < r.iceNotes.length && (r.iceNotes[creaks] as IceNote).at <= upTo + 1) {
@@ -628,6 +680,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     /** Drive the current leg in the sim, a piece of ground per tick so the page keeps drawing. */
     function driveLeg(): void {
       card.replaceChildren()
+      stage.classList.remove('at-checkpoint')
       skip.hidden = true
       const legStart = r.at
       liveHead.textContent = tf('raidUi.driving', { n: String(r.leg + 1) })
@@ -749,6 +802,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
         notes,
         el('p', 'small', tf('raidUi.nextPace', { n: String(n + 1) })), row, paceText, go,
       )
+      // Full page, the card takes the gauges' room: it says the same things.
+      stage.classList.add('at-checkpoint')
       go.focus({ preventScroll: true })
       card.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'nearest' })
     }
@@ -762,7 +817,19 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     }
 
     view3d.element.hidden = true
-    show(head, view3d.element, liveHead, progress, channelRow, chTitle, chartHolder, readout, log, skip, card)
+    const liveTop = el('div', 'live-top')
+    liveTop.append(liveHead, sizeBtn)
+    const headBox = el('div', 'live-headbox')
+    headBox.append(liveTop, progress)
+    const hud = el('div', 'live-hud')
+    hud.append(headBox, gauges)
+    const traces = el('div', 'traces')
+    traces.append(channelRow, chTitle, chartHolder, readout)
+    const foot = el('div', 'raid-foot')
+    foot.append(skip, card)
+    stage.append(view3d.element, hud, traces, log, foot)
+    layout()
+    show(head, stage)
     draw(0)
     focusHead(head)
     driveLeg()

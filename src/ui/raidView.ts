@@ -34,7 +34,8 @@ export interface RaidView {
   works(): boolean
 }
 
-export function raidView(): RaidView {
+/** `onFail` is called if the 3D can't start, so the stage can go back to the page with the trace. */
+export function raidView(onFail: () => void = () => {}): RaidView {
   const box = el('figure', 'rig-view raid-view')
   box.hidden = true
   const canvas = el('canvas', 'rig-canvas')
@@ -66,6 +67,7 @@ export function raidView(): RaidView {
     console.error(err)
     failed = true
     box.hidden = true
+    onFail()
     return null
   }
 
@@ -99,9 +101,12 @@ export function raidView(): RaidView {
         caption.textContent = b.corner >= 0
           ? tf('raidUi.viewBreak', { what, where: t(`corner.${b.corner}` as StringKey) })
           : tf('raidUi.viewBreakFrame', { what, zone: t(`zone.${b.zone ?? 'centre'}` as StringKey) })
+        // What the caption is saying, for the full-page layout: plain "highlights" is left off there, the rest stays.
+        box.dataset.state = 'ended'
         view.play(p, { rate: BREAK_RATE, loop: false, focus: { corner: b.corner, kind: b.kind } })
       } else {
         caption.textContent = weather ? tf('raidUi.viewWeather', { kind: t(`weather.${weather}` as StringKey) }) : t('raidUi.viewLive')
+        box.dataset.state = weather ? 'note' : 'live'
         view.play(p, { rate: 1, loop: false })
       }
       photo.ready(true)
