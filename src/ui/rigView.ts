@@ -49,9 +49,12 @@ export interface RigView {
   /** The run ended: replay the break (if there was one), or show the last clip. */
   finish(broken: BreakEvent | null): void
   reset(): void
+  /** False once the phone turned out not to do WebGL. */
+  works(): boolean
 }
 
-export function rigView(): RigView {
+/** `onFail` is called if the 3D can't start, so the shop can go back to the page with the traces. */
+export function rigView(onFail: () => void = () => {}): RigView {
   const box = el('figure', 'rig-view')
   box.hidden = true
   const canvas = el('canvas', 'rig-canvas')
@@ -72,10 +75,10 @@ export function rigView(): RigView {
   let retry = 0
 
   function load(): Promise<TrackView | null> {
-    loading ??= import('../render/trackView').then(
-      ({ createTrackView }) => (view = createTrackView(canvas)),
-      (err) => fail(err),
-    )
+    // The catch covers both ways it can go wrong: the 3D code not arriving, and the phone refusing WebGL when the view is made.
+    loading ??= import('../render/trackView')
+      .then(({ createTrackView }) => (view = createTrackView(canvas)))
+      .catch((err: unknown) => fail(err))
     return loading
   }
 
@@ -83,6 +86,7 @@ export function rigView(): RigView {
     console.error(err)
     failed = true
     box.hidden = true
+    onFail()
     return null
   }
 
@@ -113,6 +117,8 @@ export function rigView(): RigView {
       box.hidden = false
       canvas.setAttribute('aria-label', t(run.road ? 'view3d.alt' : 'view3d.altShaker'))
       caption.textContent = t('view3d.loading')
+      // What the view is showing, for the full-page layout: the "live" caption is left off there, the others stay.
+      box.dataset.state = 'loading'
       const setup = run.truck.ride
       void load().then(async (v) => {
         if (!v || current !== run) return
@@ -125,6 +131,7 @@ export function rigView(): RigView {
         }
         if (current !== run) return
         caption.textContent = t(run.road ? (run.ghost ? 'view3d.liveGhost' : 'view3d.live') : 'view3d.liveShaker')
+        box.dataset.state = 'live'
         next()
       })
     },
@@ -133,6 +140,8 @@ export function rigView(): RigView {
       window.clearTimeout(retry)
       const r = current
       if (!r || failed) return
+      // The shaker's caption doesn't change when it ends, so it stays off the full page.
+      if (r.road) box.dataset.state = 'ended'
       void load().then((v) => {
         if (!v || current !== r || posesHeld(r.log) < 2) return
         // A break worked out on a long stage has no moment to replay; the rigs always drive it.
@@ -160,5 +169,6 @@ export function rigView(): RigView {
       view?.stop()
       box.hidden = true
     },
+    works: () => !failed,
   }
 }

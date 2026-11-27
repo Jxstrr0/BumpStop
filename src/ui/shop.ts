@@ -8,9 +8,18 @@
  * faint dashed ghost. "Fast" plays it quicker, "Skip to the end" works it out
  * as fast as the phone can, and "Stop" ends it early.
  *
+ * The run takes the whole page (Kelbo asked, 27 November 2026): the 3D view
+ * fills the screen above the tabs, with the lap, the four corners and the
+ * buttons laid over it. "Traces" drops back to the page, with the 3D view in
+ * a box and the live trace under it; "Full page" goes back. The phone
+ * remembers which (`fullPage.ts`). If the phone can't do 3D the run stays in
+ * the page.
+ *
  * When something breaks (or the run ends) the report appears underneath
- * (`report.ts`). Its fix buttons jump up to the build screen, and a bar at
- * the bottom of the screen brings the player back to run it again.
+ * (`report.ts`). Full page, the slow-motion replay keeps the screen first,
+ * with what happened and a "See the report" button. The report's fix buttons
+ * jump to the build screen, and a bar at the bottom of the screen brings the
+ * player back to run it again.
  *
  * Each class and rig always drives the same road, so a re-run after a fix
  * shows exactly what the fix changed. The truck is copied when the run
@@ -43,6 +52,7 @@ import { BAND_WORD, bandOf, ghostLegend, lineChart, shakerChart, type Band, type
 import { el, num, reveal } from './dom'
 import { SHOP_EVENT, type ShopEvent } from './events'
 import { jumpTo, type Jump } from './fixes'
+import { readFullPage, writeFullPage } from './fullPage'
 import { distanceText, ghostRace, raceText, type GhostPick } from './ghostRace'
 import { lapReport, shakerReport, type LapGhost } from './report'
 import { rigView } from './rigView'
@@ -174,6 +184,10 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
   let channel: LiveChannel = 'oil'
   let lastChartDraw = 0
   let lastChartSamples = -1
+  /** The run takes the whole page (the player's pick, remembered), not a box in the page. */
+  let full = readFullPage()
+  /** A full-page run has ended and its replay still has the screen; the report waits under it. */
+  let ended = false
 
   // --- Picking a rig ---
   const testing = el('p', 'small testing')
@@ -220,6 +234,17 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
   const live = el('div', 'live')
   live.hidden = true
   const liveHead = el('p', 'live-head')
+  // Full page or in the page with the traces: one button swaps between them.
+  const sizeBtn = el('button', 'btn chip-btn size-btn')
+  sizeBtn.type = 'button'
+  sizeBtn.addEventListener('click', () => {
+    full = !full
+    writeFullPage(full)
+    layout()
+    if (!full) live.scrollIntoView({ behavior: 'auto', block: 'start' })
+  })
+  const liveTop = el('div', 'live-top')
+  liveTop.append(liveHead, sizeBtn)
   const progress = el('div', 'live-progress')
   progress.setAttribute('role', 'progressbar')
   progress.setAttribute('aria-valuemin', '0')
@@ -280,10 +305,56 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
   stopBtn.addEventListener('click', () => finish(true))
   controls.append(fastBtn, skipBtn, stopBtn)
 
+  // What a full-page run shows when it ends, over the replay: what happened, and the way to the report.
+  const endBar = el('div', 'end-bar')
+  endBar.hidden = true
+  const endHead = el('p', 'end-head')
+  const seeReport = el('button', 'btn end-report', t('shop.seeReport'))
+  seeReport.type = 'button'
+  seeReport.addEventListener('click', () => openReport())
+  const endAgain = el('button', 'btn', t('report.runAgain'))
+  endAgain.type = 'button'
+  endAgain.addEventListener('click', () => begin())
+  const endRow = el('div', 'btn-row controls')
+  endRow.append(seeReport, endAgain)
+  endBar.append(endHead, endRow)
+
   // The 3D view of the run (plan PR 5). It moves into the report when the run ends, so the slow-motion replay is in sight.
-  const view3d = rigView()
-  live.append(view3d.element, liveHead, progress, corners, frameLine, channelRow, chartTitle, chartHolder, legendHolder, ghostNote, raceLine, controls)
+  // If the phone can't do 3D there's nothing to fill the page with: back to the traces.
+  const view3d = rigView(() => {
+    layout()
+    if (active) live.scrollIntoView({ behavior: 'auto', block: 'start' })
+  })
+  // The numbers laid over the 3D view when it's full page; in the page they sit under it as before.
+  const hud = el('div', 'live-hud')
+  const headBox = el('div', 'live-headbox')
+  headBox.append(liveTop, progress, frameLine, raceLine)
+  hud.append(headBox, corners)
+  const traces = el('div', 'traces')
+  traces.append(channelRow, chartTitle, chartHolder, legendHolder, ghostNote)
+  live.append(view3d.element, hud, traces, controls, endBar)
   const reportHolder = el('div', 'report-holder')
+
+  /** Full page or in the page: only while a run (or its replay) has the 3D view, and only if the phone can draw it. */
+  function layout(): void {
+    const on = full && (active !== null || ended) && view3d.works()
+    live.classList.toggle('full', on)
+    // The swap button is for a run in progress; afterwards "See the report" is the way out.
+    sizeBtn.hidden = active === null || !view3d.works()
+    sizeBtn.textContent = t(on ? 'shop.traces' : 'shop.fullPage')
+    endBar.hidden = !(on && ended)
+  }
+
+  /** From the full-page replay to the report: the 3D view moves under its heading, as it does in the page. */
+  function openReport(): void {
+    ended = false
+    layout()
+    const report = reportHolder.firstElementChild
+    const head = report?.querySelector<HTMLElement>('.report-head')
+    head?.after(view3d.element)
+    head?.focus({ preventScroll: true })
+    report?.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
+  }
 
   // --- The bar that brings the player back after a fix jump ---
   const rerun = el('div', 'rerun-bar')
@@ -333,9 +404,11 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     cancelAnimationFrame(raf)
     sound.stop()
     active = null
+    ended = false
     live.hidden = true
     view3d.reset()
     reportHolder.replaceChildren()
+    layout()
     sync()
   }
 
@@ -385,6 +458,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     skipBtn.disabled = false
     fastBtn.setAttribute('aria-pressed', 'false')
     controls.hidden = false
+    ended = false
     rerun.hidden = true
     reportHolder.replaceChildren()
     const laps = active.kind === 'laps'
@@ -401,12 +475,14 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
       view3d.begin({ truck, road: null, log: sr.poses!, beat: () => sr.freqs[Math.min(sr.index, sr.freqs.length - 1)] as number })
     }
     live.hidden = false
+    layout()
     lastChartSamples = -1
     sync()
     drawLive(true)
     // Bring the run into view: on a phone the start button sits low, so the 3D view
     // would start below the fold. The Fast, Skip and Stop buttons are pinned to the
-    // bottom of the screen while the run is on (.controls in style.css).
+    // bottom of the screen while the run is on (.controls in style.css). Full page
+    // the run already has the screen; this still brings up the Test tab.
     reveal(live, { behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
     last = performance.now()
     raf = requestAnimationFrame(tick)
@@ -641,8 +717,19 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     reportHolder.replaceChildren(report)
     sync()
     const head = report.querySelector<HTMLElement>('.report-head')
+    const broken = a.kind === 'laps' ? a.runner.run.w.broken : null
+    if (live.classList.contains('full')) {
+      // Full page: the replay keeps the screen, with the report's own headline and the way to the rest of it.
+      ended = true
+      endHead.replaceChildren(...(head ? [...head.childNodes].map((n) => n.cloneNode(true)) : []))
+      layout()
+      view3d.finish(broken)
+      seeReport.focus({ preventScroll: true })
+      return
+    }
+    layout()
     head?.after(view3d.element)
-    view3d.finish(a.kind === 'laps' ? a.runner.run.w.broken : null)
+    view3d.finish(broken)
     head?.focus({ preventScroll: true })
     report.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
   }

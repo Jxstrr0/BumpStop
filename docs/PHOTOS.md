@@ -30,8 +30,8 @@ Code: `src/ui/truckCard.ts` (drawing and the block), `Garage.snapshot` in
 
 ## Photo mode
 
-Under the 3D view on a rig run and on a raid's stage highlight, **Photo
-mode** freezes the clip where it is and opens the view full screen:
+Under the 3D view on a rig run (bottom right of a full-page run) and on a
+raid's stage highlight, **Photo mode** freezes the clip where it is and opens the view full screen:
 
 - **Moment** scrubs back and forth through the clip (about 2.5 seconds of a
   live run, 3 seconds of a break replay), to catch the truck in the air or

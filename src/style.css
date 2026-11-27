@@ -28,6 +28,8 @@
   --band-warm: rgba(154, 91, 0, 0.1);
   --band-hot: rgba(192, 38, 45, 0.1);
   --focus: #1f65a8;
+  /* Panels laid over the full-page test track: the paper, a little see-through. */
+  --glass: rgba(251, 250, 245, 0.86);
   --head: 'Big Shoulders', 'Arial Narrow', system-ui, sans-serif;
   --ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: 'Overpass Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
@@ -56,6 +58,7 @@
     --band-warm: rgba(240, 174, 69, 0.12);
     --band-hot: rgba(255, 110, 110, 0.14);
     --focus: #6fb3ee;
+    --glass: rgba(32, 33, 37, 0.84);
   }
 }
 
@@ -1024,4 +1027,188 @@ body.photo-open .tabs { display: none; }
   :root { --tabs-h: 44px; }
   .tab-btn { flex-direction: row; gap: 6px; padding: 0 2px; border-top-width: 3px; font-size: 14px; }
   .tab-icon { width: 20px; height: 20px; }
+}
+
+/* ── The test track, full page (v1.17.0.0) ──
+   Kelbo asked for the test track as a whole page, not a small box. While a
+   run is on (and for its replay) the 3D view fills the screen above the tabs.
+   The numbers and buttons sit round the edges on slips of paper, so the
+   middle stays clear for the truck: the lap along the top, the front corners
+   under it and the rear corners at the bottom (the truck seen from above),
+   then Fast, Skip and Stop. "Traces" (top right) goes back to the page with
+   the chart under the 3D view; "Full page" comes back here. */
+.live-top { display: flex; align-items: flex-start; gap: 8px; }
+.live-top .live-head { flex: 1 1 auto; }
+.size-btn { flex: 0 0 auto; margin: -4px 0 6px; }
+.live-headbox .frame-line { margin: -6px 0 10px; }
+.live-headbox .race-line { margin: -4px 0 10px; }
+.live-headbox .race-line:empty { display: none; }
+.end-head { margin: 0 0 8px; font-weight: 600; }
+.end-report { background: var(--accent); color: var(--on-accent); }
+
+.live.full {
+  --edge-l: max(8px, env(safe-area-inset-left, 0px));
+  --edge-r: max(8px, env(safe-area-inset-right, 0px));
+  position: fixed;
+  inset: 0 0 var(--above-tabs) 0;
+  z-index: 20; /* over the page, under the tabs */
+  margin: 0;
+  background: var(--panel-2);
+  /* A drag on the picture doesn't scroll the page hidden behind it. */
+  touch-action: none;
+  overscroll-behavior: contain;
+  /* Three columns: a slip of numbers down each side and the gap between them. */
+  display: grid;
+  grid-template-columns: var(--edge-l) minmax(0, 200px) minmax(6px, 1fr) minmax(0, 200px) var(--edge-r);
+  grid-template-rows: auto auto 1fr auto auto;
+  grid-template-areas:
+    'top top top top top'
+    '.   fl  .   fr  .'
+    '.   mid mid mid .'
+    '.   rl  .   rr  .'
+    'bar bar bar bar bar';
+  row-gap: 6px;
+}
+/* Photo mode opens out of this box, so the box goes on top with it. */
+body.photo-open .live.full { z-index: 950; }
+/* The page behind stays put while the run has the screen (only while the Test tab is the one showing). */
+body:has(.tab-page:not([hidden]) .live.full) { overflow: hidden; }
+.live.full .traces { display: none; }
+/* The numbers' own boxes drop away, so each piece can take its place round the edge. */
+.live.full .live-hud,
+.live.full .corners { display: contents; }
+
+/* The canvas takes the whole box, behind everything. */
+.live.full .rig-view:not(.photo-on) .rig-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+}
+/* The figure keeps its caption and the photo button, at the foot of the clear middle. */
+.live.full .rig-view:not(.photo-on) {
+  grid-area: mid;
+  min-height: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  align-content: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+  /* Taps and drags in the clear middle go nowhere; only the caption and button count. */
+  pointer-events: none;
+}
+.live.full .rig-view:not(.photo-on) .rig-caption {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 2px 8px;
+  background: var(--glass);
+  border-radius: 4px;
+  color: var(--ink);
+}
+.live.full .rig-view:not(.photo-on) .rig-caption:empty,
+/* "Live from the track" goes without saying when it has the whole screen. */
+.live.full .rig-view[data-state='live']:not(.photo-on) .rig-caption { display: none; }
+.live.full .rig-view:not(.photo-on) .photo-btn {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 0 auto;
+  background: var(--glass);
+  pointer-events: auto;
+}
+
+/* The lap, along the top. */
+.live.full .live-headbox {
+  grid-area: top;
+  position: relative;
+  z-index: 1;
+  padding: calc(6px + env(safe-area-inset-top, 0px)) var(--edge-r) 6px var(--edge-l);
+  background: var(--glass);
+  border-bottom: 2px solid var(--ink);
+}
+.live.full .live-headbox > * { max-width: 560px; margin-left: auto; margin-right: auto; }
+.live.full .live-top { align-items: center; }
+.live.full .live-head { margin: 0; }
+.live.full .size-btn { margin: 0; }
+.live.full .live-progress { margin-top: 6px; margin-bottom: 0; }
+.live.full .frame-line,
+.live.full .race-line { margin-top: 4px; margin-bottom: 0; font-size: 12px; color: var(--ink); }
+
+/* The four corners: front pair under the lap, rear pair over the buttons. */
+.live.full .corner {
+  position: relative;
+  z-index: 1;
+  align-self: start;
+  padding: 4px 8px;
+  gap: 0 8px;
+  background: var(--glass);
+  border-color: var(--ink);
+}
+.live.full .corner[data-band='hot'] { border-color: var(--hot); }
+.live.full .corner:nth-child(1) { grid-area: fl; }
+.live.full .corner:nth-child(2) { grid-area: fr; }
+.live.full .corner:nth-child(3) { grid-area: rl; align-self: end; }
+.live.full .corner:nth-child(4) { grid-area: rr; align-self: end; }
+.live.full .corner-name { color: var(--ink); font-size: 11px; }
+.live.full .corner-oil { font-size: 17px; }
+.live.full .corner-line { font-size: 12px; }
+
+/* The buttons, along the bottom: Fast, Skip and Stop while it runs; the report and "Run it again" after. */
+.live.full .controls,
+.live.full .end-bar {
+  grid-area: bar;
+  position: relative;
+  bottom: auto;
+  z-index: 1;
+  margin: 0;
+  padding: 8px var(--edge-r) 8px var(--edge-l);
+  background: var(--glass);
+  border-top: 2px solid var(--ink);
+}
+.live.full .controls { justify-content: center; }
+.live.full .controls > .btn { max-width: 240px; }
+.live.full .end-bar .controls { padding: 0; border: 0; background: none; }
+.live.full .end-head { max-width: 560px; margin-left: auto; margin-right: auto; }
+
+/* A wide screen (a phone on its side, a computer): the corners go down the two sides instead. */
+@media (min-aspect-ratio: 5/4) {
+  .live.full {
+    grid-template-rows: auto auto auto 1fr auto;
+    grid-template-areas:
+      'top top top top top'
+      '.   fl  mid fr  .'
+      '.   rl  mid rr  .'
+      '.   .   mid .   .'
+      'bar bar bar bar bar';
+    grid-template-columns: var(--edge-l) minmax(0, 160px) minmax(6px, 1fr) minmax(0, 160px) var(--edge-r);
+  }
+  .live.full .rig-view:not(.photo-on) { margin: 0 6px; }
+  .live.full .corner:nth-child(3),
+  .live.full .corner:nth-child(4) { align-self: start; }
+  /* The lap line, the lap's progress, the frame and the swap button all on one line. */
+  .live.full .live-headbox {
+    display: flex;
+    align-items: center;
+    gap: 4px 14px;
+    padding-top: calc(4px + env(safe-area-inset-top, 0px));
+    padding-bottom: 4px;
+  }
+  .live.full .live-headbox > * { max-width: none; margin: 0; }
+  .live.full .live-top { display: contents; }
+  .live.full .live-head { flex: 0 1 auto; }
+  .live.full .live-progress { flex: 1 1 60px; margin: 0; }
+  .live.full .size-btn { order: 9; }
+  .live.full .controls,
+  .live.full .end-bar { padding-top: 4px; padding-bottom: 4px; }
+  .live.full .end-bar { display: flex; align-items: center; gap: 12px; }
+  .live.full .end-head { flex: 1 1 0; margin: 0; font-size: 14px; }
+  .live.full .end-bar .controls { flex: 0 0 auto; flex-wrap: nowrap; }
+  .live.full .end-bar .controls > .btn { flex: 0 0 auto; padding-left: 14px; padding-right: 14px; white-space: nowrap; }
 }
