@@ -7,6 +7,11 @@
  * then cuts out its busiest few seconds (where the wheels worked hardest),
  * or, if something broke in the sample, the last seconds before the break.
  *
+ * The busiest window starts right at the jump or the whoops, so the clip
+ * starts a little before it (`CLIP.lead`): the radio co-driver (27 November
+ * 2026) calls what's ahead as each clip starts, and needs a moment to say
+ * "Caution. Big jump. 30." before the truck gets there.
+ *
  * Each clip keeps just the bit of road under it, with room behind and ahead
  * for the camera, so a whole stage of clips stays small on a phone.
  *
@@ -22,6 +27,8 @@ import type { BreakEvent } from './wear'
 export const CLIP = {
   /** A clip is this long (s of sim time)... */
   seconds: 5,
+  /** ...and starts this long before its busiest stretch, when the road allows (s): the co-driver's time to call it. */
+  lead: 2,
   /** ...or this long when it ends on a break: the slow-motion replay. */
   breakSeconds: 3.5,
   /** Road kept behind the clip's first pose and ahead of its last (m): the 3D view needs 30 and 60, plus a wheelbase. */
@@ -90,8 +97,11 @@ export function pickClip(poses: readonly Pose[], roadLength: number, broken: boo
     }
   }
   if (best < 0) return null
+  // Back up to start a little before the busiest stretch, as far as the road behind allows.
+  let from = best
+  while (from > 0 && okStart(poses[from - 1]!) && poses[best]!.t - poses[from - 1]!.t <= CLIP.lead) from--
   const out: Pose[] = []
-  for (let k = best; k < poses.length && poses[k]!.t - poses[best]!.t <= CLIP.seconds; k++) out.push(poses[k]!)
+  for (let k = from; k < poses.length && poses[k]!.t - poses[from]!.t <= CLIP.seconds; k++) out.push(poses[k]!)
   return out
 }
 

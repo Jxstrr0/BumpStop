@@ -8,7 +8,7 @@ build in `src/data/kit.ts`, and the builder in `src/sim/build.ts`.
 
 Frame, front suspension, rear suspension, dampers, bump stops, anti-roll
 bars, axles and CVs, wheels, tires, protection, engine, light bar, spot
-lamps and spares (the two lamp slots came with night stages, v1.23:
+lamps and spares (the two lamp slots came with night stages, v1.24:
 `docs/NIGHT.md`). Every
 part lists its mass (kg, whole truck) and cost (cr., the game's money) for each class it
 comes in, and the year it can first be bought. A part with no number for a

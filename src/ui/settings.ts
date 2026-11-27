@@ -6,9 +6,13 @@
  *   see Auto step down.
  * - Works offline: whether this copy of the game opens with no signal
  *   (`src/pwa/register.ts`).
+ * - Co-driver (27 November 2026): the radio calls on a raid stage, On,
+ *   Words only or Off, and their volume (`src/audio/radio.ts`).
  */
 import { TIERS, type GraphicsChoice } from '../data/graphics'
+import { RADIO_CREDIT } from '../data/radio'
 import { RECORDINGS } from '../data/recordings'
+import { getRadio, RADIO_MODES } from '../audio/radio'
 import { t, tf, type StringKey } from '../data/strings'
 import { offlineState } from '../pwa/register'
 import { currentTier, graphicsChoice, onTierChange, setGraphicsChoice, tierPinned } from '../render/tiers'
@@ -67,6 +71,52 @@ export function settingsPanel(): HTMLElement {
   const oHead = el('h3', '', t('offline.title'))
   const oLine = el('p', 'small', t(`offline.${offlineState()}`))
 
+  // --- Co-driver ---
+  const radio = getRadio()
+  const rHead = el('h3', '', t('radio.title'))
+  const rLead = el('p', 'small', t('radio.lead'))
+  const rRow = el('div', 'btn-row chip-row')
+  rRow.setAttribute('role', 'group')
+  rRow.setAttribute('aria-label', t('radio.title'))
+  const rNote = el('p', 'small')
+  rNote.setAttribute('aria-live', 'polite')
+  // A browser with no sound only offers the words.
+  const modes = radio.canPlay ? RADIO_MODES : RADIO_MODES.filter((m) => m !== 'on')
+  const rButtons = modes.map((m) => {
+    const b = el('button', 'btn chip-btn', t(`radio.${m}` as StringKey))
+    b.type = 'button'
+    b.addEventListener('click', () => {
+      radio.setMode(m)
+      showRadio()
+    })
+    rRow.append(b)
+    return b
+  })
+  const volLabel = el('label', 'radio-volume')
+  const volName = el('span', '', t('radio.volume'))
+  const vol = el('input')
+  vol.type = 'range'
+  vol.min = '0'
+  vol.max = '100'
+  vol.step = '5'
+  const volValue = el('span', 'radio-volume-value')
+  volLabel.append(volName, vol, volValue)
+  vol.addEventListener('input', () => {
+    radio.setVolume(Number(vol.value) / 100)
+    showRadio()
+  })
+  function showRadio(): void {
+    const m = radio.canPlay ? radio.mode() : 'captions'
+    modes.forEach((id, i) => rButtons[i]!.setAttribute('aria-pressed', String(id === m)))
+    rNote.textContent = radio.canPlay ? t(`radio.${m}Text` as StringKey) : t('radio.noSound')
+    const pct = String(Math.round(radio.volume() * 100))
+    vol.value = pct
+    volValue.textContent = tf('radio.volumeValue', { pct })
+    vol.setAttribute('aria-valuetext', volValue.textContent)
+    volLabel.hidden = !radio.canPlay || m !== 'on'
+  }
+  showRadio()
+
   // Credits (plan PR 13): who made it and what it's made with. The full list is CREDITS.md.
   const cHead = el('h3', '', t('credits.title'))
   const credits = el('ul', 'small credit-list')
@@ -87,6 +137,7 @@ export function settingsPanel(): HTMLElement {
     sound.append(list)
     credits.append(sound)
   }
-  box.append(gHead, gLead, row, now, reloadNote, tiers, oHead, oLine, cHead, credits)
+  credits.append(el('li', '', tf('credits.radio', { voice: RADIO_CREDIT.voice, author: RADIO_CREDIT.author, source: RADIO_CREDIT.source })))
+  box.append(gHead, gLead, row, now, reloadNote, tiers, oHead, oLine, rHead, rLead, rRow, rNote, volLabel, cHead, credits)
   return box
 }
