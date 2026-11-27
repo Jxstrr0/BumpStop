@@ -713,6 +713,8 @@ const STRINGS = {
   'raidUi.skipFinish': 'Skip to the finish',
   'raidUi.chOil': 'Hottest damper oil (°C)',
   'raidUi.chWear': 'Most worn part (%)',
+  'raidUi.gaugeOil': 'Hottest oil',
+  'raidUi.gaugeWear': 'Most worn',
   'raidUi.axis': 'km →',
   'raidUi.alt': 'The stage so far: {channel}. Now {value}.',
   'raidUi.view': '3D highlight of the stage',

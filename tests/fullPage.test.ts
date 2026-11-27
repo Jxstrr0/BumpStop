@@ -50,6 +50,11 @@ describe('the test track, full page', () => {
     expect(t('shop.traces')).toBeTruthy()
     expect(t('shop.seeReport')).toBeTruthy()
   })
+
+  it('the raid stage has its two gauges for the full page', () => {
+    expect(t('raidUi.gaugeOil')).toBeTruthy()
+    expect(t('raidUi.gaugeWear')).toBeTruthy()
+  })
 })
 
 describe('the test track camera fits the shape of its canvas', () => {
