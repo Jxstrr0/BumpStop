@@ -594,9 +594,11 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
       const band = bandOf(oil, axle.damper.warmFrom - C0, axle.damper.redLine - C0)
       c.oil.textContent = `${num(oil)} °C`
       setChip(c.chip, band)
-      const travel = (r.stats.peakCompression[i] as number) / axle.bumpTravel
+      // Each corner's own travel: a load off to one side leaves the low side less (weight and balance).
+      const bump = a.truck.balance.corners[i]?.bumpTravel ?? axle.bumpTravel
+      const travel = (r.stats.peakCompression[i] as number) / bump
       c.travel.textContent = tf('live.cornerTravel', { pct: num(Math.max(0, travel) * 100) })
-      c.travel.className = `corner-line ${bandOf(travel, 1 - axle.bumpStopLength / axle.bumpTravel, 1)}-text`
+      c.travel.className = `corner-line ${bandOf(travel, 1 - axle.bumpStopLength / bump, 1)}-text`
       const wear = cornerWear(r, i)
       c.wear.textContent = tf('live.cornerWear', { pct: num(wear * 100) })
       c.wear.className = `corner-line ${bandOf(wear, WARM_SHARE, 1)}-text`
