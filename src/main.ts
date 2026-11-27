@@ -77,7 +77,7 @@ function gameScreen(app: HTMLElement, garage: Garage): void {
   // The bottom tabs: one area of the game on screen at a time (Kelbo asked, 26 November 2026).
   const tabs = makeTabs(app, {
     career: [head, ...(reminder ? [reminder] : []), loopPanel(help.element), career.element],
-    build: [buildPanel(store)],
+    build: [buildPanel(store, help.showTerm)],
     test: [shopPanel(store, garage.shop)],
     raid: [raidPanel(store, garage.raid, career.raid)],
     more: [help.element, savesPanel(garage), settingsPanel(), roadbookStrip(), el('p', 'note', t('preview.note'))],

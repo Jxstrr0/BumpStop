@@ -114,10 +114,21 @@ every value as it is, so the ends can be tuned apart again. The choice is
 kept on the phone under `bumpstop.linkAxles` (not in a save slot); without
 localStorage it starts unticked.
 
+**The "i" buttons** (Kelbo asked, 27 November 2026): every Tune slider and
+every part slot has a round "i" beside its name (`src/ui/info.ts`). A tap
+opens a short note in the page under it (what it does, when to change it),
+and a second tap or Escape closes it. One note is open at a time across the
+screen. The "i" sits inside the slot's heading, so its tap is kept from
+folding the slot; on a shut slot it opens the slot a moment later, after
+`oneOpenAtATime` has seen the tap. The words are `info.*` in `strings.ts`,
+listed per slider and slot in `src/data/info.ts`, with the glossary word
+behind each note's "More in the help" button (`helpPanel.showTerm`).
+
 ## Tests
 
 `tests/build.test.ts`: every stock build is legal in 1985 and drives on its
 mule's numbers; softer springs lose bump travel; preload lifts; straps cut
 droop; pressure sets stiffness; clicks only work where a damper has an
-adjuster; the rules catch weight, money and year. The balance bot
+adjuster; the rules catch weight, money and year. `tests/info.test.ts`:
+every slider and slot has an "i" note that points at a real glossary word. The balance bot
 (`tests/balance.*.test.ts`) now drives the stock builds.

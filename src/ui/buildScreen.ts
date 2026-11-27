@@ -7,6 +7,7 @@
  * from `src/sim/build.ts`; this file only shows them.
  */
 import { CLASSES } from '../data/classes'
+import { SETTING_INFO, SLOT_INFO } from '../data/info'
 import { KITS, TUNE, type AxleSettings } from '../data/kit'
 import { SLOTS, type Part, type SlotId } from '../data/parts'
 import { t, tf, type StringKey } from '../data/strings'
@@ -15,6 +16,7 @@ import { FIRST_YEAR, LAST_YEAR, readLinkAxles, withSetting, writeLinkAxles, type
 import { shareBuildBlock } from './saves'
 import { truckCardBlock } from './truckCard'
 import { el, num, oneOpenAtATime } from './dom'
+import { infoButton, type ShowTerm } from './info'
 import { truckView } from './truckView'
 
 /** One slider: its setting, label, range in screen units, and how to show its value. */
@@ -94,7 +96,8 @@ function deltaText(part: Part, current: Part, store: BuildStore): string {
   return tf('build.delta', { mass: sign(dm), cost: sign(dc) })
 }
 
-export function buildPanel(store: BuildStore): HTMLElement {
+/** `showTerm` opens the help's glossary at a word, for the "i" notes' "More in the help". */
+export function buildPanel(store: BuildStore, showTerm?: ShowTerm): HTMLElement {
   const box = el('section', 'panel build')
   box.append(el('h2', '', t('build.title')), el('p', 'lead', t('build.lead')))
 
@@ -243,8 +246,13 @@ export function buildPanel(store: BuildStore): HTMLElement {
     details.open = open
     oneOpenAtATime(details, 'build-parts')
     const head = el('summary')
+    const slotName = t(`slot.${slot}` as StringKey)
+    // The "i" sits beside the slot's name; its note opens at the top of the choices.
+    const info = infoButton(slotName, SLOT_INFO[slot], showTerm)
+    const name = el('span', 'slot-name', slotName)
+    name.append(info.button)
     head.append(
-      el('span', 'slot-name', t(`slot.${slot}` as StringKey)),
+      name,
       el('span', 'slot-part', t(current.name)),
       el('span', 'slot-numbers', tf('build.partNumbers', { mass: num(current.mass[b.cls] as number), cost: num(current.cost[b.cls] as number) })),
     )
@@ -273,7 +281,7 @@ export function buildPanel(store: BuildStore): HTMLElement {
       label.append(radio, words, meta)
       field.append(label)
     }
-    details.append(head, field)
+    details.append(head, info.note, field)
     return details
   }
 
@@ -295,6 +303,10 @@ export function buildPanel(store: BuildStore): HTMLElement {
       const row = el('div', 'setting')
       const label = el('label', 'setting-label', t(slider.label))
       label.htmlFor = id
+      // The label and its "i" share the first cell; the note opens under the slider.
+      const info = infoButton(t(slider.label), SETTING_INFO[slider.key], showTerm)
+      const head = el('span', 'setting-head')
+      head.append(label, info.button)
       const out = el('output', 'setting-value')
       out.htmlFor.add(id)
       const input = el('input')
@@ -310,7 +322,7 @@ export function buildPanel(store: BuildStore): HTMLElement {
         store.setBuild(withSetting(now, end, slider.key, value, linked), 'setting')
       })
       outputs.push({ end, slider, out, input })
-      row.append(label, out, input)
+      row.append(head, out, input, info.note)
       details.append(row)
     }
     if (!slidersFor(store).some((s) => s.key === 'rebound')) details.append(el('p', 'small', t('build.noAdjusters')))
