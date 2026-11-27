@@ -1,5 +1,5 @@
 /**
- * The jump ramp's landing score (v1.21, Kelbo picked it, 27 November 2026).
+ * The jump ramp's landing score (v1.22, Kelbo picked it, 27 November 2026).
  *
  * The lap runner hands every step on the jump's piece to `watchLanding`,
  * which only reads the sim: it never changes a result. It watches for the

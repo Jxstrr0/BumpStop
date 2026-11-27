@@ -1,5 +1,5 @@
 /**
- * The jump ramp (v1.21): the tabletop's shape, one scored landing a jump,
+ * The jump ramp (v1.22): the tabletop's shape, one scored landing a jump,
  * the sweet speed, a fix that helps, and that a run in pieces scores the
  * same as one all at once.
  */

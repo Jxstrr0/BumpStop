@@ -5,12 +5,12 @@
  */
 import { describe, expect, it } from 'vitest'
 import { GLOSSARY } from '../src/data/glossary'
-import { SETTING_INFO, SLOT_INFO } from '../src/data/info'
+import { LOAD_INFO, SETTING_INFO, SLOT_INFO } from '../src/data/info'
 import { SLOTS } from '../src/data/parts'
 import { t } from '../src/data/strings'
 import { stockBuild } from '../src/sim/build'
 
-const notes = [...Object.values(SETTING_INFO), ...Object.values(SLOT_INFO)]
+const notes = [...Object.values(SETTING_INFO), ...Object.values(SLOT_INFO), ...Object.values(LOAD_INFO)]
 
 describe('the build screen info notes', () => {
   it('cover every Tune setting and every part slot', () => {

@@ -1,7 +1,7 @@
 # The rigs and the report
 
 How the shop's rigs, the report and the ghost runs work (plan PR 4; the
-jump ramp came in v1.21).
+jump ramp came in v1.22).
 The sim is in `src/sim/laps.ts` and `src/sim/shaker.ts`; the screens are in
 `src/ui/shop.ts`, `src/ui/report.ts`, `src/ui/charts.ts` and
 `src/ui/fixes.ts`; every number is in `src/data/rigs.ts`.
@@ -53,7 +53,7 @@ wheels hop and the dampers work hardest.
 
 ## The jump ramp
 
-Added in v1.21 (Kelbo picked it, 27 November 2026). A 75 m lap with one
+Added in v1.22 (Kelbo picked it, 27 November 2026). A 75 m lap with one
 built tabletop on it (`RIGS.jumpRig` and `TableJump` in `src/data/rigs.ts`,
 laid on the road by `stampTable` in `src/sim/ground.ts`): 20 m of run-up,
 an 8 m entry curve that bends the road up to a straight face (slope 0.18),
