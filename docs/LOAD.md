@@ -1,6 +1,6 @@
 # Weight and balance
 
-Added in 1.19.0.0 (Kelbo picked it, 27 November 2026). Code: `src/sim/load.ts`,
+Added in 1.21.0.0 (Kelbo picked it, 27 November 2026). Code: `src/sim/load.ts`,
 the load parts of `buildTruck` in `src/sim/build.ts`, `rideParams` in
 `src/sim/ride.ts`, and fuel stops in `src/sim/raid.ts`. Numbers:
 `src/data/load.ts`. Screen: the **Load and balance** section at the bottom of

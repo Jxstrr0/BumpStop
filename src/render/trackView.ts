@@ -23,13 +23,20 @@
  *
  * With reduced motion the camera holds one side-on view and never shakes or
  * swoops; the truck still moves as the sim says.
+ *
+ * The swing-around camera (v1.19): a drag on the picture hands the camera
+ * to the player (`swingStart`/`swingSet`). It keeps following the truck
+ * from wherever they put it, clip after clip, until `swingEnd` gives it
+ * back to the TV-style shots. It never goes into the forest on the right
+ * or past the cameras' clear lane on the left (`SWING` in `graphics.ts`).
  */
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
-import { PHOTO_LIFT, TRACK_CAMERA } from '../data/graphics'
+import { PHOTO_LIFT, SWING, TRACK_CAMERA } from '../data/graphics'
 import { LAND, LAND_COLOUR, SHAKER_FLOOR, SKY } from '../data/scenery'
 import type { FailureKind } from '../data/wear'
 import { WEATHER_LOOK, type WeatherId } from '../data/weather'
+import type { Grime } from '../sim/grime'
 import type { Profile } from '../sim/ground'
 import type { Pose } from '../sim/poses'
 import { GHOST_LOOK } from '../data/rigs'
@@ -75,6 +82,8 @@ export interface RunSetup {
   ghost?: { stance: Stance; parts: FittedParts } | null
   /** The road is a rig's loop, driven lap after lap: it gets a start line, and the same scenery every lap. */
   loop?: boolean
+  /** Mud, dust, snow and dents to show on the truck (a raid's); left out for a clean truck. */
+  grime?: Grime | null
 }
 
 /** Photo mode's camera and moment (plan PR 12). */
@@ -86,6 +95,16 @@ export interface PhotoControls {
   /** The camera's height, as an angle above the ground (radians). */
   lift: number
   /** Distance from the truck, as a share of where photo mode started (smaller is closer). */
+  zoom: number
+}
+
+/** The swing-around camera: where the player has put it, round the middle of the truck. */
+export interface SwingControls {
+  /** The camera's way round the truck (radians; 0 is side-on from the left). */
+  turn: number
+  /** The camera's height, as an angle above the ground (radians). */
+  lift: number
+  /** Distance from the truck, as a share of `SWING.base` truck lengths (smaller is closer). */
   zoom: number
 }
 
@@ -102,8 +121,18 @@ export interface TrackView {
   photoStart(): PhotoControls | null
   photoSet(c: PhotoControls): void
   photoEnd(): void
+  /**
+   * The swing-around camera: take the camera from wherever the shot has it
+   * (or carry on from where the player left it). Null when there's no truck yet.
+   */
+  swingStart(): SwingControls | null
+  swingSet(c: SwingControls): void
+  /** Back to the TV-style shots. */
+  swingEnd(): void
   /** The sky for a raid's weather (the fog closes in and changes colour); 'clear' for a clear day. */
   setWeather(kind: WeatherId | 'clear'): void
+  /** The truck's mud, dust, snow and dents as the raid goes on (`src/sim/grime.ts`); null for a clean truck. */
+  setGrime(g: Grime | null): void
   /** The view as it stands, drawn with its longer side `longSide` pixels and copied onto a plain canvas. */
   snapshot(longSide: number): HTMLCanvasElement | null
   dispose(): void
@@ -244,6 +273,8 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   let photo: PhotoControls | null = null
   let photoDistance = 1
   let waiting: { clip: readonly Pose[]; o: ClipOptions } | 'stop' | null = null
+  // The swing-around camera, while the player has it.
+  let swing: SwingControls | null = null
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
 
   // The raid's weather, if any: it sets the sky colour and how near the fog closes in.
@@ -414,13 +445,77 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
 
   function placeCamera(tx: number, progress: number): void {
     if (!truck) return
+    if (swing) {
+      placeSwing(swing, tx, progress)
+    } else {
+      placeShot(tx, progress)
+    }
+    if (shake > 0 && !reduced.matches) {
+      const k = shake * 0.06 * truck.radius
+      camPos.x += Math.sin(performance.now() * 0.09) * k
+      camPos.y += Math.sin(performance.now() * 0.13) * k
+    }
+    aim(tx)
+  }
+
+  /** The player's camera, following the truck. On a break replay it looks more and more at the corner that broke. */
+  function placeSwing(c: SwingControls, tx: number, progress: number): void {
+    const t = truck!
+    photoTarget(tx, camTarget)
+    const focus = opts.focus
+    if (focus && focus.corner >= 0) {
+      const corner = t.cornerPosition(focus.corner, focusTarget)
+      camTarget.lerp(corner, 0.6 * (reduced.matches ? 1 : smooth(progress * 1.25)))
+    }
+    orbit(c.turn, c.lift, swingBase() * c.zoom, camTarget, camPos)
+  }
+
+  /** The distance the swing camera stands at zoom 1 (m). */
+  function swingBase(): number {
+    return SWING.base * (truck?.length ?? 4)
+  }
+
+  const toward = new THREE.Vector3()
+  /**
+   * Put `out` at distance `d` from `target`, `turn` round and `lift` up, but
+   * no further than the clear space round the truck: the road's verges
+   * outdoors (the forest on the right, the cameras' lane on the left), the
+   * workshop's walls and roof indoors. It comes in closer instead.
+   */
+  function orbit(turn: number, lift: number, d: number, target: THREE.Vector3, out: THREE.Vector3): void {
+    const up = Math.min(PHOTO_LIFT.max, Math.max(PHOTO_LIFT.min, lift))
+    toward.set(Math.sin(turn) * Math.cos(up), Math.sin(up), -Math.cos(turn) * Math.cos(up))
+    let reach = d
+    const limit = (dir: number, from: number, edge: number) => {
+      if (dir > 1e-4) reach = Math.min(reach, (edge - from) / dir)
+    }
+    if (run && !run.road) {
+      const box = SWING.shop
+      limit(toward.x, target.x, box.xMax)
+      limit(-toward.x, -target.x, -box.xMin)
+      limit(toward.y, target.y, box.yMax)
+      limit(toward.z, target.z, box.zMax)
+    } else if (run && truck) {
+      // The same lane `buildStrip` keeps clear of anything tall.
+      const lane = 2.2 * truck.length + 4
+      limit(toward.z, target.z, SWING.rightEdge)
+      limit(-toward.z, -target.z, lane - SWING.leftSpare)
+    }
+    reach = Math.max(reach, (truck?.radius ?? 0.4) * 3)
+    out.copy(target).addScaledVector(toward, reach)
+    out.y = Math.max(0.15, out.y)
+  }
+
+  /** The TV-style shot for this clip, closing in on a break. */
+  function placeShot(tx: number, progress: number): void {
+    const t = truck!
     shotCamera(reduced.matches ? 'side' : shot, tx, camPos, camTarget)
     const focus = opts.focus
     if (focus && focus.corner >= 0) {
       // Close in on the corner that broke, from its own side.
-      const c = truck.cornerPosition(focus.corner, focusTarget)
+      const c = t.cornerPosition(focus.corner, focusTarget)
       const out = focus.corner % 2 === 0 ? -1 : 1
-      const R = truck.radius
+      const R = t.radius
       focusPos.set(c.x + 3.4 * R, c.y + 1.6 * R, c.z + out * 5.6 * R)
       const u = reduced.matches ? 1 : smooth(progress * 1.25)
       camPos.lerp(focusPos, u)
@@ -432,12 +527,6 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       focusPos.lerp(focusTarget, 0.35)
       camPos.lerp(focusPos, u)
     }
-    if (shake > 0 && !reduced.matches) {
-      const k = shake * 0.06 * truck.radius
-      camPos.x += Math.sin(performance.now() * 0.09) * k
-      camPos.y += Math.sin(performance.now() * 0.13) * k
-    }
-    aim(tx)
   }
 
   /** Point the camera from `camPos` at `camTarget`, keeping it above the ground, and bring the sun and sky along. */
@@ -540,13 +629,8 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const tx = applyPose(poseAt(clipTime))
     placeGhost(clipTime)
     photoTarget(tx, camTarget)
-    const d = photoDistance * photo.zoom
-    const lift = Math.min(PHOTO_LIFT.max, Math.max(PHOTO_LIFT.min, photo.lift))
-    camPos.set(
-      camTarget.x + Math.sin(photo.turn) * Math.cos(lift) * d,
-      Math.max(0.15, camTarget.y + Math.sin(lift) * d),
-      camTarget.z - Math.cos(photo.turn) * Math.cos(lift) * d,
-    )
+    // The same clear space as the swing camera: it comes in rather than go into the trees.
+    orbit(photo.turn, photo.lift, photoDistance * photo.zoom, camTarget, camPos)
     aim(tx)
     renderer.render(scene, camera)
   }
@@ -646,6 +730,9 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       weather = kind
       look()
     },
+    setGrime(g) {
+      truck?.setGrime(g)
+    },
     async setRun(next) {
       const mine = ++ticket
       // The scenery kit too. If it can't be fetched the truck still drives, on bare land.
@@ -689,6 +776,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       truck.stance = next.stance
       truck.fit(next.parts)
       truck.breakCorner(null)
+      truck.setGrime(next.grime ?? null)
       clip = []
       ghostClip = []
       dust.clear()
@@ -765,6 +853,36 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
         lastTime = 0
         loop()
       }
+    },
+    swingStart() {
+      if (!truck) return null
+      if (!swing) {
+        // Start from the camera as it is, seen from the middle of the truck, so nothing jumps.
+        const target = photoTarget(truck.root.position.x, new THREE.Vector3())
+        const off = camera.position.clone().sub(target)
+        const d = Math.max(truck.radius * 3, off.length())
+        swing = {
+          turn: Math.atan2(off.x, -off.z),
+          lift: Math.min(PHOTO_LIFT.max, Math.max(PHOTO_LIFT.min, Math.asin(Math.min(1, Math.max(-1, off.y / d))))),
+          zoom: Math.min(SWING.zoom.max, Math.max(SWING.zoom.min, d / swingBase())),
+        }
+      }
+      return { ...swing }
+    },
+    swingSet(c) {
+      if (!swing) return
+      swing = {
+        turn: c.turn,
+        lift: Math.min(PHOTO_LIFT.max, Math.max(PHOTO_LIFT.min, c.lift)),
+        zoom: Math.min(SWING.zoom.max, Math.max(SWING.zoom.min, c.zoom)),
+      }
+      // A clip that has ended isn't redrawn on its own: show the new view now.
+      if (!raf && !photo) draw(0)
+    },
+    swingEnd() {
+      if (!swing) return
+      swing = null
+      if (!raf && !photo) draw(0)
     },
     snapshot(longSide) {
       const w0 = canvas.clientWidth

@@ -1409,6 +1409,8 @@ const STRINGS = {
   'log.h.sump': 'a rock holed the oil pan',
   'log.h.diff': 'a rock cracked the diff cover',
   'log.h.tank': 'a rock dented the fuel tank',
+  'swing.auto': 'Auto camera',
+  'swing.hint': 'Drag to swing the camera round; pinch to zoom.',
   'photo.open': 'Photo mode',
   'photo.hint': 'Drag the picture to walk round the truck; pinch to zoom. Moment scrubs through the clip.',
   'photo.moment': 'Moment',

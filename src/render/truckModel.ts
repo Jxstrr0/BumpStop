@@ -35,9 +35,12 @@
  */
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
+import { DENT_PLACES } from '../data/grime'
 import { KITS } from '../data/kit'
 import type { SlotId } from '../data/parts'
+import type { Grime } from '../sim/grime'
 import { loadGlb } from './glb'
+import { grimeMaterial, grimeUniforms, setGrimeUniforms, type GrimeUniforms } from './grime'
 import { truckReflections } from './look'
 import { tierSettings } from './tiers'
 
@@ -179,8 +182,10 @@ export class TruckModel {
   private fits: { node: THREE.Object3D; slot: string; parts: string[] }[] = []
   /** Corners whose wheel has been made to look broken, and how. */
   private broken = new Map<number, 'flat' | 'flop' | 'mount'>()
-  /** Materials this copy made for itself (a ghost truck's), freed with it. */
+  /** Materials this copy made for itself (a ghost truck's, or its grimy paint), freed with it. */
   private owned: THREE.Material[] = []
+  /** The grimy paint's shader values, once the truck has been given any grime (`setGrime`). */
+  private grimeU: GrimeUniforms | null = null
 
   static async load(cls: ClassId): Promise<TruckModel> {
     return new TruckModel(cls, await loadScene(cls))
@@ -355,6 +360,76 @@ export class TruckModel {
       s.shaft.position.copy(low)
       s.shaft.quaternion.setFromUnitVectors(UP, dir.negate())
     }
+  }
+
+  /**
+   * Show mud, dust, snow, chips and dents (damage you can see, Kelbo, 27
+   * November 2026; `src/sim/grime.ts` works out how much). `null` is a clean
+   * truck. The first call gives this copy its own grimy paint (two copies
+   * of the shared material: one for the body, one whose pattern turns with
+   * the wheels), so the draw calls stay the same; the Lite tier's is simpler.
+   * The shocks and springs stay clean, so the suspension is always easy to see.
+   */
+  setGrime(g: Grime | null): void {
+    if (!g) {
+      if (this.grimeU) setGrimeUniforms(this.grimeU, { mud: 0, dust: 0, snow: 0, chips: 0, wet: 0, season: 'summer', dents: [] }, [])
+      return
+    }
+    const u = (this.grimeU ??= this.grimeOn())
+    const r = this.radius
+    const wheelbase = this.frontX - this.rearX
+    const places = DENT_PLACES[this.cls]
+    const dents = g.dents.map((d) => {
+      if (d.where === 'nose') {
+        // The front corner on the left, the side the cameras see.
+        return { centre: new THREE.Vector3(this.frontX + r * 1.5, r * 2.3, -this.track * 0.45), radius: r * 1.1, across: 1, amount: d.amount }
+      }
+      if (d.where.startsWith('arch')) {
+        const hub = this.hubRest[Number(d.where.slice(4))]!
+        return { centre: new THREE.Vector3(hub.x, r * 2.5, hub.z * 1.1), radius: r * 1.0, across: 0.6, amount: d.amount }
+      }
+      const p = places[d.where as keyof typeof places]
+      return { centre: new THREE.Vector3(this.rearX + p.x * wheelbase, p.y * r, 0), radius: r * 0.8, across: 1, amount: d.amount }
+    })
+    setGrimeUniforms(u, g, dents)
+  }
+
+  /** Swap the shared paint for this copy's grimy one. */
+  private grimeOn(): GrimeUniforms {
+    const u = grimeUniforms()
+    u.uGrimeShape.value.set(this.radius, this.frontX, this.rearX, this.track / 2)
+    const lite = !tierSettings().grimeDetail
+    const spinning = new Set<THREE.Object3D>()
+    for (const w of this.wheels) w.traverse((o) => spinning.add(o))
+    // The suspension is the show (Kelbo's rule): shocks and springs keep their clean paint, so they stay easy to see.
+    const clean = new Set<THREE.Object3D>()
+    for (const sh of this.shocks) for (const n of [sh.body, sh.shaft, sh.spring]) n.traverse((o) => clean.add(o))
+    const made = new Map<string, THREE.Material>()
+    const own = (m: THREE.Material, spin: boolean): THREE.Material => {
+      if (m.name !== 'Truck' || !(m instanceof THREE.MeshStandardMaterial)) return m
+      const key = `${m.uuid}|${spin}`
+      let c = made.get(key)
+      if (!c) {
+        c = grimeMaterial(m, u, spin, lite)
+        made.set(key, c)
+        this.owned.push(c)
+      }
+      return c
+    }
+    // The body's own space, read just before each draw (after three.js has moved everything for the frame).
+    const body = this.body
+    const follow = () => {
+      u.uGrimeSpace.value.copy(body.matrixWorld).invert()
+    }
+    this.root.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!mesh.isMesh || clean.has(mesh)) return
+      const spin = spinning.has(mesh)
+      const before = mesh.material
+      mesh.material = Array.isArray(before) ? before.map((m) => own(m, spin)) : own(before, spin)
+      if (mesh.material !== before) mesh.onBeforeRender = follow
+    })
+    return u
   }
 
   /**

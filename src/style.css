@@ -602,6 +602,13 @@ input[type='range'] {
   background: var(--panel-2);
 }
 .rig-caption { margin-top: 6px; }
+/* The swing-around camera (v1.19): a sideways drag swings it round the truck; an up-and-down drag
+   still scrolls the page here (full page, any drag swings it). */
+.rig-canvas { touch-action: pan-y; cursor: grab; }
+.rig-canvas:active { cursor: grabbing; }
+.rig-canvas:focus-visible { outline-offset: -3px; }
+.swing-btn { margin: 8px 8px 0 0; }
+.swing-hint { margin: 6px 0 0; color: var(--muted); }
 
 /* The raids (plan PR 7b). */
 .raid-sub { margin: 16px 0 8px; font-family: var(--head); font-size: 20px; font-weight: 700; text-transform: uppercase; }
@@ -951,7 +958,9 @@ body.photo-open { overflow: hidden; }
   touch-action: none;
   cursor: grab;
 }
-.photo-on .rig-caption { display: none; }
+.photo-on .rig-caption,
+.photo-on .swing-hint,
+.photo-on .swing-btn { display: none; }
 .photo-bar {
   flex: 0 0 auto;
   max-height: 50vh;
@@ -1201,6 +1210,27 @@ body:has(.tab-page:not([hidden]) .live.full) { overflow: hidden; }
   margin: 0 0 0 auto;
   background: var(--glass);
   pointer-events: auto;
+}
+
+/* The swing camera: the picture under everything takes drags and pinches (the numbers and buttons over it
+   still take their own taps); "Auto camera" and the how-to slip sit by the photo button. */
+.live.full .rig-view:not(.photo-on) .rig-canvas { pointer-events: auto; touch-action: none; }
+.live.full .rig-view:not(.photo-on) .swing-btn {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 0 auto;
+  background: var(--glass);
+  pointer-events: auto;
+}
+.live.full .rig-view:not(.photo-on) .swing-btn:not([hidden]) + .photo-btn { margin-left: 0; }
+.live.full .rig-view:not(.photo-on) .swing-hint {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 2px 8px;
+  background: var(--glass);
+  border-radius: 4px;
+  color: var(--ink);
 }
 
 /* The lap, along the top. */
