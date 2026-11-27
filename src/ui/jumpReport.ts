@@ -9,7 +9,9 @@
  * 4. Every landing: its score and word, where it came down, the nose angle,
  *    the bump stops, bottom-outs and bounces. Beside each, the same jump on
  *    the last run here and on the ghost truck (if it raced one): before and
- *    after on the same ramp, a higher score being the calmer landing.
+ *    after on the same ramp, a higher score being the calmer landing. A
+ *    Watch button on each plays it again in slow motion in the 3D view
+ *    (v1.28: the run itself no longer stops for replays).
  * 5. If something broke, why, with its trace, as on the other rigs.
  * 6. Up to three fixes, each a jump to the part or slider.
  */
@@ -46,7 +48,10 @@ export function cleanUpTo(landings: readonly LandingScore[]): number | null {
   return best
 }
 
-export function jumpReport(run: LapRun, stopped: boolean, ghost: LapGhost | null, ctx: ReportContext, rival: JumpRival | null): HTMLElement {
+/** Replays a landing in the 3D view; false if it couldn't. */
+export type WatchLanding = (score: LandingScore) => boolean
+
+export function jumpReport(run: LapRun, stopped: boolean, ghost: LapGhost | null, ctx: ReportContext, rival: JumpRival | null, watch: WatchLanding | null = null): HTMLElement {
   const box = el('section', 'report jump-report')
   box.setAttribute('aria-labelledby', 'report-head')
   const last = run.laps[run.laps.length - 1]
@@ -75,7 +80,7 @@ export function jumpReport(run: LapRun, stopped: boolean, ghost: LapGhost | null
   const habit = worstHabit(landings)
   box.append(crewNote(habit === 'flat' ? tf('jump.crewFlat', { speed: num(msToKmh(firstFlat(landings) ?? 0)) }) : t(CREW[habit])))
 
-  if (landings.length > 0) box.append(landingList(landings, ghost, rival))
+  if (landings.length > 0) box.append(landingList(landings, ghost, rival, watch))
 
   if (ev) {
     box.append(el('p', 'cause', t(FAILURES[ev.kind].cause)))
@@ -153,7 +158,7 @@ function landingFixes(landings: readonly LandingScore[]): { target: FixTarget; t
 }
 
 /** Every landing, with the same jump on the last run and the ghost beside it. */
-function landingList(landings: readonly LandingScore[], ghost: LapGhost | null, rival: JumpRival | null): HTMLElement {
+function landingList(landings: readonly LandingScore[], ghost: LapGhost | null, rival: JumpRival | null, watch: WatchLanding | null): HTMLElement {
   const wrap = el('div', 'jump-landings')
   const lastScores = ghost?.landings ?? null
   // Racing your best when your best was also the last run: one column says it all.
@@ -181,6 +186,15 @@ function landingList(landings: readonly LandingScore[], ghost: LapGhost | null, 
       vs.append(el('span', `chip ${VERDICT_BAND[v]}`, t(`report.${v}` as StringKey)), ' ', tf('jump.vsGhost', { who: rival.who, score: String(theirs.score) }))
     }
     if (vs.childNodes.length) li.append(vs)
+    if (watch) {
+      const btn = el('button', 'btn small-btn jump-watch', t('jump.watch'))
+      btn.type = 'button'
+      btn.setAttribute('aria-label', tf('jump.watchLabel', { n: String(l.lap) }))
+      btn.addEventListener('click', () => {
+        if (!watch(l)) btn.disabled = true
+      })
+      li.append(btn)
+    }
     list.append(li)
   }
   wrap.append(el('h4', '', t('jump.title')))

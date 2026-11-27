@@ -11,10 +11,13 @@
  * With a ghost truck (your best run or a friend's) its own pose log, kept
  * step for step with yours, is handed over beside each clip.
  *
- * On the jump ramp the run plays at true speed, so each clip carries on
- * where the last one stopped, and after every landing `landing` replays it
- * in slow motion from the side, with puffs where the bump stops and
- * bottom-outs happen and the caption saying each one as it comes.
+ * On the jump ramp the run plays at true speed as one unbroken shot from
+ * the side (v1.28, Kelbo asked for it smoother and more continuous): the
+ * view follows the pose log a moment behind the sim instead of playing
+ * clips (`ClipStream` in `src/render/trackView.ts`), and the run never stops
+ * for a replay. Once it's over, `replay` plays any landing again in slow
+ * motion, with puffs where the bump stops and bottom-outs happen and the
+ * caption saying each one as it comes.
  *
  * three.js loads the first time a run starts. If the phone can't do WebGL,
  * the view hides itself and the rigs carry on in 2D.
@@ -23,7 +26,7 @@ import { ROLL_OUT, VIEW_3D } from '../data/rigs'
 import { t, tf, type StringKey } from '../data/strings'
 import type { BuiltTruck } from '../sim/build'
 import type { Profile } from '../sim/ground'
-import { lastPoses, poseAgo, posesHeld, POSES_PER_SECOND, type Pose, type PoseLog } from '../sim/poses'
+import { lastPoses, posesHeld, posesSince, POSES_PER_SECOND, type Pose, type PoseLog } from '../sim/poses'
 import type { LandingMark, LandingScore } from '../sim/landing'
 import type { BreakEvent } from '../sim/wear'
 import type { BreakFocus, TrackView } from '../render/trackView'
@@ -43,8 +46,19 @@ export interface RigRun {
   beat?: () => number
   /** A ghost truck driving the same loop step for step, or null. */
   ghost?: { truck: BuiltTruck; log: PoseLog; broken: () => BreakEvent | null } | null
-  /** The sim runs at true speed (the jump ramp): each clip picks up where the last one ended instead of the newest few seconds. */
+  /** The sim runs at true speed (the jump ramp): show it as one unbroken shot instead of clips. */
   trueSpeed?: boolean
+}
+
+/** A landing's moments, kept when it was scored so it can be replayed after the run: your truck's poses and the ghost's. */
+export interface LandingClip {
+  mine: readonly Pose[]
+  ghost: readonly Pose[] | null
+}
+
+/** The poses from `from` to `to` (s into the run), oldest first. */
+export function posesBetween(log: PoseLog, from: number, to: number): Pose[] {
+  return posesSince(log, from).filter((p) => p.t <= to)
 }
 
 /** The ghost's clip covering the same moments (a second spare, in case it stopped a little before). */
@@ -52,11 +66,6 @@ function ghostClip(r: RigRun, seconds: number): { ghost: ReturnType<typeof lastP
   if (!r.ghost || posesHeld(r.ghost.log) < 2) return { ghost: null, ghostBroken: null }
   const b = r.ghost.broken()
   return { ghost: lastPoses(r.ghost.log, seconds + 1), ghostBroken: b ? { corner: b.corner, kind: b.kind } : null }
-}
-
-/** The newest pose's time (s into the run). */
-function poseNewest(log: PoseLog): number {
-  return posesHeld(log) > 0 ? poseAgo(log, 0).t : 0
 }
 
 /**
@@ -72,11 +81,8 @@ export interface RunFinish {
 export interface RigView {
   element: HTMLElement
   begin(run: RigRun): void
-  /**
-   * The jump ramp: replay this landing in slow motion, then call `done` (the
-   * shop holds the run meanwhile). Calls `done` straight away if there's no 3D.
-   */
-  landing(score: LandingScore, done: () => void): void
+  /** The jump ramp, after the run: play this landing again in slow motion. False if there's no 3D to show it on. */
+  replay(score: LandingScore, clip: LandingClip): boolean
   /**
    * The run ended: replay the break (if there was one), or show the last
    * clip. A run that lasted every lap brings its `rollOut`, and the truck
@@ -143,8 +149,7 @@ export function rigView(onFail: () => void = () => {}): RigView {
     const r = current
     if (!live || !r || !view) return
     // At true speed the newest few seconds would show some of the last clip again: take only what's new.
-    const fresh = r.trueSpeed && Number.isFinite(lastShown) ? Math.max(0.02, Math.min(VIEW_3D.clipSeconds, poseNewest(r.log) - lastShown)) : VIEW_3D.clipSeconds
-    const clip = lastPoses(r.log, fresh)
+    const clip = lastPoses(r.log, VIEW_3D.clipSeconds)
     const end = clip[clip.length - 1]
     if (!end || clip.length < POSES_PER_SECOND / 2 || end.t <= lastShown + 0.05) {
       retry = window.setTimeout(next, 150)
@@ -152,8 +157,41 @@ export function rigView(onFail: () => void = () => {}): RigView {
     }
     lastShown = end.t
     const rate = r.beat ? Math.min(1, VIEW_3D.shakerShownHz / Math.max(0.1, r.beat())) : 1
-    // The jump ramp holds the side-on shot: one clip runs into the next, and a jump reads best from the side.
-    view.play(clip, { rate, loop: false, onEnd: next, side: r.trueSpeed === true, ...ghostClip(r, VIEW_3D.clipSeconds) })
+    view.play(clip, { rate, loop: false, onEnd: next, ...ghostClip(r, VIEW_3D.clipSeconds) })
+    photo.ready(true)
+    swing.ready(true)
+  }
+
+  /** The jump ramp: one unbroken side-on shot that follows the run as it happens (`ClipStream`). */
+  function stream(): void {
+    window.clearTimeout(retry)
+    const r = current
+    if (!live || !r || !view) return
+    if (posesHeld(r.log) < 2) {
+      retry = window.setTimeout(stream, 100)
+      return
+    }
+    const g = r.ghost
+    const lead = VIEW_3D.streamLead
+    view.play(lastPoses(r.log, lead * 2), {
+      rate: 1,
+      loop: false,
+      side: true,
+      ghost: g && posesHeld(g.log) > 0 ? lastPoses(g.log, lead * 2 + 1) : null,
+      stream: {
+        more: (after) => posesSince(r.log, after),
+        ...(g
+          ? {
+              ghostMore: (after: number) => posesSince(g.log, after),
+              ghostBroken: () => {
+                const b = g.broken()
+                return b ? { corner: b.corner, kind: b.kind } : null
+              },
+            }
+          : {}),
+        lead,
+      },
+    })
     photo.ready(true)
     swing.ready(true)
   }
@@ -182,40 +220,23 @@ export function rigView(onFail: () => void = () => {}): RigView {
           return
         }
         if (current !== run) return
-        caption.textContent = t(run.road ? (run.ghost ? 'view3d.liveGhost' : 'view3d.live') : 'view3d.liveShaker')
+        caption.textContent = t(run.road ? (run.ghost ? 'view3d.liveGhost' : run.trueSpeed ? 'view3d.liveStream' : 'view3d.live') : 'view3d.liveShaker')
         box.dataset.state = 'live'
-        next()
+        if (run.trueSpeed) stream()
+        else next()
       })
     },
-    landing(score, done) {
+    replay(score, clip) {
       const r = current
-      if (!r || failed || !view || !live || posesHeld(r.log) < 2) {
-        done()
-        return
-      }
       const v = view
+      if (!r || failed || !v || clip.mine.length < 2) return false
       window.clearTimeout(retry)
       live = false
       const mine = ++turn
-      const speed = num(msToKmh(score.speed))
-      caption.textContent = tf('jump.replay', { n: String(score.lap), speed })
+      caption.textContent = tf('jump.replay', { n: String(score.lap), speed: num(msToKmh(score.speed)) })
       box.dataset.state = 'landing'
       const notes: string[] = []
-      const seconds = Math.min(VIEW_3D.poseSeconds, poseNewest(r.log) - score.from + VIEW_3D.landingBefore)
-      const finished = () => {
-        if (current !== r || turn !== mine) return
-        caption.textContent = landingVerdict(score)
-        retry = window.setTimeout(() => {
-          if (current !== r || turn !== mine) return
-          live = true
-          lastShown = poseNewest(r.log)
-          box.dataset.state = 'live'
-          caption.textContent = t(r.ghost ? 'view3d.liveGhost' : 'view3d.live')
-          done()
-          next()
-        }, VIEW_3D.landingHold * 1000)
-      }
-      v.play(lastPoses(r.log, seconds), {
+      v.play(clip.mine, {
         rate: VIEW_3D.slowMotion,
         loop: false,
         side: true,
@@ -227,9 +248,15 @@ export function rigView(onFail: () => void = () => {}): RigView {
           notes.push(said)
           caption.textContent = notes.slice(-2).join(' ')
         },
-        onEnd: finished,
-        ...ghostClip(r, seconds),
+        onEnd: () => {
+          if (current === r && turn === mine) caption.textContent = landingVerdict(score)
+        },
+        ghost: clip.ghost,
+        ghostBroken: null,
       })
+      photo.ready(true)
+      swing.ready(true)
+      return true
     },
     finish(broken, done) {
       turn++

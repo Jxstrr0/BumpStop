@@ -88,6 +88,29 @@ export interface ClipOptions {
   /** Moments to mark as the clip passes them, and who to tell. */
   marks?: readonly ClipMark[]
   onMark?: (mark: ClipMark) => void
+  /** A live run shown as one unbroken shot instead of clips (the jump ramp, v1.28): see `ClipStream`. */
+  stream?: ClipStream | null
+}
+
+/**
+ * One unbroken shot of a run as it happens (the jump ramp, v1.28, Kelbo
+ * asked for it smoother and more continuous, 27 November 2026). The clip
+ * handed to `play` is only the start: each frame the view asks for the
+ * poses that have come in since, and plays a moment (`lead` seconds) behind
+ * the newest, a touch quicker or slower to hold that gap, so it never
+ * catches up and stops. The road is laid once for a whole lap: the land and
+ * scenery come round the same every lap, so when the truck finishes a lap it
+ * goes back to the start of the same strip and nothing on screen moves.
+ */
+export interface ClipStream {
+  /** Your truck's poses newer than `after` (s into the run), oldest first. */
+  more: (after: number) => readonly Pose[]
+  /** The ghost's, the same way. */
+  ghostMore?: (after: number) => readonly Pose[]
+  /** What broke on the ghost, once it has. */
+  ghostBroken?: () => BreakFocus | null
+  /** How far behind the newest pose to play (s). */
+  lead: number
 }
 
 export interface RunSetup {
@@ -174,6 +197,12 @@ const HOLD = 1.8
 /** Strip margins behind and ahead of the clip (m). */
 const BEHIND = 30
 const AHEAD = 60
+/** A streamed lap's strip reaches this far past each end of the lap (m), so the wrap back to the start never shows. */
+const STREAM_BEHIND = 60
+const STREAM_AHEAD = 80
+
+/** `a` brought into [0, n). */
+const wrapInto = (a: number, n: number) => ((a % n) + n) % n
 
 const smooth = (u: number) => {
   const v = Math.min(1, Math.max(0, u))
@@ -285,6 +314,11 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   let ghostCursor = 0
   let run: RunSetup | null = null
   let clip: readonly Pose[] = []
+  // A streamed run (`ClipStream`): the clip and the ghost's grow as poses come in, and the lap the strip covers.
+  let streamMine: Pose[] | null = null
+  let streamGhost: Pose[] | null = null
+  let streamLap = 0
+  let lastTx = 0
   let opts: ClipOptions = { rate: 1, loop: false }
   let clipTime = 0
   let cursor = 0
@@ -394,6 +428,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const first = clip[0]!
     const last = clip[clip.length - 1]!
     origin = first.distance
+    streamLap = 0
     const night = darkNow()
     if (!run.road) {
       outdoors.visible = false
@@ -404,10 +439,14 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     shop.visible = false
     outdoors.visible = true
     const pieces = placePieces(run.road, run.wheelbase, first.piece, first.distance, first.x)
-    const { from, to } = wholeRows(first.distance - BEHIND, last.distance + AHEAD)
-    const tier = tierSettings()
     // A loop's length: each piece's road overlaps the next by a wheelbase.
     const lap = run.loop ? run.road.reduce((sum, p) => sum + p.length - run!.wheelbase, 0) : 0
+    // A streamed loop gets one strip for the whole lap and a bit past each end (`ClipStream`).
+    if (opts.stream && lap > 0) streamLap = lap
+    const { from, to } = streamLap > 0
+      ? wholeRows(first.distance - STREAM_BEHIND, first.distance + streamLap + STREAM_AHEAD)
+      : wholeRows(first.distance - BEHIND, last.distance + AHEAD)
+    const tier = tierSettings()
     const winter = isWinter(run.road)
     dustColour()
     strip.geometry.dispose()
@@ -455,10 +494,17 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       ghostCursor = found.cursor
       p = found.pose
     }
-    const gx = p.distance - origin
-    g.root.visible = gx > -BEHIND * 0.8
+    let gx = p.distance - origin
+    if (streamLap > 0 && ground) {
+      // On a streamed lap, the ghost's place within the same lap, nearest your truck: ahead, or behind.
+      const tx = truck?.root.position.x ?? 0
+      gx -= streamLap * Math.round((gx - tx) / streamLap)
+      g.root.visible = gx > ground.from - origin + 10 && gx < ground.to - origin - 10
+    } else {
+      g.root.visible = gx > -BEHIND * 0.8
+    }
     if (!g.root.visible) return
-    const broken = t >= last.t ? opts.ghostBroken : null
+    const broken = t >= last.t ? (opts.stream?.ghostBroken?.() ?? opts.ghostBroken) : null
     g.breakCorner(null)
     if (broken && broken.corner >= 0) {
       if (broken.kind === 'tire') g.breakCorner(broken.corner, 'flat')
@@ -681,7 +727,8 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   /** Put the truck (and the shaker's posts) where pose `p` says. Returns the truck's x in the scene. */
   function applyPose(p: Pose): number {
     const t = truck!
-    const tx = p.distance - origin
+    // A streamed lap: every lap is driven over the same strip (`ClipStream`).
+    const tx = streamLap > 0 ? wrapInto(p.distance - origin, streamLap) : p.distance - origin
     t.root.position.set(run?.road ? tx : 0, 0, 0)
     const pose: TruckPose = { z: p.z, pitch: p.pitch, roll: p.roll, wheelZ: p.wheelZ, distance: p.distance }
     t.pose(pose)
@@ -733,10 +780,17 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       renderer.render(scene, camera)
       return
     }
+    if (opts.stream) pull()
     const length = clipLength()
-    const dt = dtReal * opts.rate
     const before = clipTime
-    if (!ended) {
+    let dt = dtReal * opts.rate
+    if (opts.stream) {
+      // Hold the shot `lead` seconds behind the newest pose, easing the pace a little either way.
+      const lead = opts.stream.lead
+      if (length - clipTime > lead * 4) clipTime = Math.max(clipTime, length - lead)
+      dt = dtReal * Math.min(1.25, Math.max(0.75, 1 + (length - clipTime - lead) * 0.8))
+      clipTime = Math.min(length, clipTime + dt)
+    } else if (!ended) {
       clipTime += dt
       if (clipTime >= length) {
         clipTime = length
@@ -752,6 +806,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const p = poseAt(clipTime)
     const progress = length > 0 ? clipTime / length : 1
     const tx = applyPose(p)
+    unwrapPuffs(tx)
     placeGhost(clipTime)
     if (opts.marks && clipTime > before) passMarks(clip[0]!.t + before, clip[0]!.t + clipTime)
     if (!ended) {
@@ -767,6 +822,27 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     shake = Math.max(0, shake - dtReal * 2.2)
     placeCamera(run?.road ? tx : 0, progress)
     renderer.render(scene, camera)
+  }
+
+  /** A streamed run: take the poses that have come in since the last frame. */
+  function pull(): void {
+    const s = opts.stream
+    if (!s || !streamMine) return
+    const newest = streamMine[streamMine.length - 1]
+    for (const p of s.more(newest ? newest.t : -Infinity)) streamMine.push(p)
+    if (s.ghostMore && streamGhost) {
+      const g = streamGhost[streamGhost.length - 1]
+      for (const p of s.ghostMore(g ? g.t : -Infinity)) streamGhost.push(p)
+    }
+  }
+
+  /** When the truck goes round from the end of a streamed lap to its start, the dust in the air comes too. */
+  function unwrapPuffs(tx: number): void {
+    if (streamLap > 0) {
+      const jump = tx < lastTx - streamLap / 2 ? -streamLap : tx > lastTx + streamLap / 2 ? streamLap : 0
+      if (jump) for (const p of [dust, smoke, amber, red]) p.shift(jump)
+    }
+    lastTx = tx
   }
 
   function restart(): void {
@@ -890,6 +966,8 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       truck.setGrime(next.grime ?? null)
       clip = []
       ghostClip = []
+      streamMine = streamGhost = null
+      streamLap = 0
       dust.clear()
       smoke.clear()
     },
@@ -899,11 +977,14 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
         waiting = { clip: next, o }
         return
       }
-      const sameRoad = clip.length > 0 && clip[0] === next[0]
-      clip = next
+      const sameRoad = clip.length > 0 && clip[0] === next[0] && !o.stream
+      // A streamed run keeps its own copies, which grow as the run goes on.
+      streamMine = o.stream ? next.slice() : null
+      streamGhost = o.stream && run?.ghost ? (o.ghost ?? []).slice() : null
+      clip = streamMine ?? next
       opts = o
       cursor = 0
-      ghostClip = (run?.ghost && o.ghost) || []
+      ghostClip = streamGhost ?? ((run?.ghost && o.ghost) || [])
       ghostCursor = 0
       if (ghost && ghostClip.length === 0) ghost.root.visible = false
       restart()
@@ -915,6 +996,9 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
         shot = 'side'
       }
       if (!sameRoad) buildStrip()
+      // A stream starts a moment behind the newest pose, and stays that far behind.
+      if (o.stream) clipTime = Math.max(0, clipLength() - o.stream.lead)
+      lastTx = truck && clip.length > 0 ? applyPose(poseAt(clipTime)) : 0
       dust.clear()
       amber.clear()
       red.clear()
@@ -929,6 +1013,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       raf = 0
       clip = []
       ghostClip = []
+      streamMine = streamGhost = null
       truck?.breakCorner(null)
       if (ghost) ghost.root.visible = false
     },

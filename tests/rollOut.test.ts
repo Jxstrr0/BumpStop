@@ -1,11 +1,11 @@
 /**
  * The finish (v1.26): a run that lasts every lap carries on in 3D through
  * the start-line arch and brakes to a stop. It works on a copy, so the run
- * and its result never change, and over the jump ramp's tabletop it holds
- * its speed until it has landed.
+ * and its result never change. On the jump ramp it pulls up well short of
+ * the tabletop (it never brakes on it).
  */
 import { describe, expect, it } from 'vitest'
-import { RIGS, ROLL_OUT, tableMarks, type Rig } from '../src/data/rigs'
+import { RIGS, ROLL_OUT, type Rig } from '../src/data/rigs'
 import { START_LINE } from '../src/data/scenery'
 import { buildTruck, stockBuild } from '../src/sim/build'
 import { advanceLaps, lapLength, lapResult, rollOut, startLaps } from '../src/sim/laps'
@@ -48,15 +48,16 @@ describe('the finish roll-out', () => {
     expect(Math.min(...braking.map((p) => p.pitch))).toBeLessThan(Math.min(...poses.slice(0, 10).map((p) => p.pitch)))
   }, 60000)
 
-  it('holds its speed over the jump ramp until it has landed', () => {
+  it('pulls up on the jump ramp before it reaches the tabletop', () => {
     const r = startLaps(truck.ride, truck.wear, RIGS.jumpRig, 9, { airTemp: AIR, poses: 4 })
     advanceLaps(r, Infinity)
     expect(r.run.w.broken).toBeNull()
     const poses = rollOut(r)
-    const top = poses[0]!.speed
-    const landEnd = tableMarks(RIGS.jumpRig.pieces[0]!.table!).landEnd
-    for (const p of poses) if (p.x + truck.ride.cgToFront < landEnd) expect(p.speed).toBe(top)
-    expect(poses.at(-1)!.speed).toBe(0)
+    const table = RIGS.jumpRig.pieces[0]!.table!
+    // Since v1.28 the run-up is long: it stops well short of the jump, and never brakes on it.
+    const last = poses.at(-1)!
+    expect(last.speed).toBe(0)
+    expect(last.x + truck.ride.cgToFront).toBeLessThan(table.at)
   }, 60000)
 
   it('gives nothing once something broke', () => {

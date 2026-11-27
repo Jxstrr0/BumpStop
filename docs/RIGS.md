@@ -53,12 +53,15 @@ wheels hop and the dampers work hardest.
 
 ## The jump ramp
 
-Added in v1.22 (Kelbo picked it, 27 November 2026). A 75 m lap with one
+Added in v1.22 (Kelbo picked it, 27 November 2026). A 200 m lap with one
 built tabletop on it (`RIGS.jumpRig` and `TableJump` in `src/data/rigs.ts`,
-laid on the road by `stampTable` in `src/sim/ground.ts`): 20 m of run-up,
+laid on the road by `stampTable` in `src/sim/ground.ts`): 90 m of run-up,
 an 8 m entry curve that bends the road up to a straight face (slope 0.18),
-a lip 1 m up, a 4 m flat top and a 12 m landing slope back down. The first
-jump is at 45 km/h and each one is 5 km/h faster, up to 70.
+a lip 1 m up, a 4 m flat top and a 12 m landing slope back down, then about
+80 m of run-out for the truck to settle before it comes round again. The
+first jump is at 45 km/h and each one is 5 km/h faster, up to 70. (Until
+v1.28 the lap was 75 m with 20 m of run-up; Kelbo found it too short, and
+the longer lap gives each lap 10 to 16 seconds on screen.)
 
 The stock trucks land it best at about 45 to 55 km/h. Slower, they hardly
 leave the top; faster, they fly further down the slope, land harder and
@@ -97,16 +100,26 @@ fix (69 to 78 at 60 km/h, 29 to 57 at 65), then softer springs (the lip
 throws the truck less high) and more rebound. The harness
 `scripts/harness/jumps.harness.ts` prints every landing for any tune.
 
-**On screen** the jump ramp runs at true speed, so the 3D jump is the jump
-as it happened, and each clip picks up where the last one ended. After each
-landing the run holds while the 3D view replays it from the side in slow
-motion (0.3×): a dust puff where the wheels touch, an amber puff at a corner
+**On screen** the jump ramp runs at true speed as **one unbroken side-on
+shot** (v1.28, Kelbo asked for it smoother and more continuous). The other
+rigs play short clips with cuts between camera angles; the jump ramp's view
+instead follows the pose log a quarter of a second behind the sim, easing
+its pace a touch to hold that gap, so it never catches up and stops
+(`ClipStream` in `src/render/trackView.ts`, `VIEW_3D.streamLead`). The road
+and scenery are laid once for the whole lap plus a margin each end; every
+lap has the same land, so when the truck comes round the view puts it back
+at the start of the same strip and nothing on screen jumps. The run no
+longer stops after a landing: a line over the view gives each landing's
+score as it comes, and the shop keeps each landing's moments (`keepLandings`
+in `src/ui/shop.ts`).
+
+**Slow-motion replays** are on the report: each landing has a **Watch in
+slow motion** button that plays it again in the 3D view (0.3×): a dust puff where the wheels touch, an amber puff at a corner
 when that end reaches its bump stops, a red one and a jolt for a
 bottom-out, and the caption saying each as it comes ("Nose first: 11°
 down against the slope", "Rear bump stops hit", "Bottomed out: rear left,
-metal to metal"), then the verdict ("Clean landing: 87 out of 100"). A line
-over the view keeps the last landing's score and what happened. Fast and
-Skip don't stop for the replays.
+metal to metal"), then the verdict ("Clean landing: 87 out of 100"). The
+replays work after Fast and Skip too.
 
 **The report** (`src/ui/jumpReport.ts`) says how far up the speeds it landed
 clean and the best landing, has a crew note on the worst habit (bottoming,
