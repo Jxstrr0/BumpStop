@@ -11,11 +11,12 @@ import { SETTING_INFO, SLOT_INFO } from '../data/info'
 import { KITS, TUNE, type AxleSettings } from '../data/kit'
 import { SLOTS, type Part, type SlotId } from '../data/parts'
 import { t, tf, type StringKey } from '../data/strings'
-import { changeCost, checkBuild, minPressure, partIn, partsFor, type BuildProblem, type CornerGeometry } from '../sim/build'
+import { arePartsUnlocked, changeCost, checkBuild, minPressure, partIn, partOnSale, partsFor, type BuildProblem, type CornerGeometry } from '../sim/build'
 import { FIRST_YEAR, LAST_YEAR, readLinkAxles, withSetting, writeLinkAxles, type BuildStore, type End } from './buildStore'
 import { shareBuildBlock } from './saves'
 import { truckCardBlock } from './truckCard'
 import { el, num, oneOpenAtATime } from './dom'
+import { DEV_EVENT } from './events'
 import { infoButton, type ShowTerm } from './info'
 import { loadBlock, type LoadBlock } from './loadBlock'
 import { truckView } from './truckView'
@@ -271,7 +272,7 @@ export function buildPanel(store: BuildStore, showTerm?: ShowTerm): HTMLElement 
       radio.id = id
       radio.value = part.id
       radio.checked = part.id === current.id
-      const notYet = part.year > store.year()
+      const notYet = !partOnSale(part, store.year())
       radio.disabled = notYet && part.id !== current.id
       radio.addEventListener('change', () => {
         if (!radio.checked) return
@@ -368,6 +369,7 @@ export function buildPanel(store: BuildStore, showTerm?: ShowTerm): HTMLElement 
     yearNote.textContent = t(bench ? 'build.yearCareer' : 'build.yearNote')
     benchLabel.textContent = bench?.label ?? ''
     benchLabel.hidden = !bench
+    devBanner.hidden = !arePartsUnlocked()
 
     const openSlots = new Set([...partsHolder.querySelectorAll<HTMLDetailsElement>('details[open]')].map((d) => d.dataset.slot))
     const openEnds = new Set([...tuneHolder.querySelectorAll<HTMLDetailsElement>('details[open]')].map((d) => d.dataset.end))
@@ -393,9 +395,12 @@ export function buildPanel(store: BuildStore, showTerm?: ShowTerm): HTMLElement 
   }
 
   store.onChange((change) => (change === 'setting' ? refresh() : render()))
+  // Dev mode's Unlock parts (More tab) opens up, or locks again, the parts from later years.
+  window.addEventListener(DEV_EVENT, () => render())
+  const devBanner = el('p', 'chip warm dev-banner', t('dev.buildBanner'))
   const yearNote = el('p', 'small', t('build.yearNote'))
   const view = truckView(store)
-  box.append(benchLabel, classRow, blurb, view.element, yearRow, yearNote, summary, partsHolder, tuneHolder, reset, shareBuildBlock(store), truckCardBlock(store, view.garage, view.garageNow))
+  box.append(devBanner, benchLabel, classRow, blurb, view.element, yearRow, yearNote, summary, partsHolder, tuneHolder, reset, shareBuildBlock(store), truckCardBlock(store, view.garage, view.garageNow))
   render()
   return box
 }

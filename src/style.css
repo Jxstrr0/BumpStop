@@ -843,6 +843,11 @@ input[type='range'] {
 .credit-list { margin: 8px 0 0; padding-left: 20px; }
 .credit-list li { margin: 4px 0; }
 
+/* Dev mode (27 November 2026): playtesting switches at the bottom of More. */
+.dev-options { margin-left: 30px; }
+.dev-options .small { margin: 0 0 4px; }
+.dev-banner { margin: 0 0 8px; }
+
 /* "A new version is ready" bar (plan PR 12): pinned to the bottom, above the safe area. */
 .update-bar {
   position: fixed;

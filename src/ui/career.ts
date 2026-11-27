@@ -46,6 +46,7 @@ import { hallBlock, type HallBlock } from './hall'
 import type { GlossaryId } from '../data/glossary'
 import type { BuildStore } from './buildStore'
 import { el, num, reveal } from './dom'
+import { DEV_EVENT } from './events'
 import { ordinal, raidRockLine, raidStuckLine, raidTable, sparesList, type RaidCareer } from './raid'
 import { farewellText, logbookBlock, oldTrucksBlock } from './logbook'
 import { firstJobGuide } from './tutorial'
@@ -807,6 +808,10 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
 
   syncBench()
   render()
+  // Dev mode's Unlock parts (More tab): the entry check may pass or fail now.
+  window.addEventListener(DEV_EVENT, () => {
+    if (c) renderJob()
+  })
 
   return {
     element: box,

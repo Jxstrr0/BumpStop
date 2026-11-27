@@ -455,6 +455,29 @@ export function changeCost(from: TruckBuild, to: TruckBuild, resale: number, dis
   return sum
 }
 
+/**
+ * Dev mode's "Unlock parts" (Kelbo asked, 27 November 2026): a playtesting
+ * switch that puts every part on sale whatever the year. It lives here so
+ * every place that asks "is this part out yet?" gives the same answer. The
+ * More tab turns it on and off (`src/ui/devMode.ts`); nothing about it is
+ * saved with the garage, so turning it off puts the normal rules back. Rival
+ * teams never see it: they still only buy what's out (`src/sim/teams.ts`).
+ */
+let partsUnlocked = false
+
+export function setPartsUnlocked(on: boolean): void {
+  partsUnlocked = on
+}
+
+export function arePartsUnlocked(): boolean {
+  return partsUnlocked
+}
+
+/** Can a part be bought in `year`? Out by then, or dev mode has every part unlocked. */
+export function partOnSale(p: { year: number }, year: number): boolean {
+  return partsUnlocked || p.year <= year
+}
+
 /** The shop's rules for a class until the career sets them: its test budget, any year. */
 export function shopRules(cls: ClassId, year: number): BuildRules {
   return { year, budget: KITS[cls].budget }
@@ -472,7 +495,7 @@ export function checkBuild(b: TruckBuild, rules: BuildRules): BuildProblem[] {
   if (spend > 0 && spend > rules.budget) out.push({ kind: 'overBudget', by: spend - rules.budget, budget: rules.budget })
   for (const slot of SLOTS) {
     const p = partIn(b, slot)
-    if (p.year > rules.year) out.push({ kind: 'notYet', slot, part: p.id, year: p.year })
+    if (!partOnSale(p, rules.year)) out.push({ kind: 'notYet', slot, part: p.id, year: p.year })
   }
   return out
 }
