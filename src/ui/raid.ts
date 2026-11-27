@@ -448,7 +448,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       const stops = fuelStops(cls, fuel, stageKm(spec) * 1000)
       fuelLine.className = stops > 0 ? 'small warm-text' : 'small'
       fuelLine.textContent = tf(stops === 0 ? 'raidUi.fuelNone' : stops === 1 ? 'raidUi.fuelOne' : 'raidUi.fuelMany', {
-        fuel: fuelWords(fuel), km: num(fuelRangeKm(cls, fuel)), n: String(stops), min: num(FUEL_STOP / 60),
+        fuel: fuelWords(fuel).toLowerCase(), km: num(fuelRangeKm(cls, fuel)), n: String(stops), min: num(FUEL_STOP / 60),
       })
     }
     refreshFuel()
