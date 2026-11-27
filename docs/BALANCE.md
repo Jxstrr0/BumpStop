@@ -30,6 +30,7 @@ npx vitest run --config vitest.harness.config.ts career-light4x4
   par for a stock truck and for an upgraded one, by driver and pace call.
   Rivals' `pace` is the same ratio, so this is what their numbers are set
   against. `teams.harness.ts` prints each team's pace and trouble by year.
+- **Underside hits** (`underside.harness.ts`): rocks through the guards and the time they cost, per class, raid, guards and pace (`docs/UNDERSIDE.md`).
 - **Part traps** (`culprit.harness.ts`): every part, one at a time, on the
   stock truck with factory settings: no part should break far more than
   stock (cheap parts like twin-tube dampers and all-terrain tires are meant

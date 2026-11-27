@@ -24,6 +24,7 @@ import { LOGBOOK } from '../data/logbook'
 import { SLOTS } from '../data/parts'
 import { RAIDS, type RaidId } from '../data/raids'
 import type { FailureKind } from '../data/wear'
+import type { UnderPart } from '../data/underside'
 import { stageKm, type RaidState, type Stop } from './raid'
 
 /** A line worth telling in a truck's logbook. The screens turn it into words. */
@@ -34,8 +35,10 @@ export type TruckMoment =
   | { kind: 'broke'; year: number; raid: RaidId; part: FailureKind; corner: number }
   /** Slid into a snowbank, or the ice cracked under it and it took the shore track. */
   | { kind: 'slide' | 'ice'; year: number; raid: RaidId }
+  /** A rock got past the guards and dented the oil pan, diff or fuel tank (underside hits, after 1.13). */
+  | { kind: 'hit'; year: number; raid: RaidId; part: UnderPart }
 
-export const MOMENT_KINDS: readonly TruckMoment['kind'][] = ['win', 'podium', 'longOne', 'firstRaid', 'retired', 'broke', 'slide', 'ice']
+export const MOMENT_KINDS: readonly TruckMoment['kind'][] = ['win', 'podium', 'longOne', 'firstRaid', 'retired', 'broke', 'slide', 'ice', 'hit']
 
 export interface TruckLog {
   /** The garage's truck number: 1 for its first truck, 2 for the next, and so on. */
@@ -171,6 +174,7 @@ export function logRaid(c: HasTrucks, state: RaidState, pos: number | null, reti
   if (stop) {
     const year = c.year
     if (stop.kind === 'ice' || stop.kind === 'slide') addMoment(log, { kind: stop.kind, year, raid })
+    else if (stop.kind === 'sump' || stop.kind === 'diff' || stop.kind === 'tank') addMoment(log, { kind: 'hit', year, raid, part: stop.kind })
     else addMoment(log, { kind: 'broke', year, raid, part: stop.kind, corner: stop.corner })
   }
   const year = c.year

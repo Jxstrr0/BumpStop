@@ -46,7 +46,7 @@ import { hallBlock, type HallBlock } from './hall'
 import type { GlossaryId } from '../data/glossary'
 import type { BuildStore } from './buildStore'
 import { el, num, reveal } from './dom'
-import { ordinal, raidTable, sparesList, type RaidCareer } from './raid'
+import { ordinal, raidRockLine, raidTable, sparesList, type RaidCareer } from './raid'
 import { farewellText, logbookBlock, oldTrucksBlock } from './logbook'
 import { firstJobGuide } from './tutorial'
 
@@ -540,6 +540,8 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     if (RAIDS[nextEvent(career).raid].season === 'winter' && !partIn(store.build(), 'tires').studded) {
       lines.append(el('p', 'small warm-text', t('raidUi.winterNoStuds')))
     }
+    // Underside hits: how rocky the raid is for this truck's guards, before the fees are paid.
+    lines.append(raidRockLine(store.truck(), RAIDS[nextEvent(career).raid]))
     // The parts truck's spares (late crew and tools) come on top of the truck's own.
     const more = garageSpares(career)
     const hasMore = SPARE_IDS.some((id) => more[id] > 0)

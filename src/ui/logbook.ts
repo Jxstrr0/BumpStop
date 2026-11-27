@@ -28,6 +28,8 @@ export function momentText(m: TruckMoment): string {
       const corner = m.corner >= 0 ? t(`corner.${m.corner}` as StringKey) : ''
       return tf('log.m.broke', { ...vars, what: tf(`log.b.${m.part}` as StringKey, { corner }) })
     }
+    case 'hit':
+      return tf('log.m.hit', { ...vars, what: t(`log.h.${m.part}` as StringKey) })
     case 'win': case 'longOne': case 'retired': case 'slide': case 'ice':
       return tf(`log.m.${m.kind}`, vars)
     case 'podium': case 'firstRaid':

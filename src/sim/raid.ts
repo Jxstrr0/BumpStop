@@ -27,6 +27,12 @@
  * drives to the thinnest place, and if the ice can't hold it at that speed
  * it cracks: the crew backs off and takes the shore track (`ICE_ROAD`).
  *
+ * Underside hits (Kelbo, 27 November 2026): on rough ground rocks reach
+ * the bottom of the truck, more often at Push, riding low or bottoming out.
+ * The guards take most of them; one that gets through dents the oil pan,
+ * the diff or the fuel tank, which the crew patches at the roadside, and a
+ * dented part leaks until the bivouac fixes it (`underside.ts`).
+ *
  * Weather (Kelbo, 26 November 2026): some stages have a thaw, a whiteout or
  * a dust storm in the forecast, which comes in partway through or holds off
  * (`weather.ts`). From where it turns, the ground it changes is driven
@@ -60,6 +66,8 @@ import { hashString, Rng } from './rng'
 import { runStage } from './stage'
 import { fromCelsius } from './units'
 import { newFatigue, newWearState, worstDamage, type BreakEvent, type Fatigue, type WearState } from './wear'
+import { leakPerKm, newUnderside, patchHours, rollStrikes, type Underside } from './underside'
+import { UNDER_PARTS, UNDERSIDE, type UnderPart } from '../data/underside'
 import { groundMod, stageWeather, weatherOn, weatherShare, weatherSpeed, type StageWeather } from './weather'
 
 /** What the player entered: the truck (parts locked for the raid) and the driver. */
@@ -98,15 +106,18 @@ export interface Stop {
   leg: number
   /** Metres from the start of the stage. */
   at: number
-  /** What broke, or 'ice' when the ice cracked under the truck, or 'slide' when it slid into a snowbank. */
-  kind: BreakEvent['kind'] | 'ice' | 'slide'
+  /**
+   * What broke, or 'ice' when the ice cracked under the truck, or 'slide'
+   * when it slid into a snowbank, or the part a rock dented under the truck.
+   */
+  kind: BreakEvent['kind'] | 'ice' | 'slide' | UnderPart
   /** The corner (0 to 3), or -1 for the frame. */
   corner: number
   zone: BreakEvent['zone']
   /** Seconds lost. */
   lost: number
-  /** Fitted a spare, bodged it, let the dampers cool, backed off cracking ice onto the shore track, or dug it out. */
-  fix: 'spare' | 'bodge' | 'cool' | 'shore' | 'dig'
+  /** Fitted a spare, bodged it, let the dampers cool, backed off cracking ice onto the shore track, dug it out, or patched the underside. */
+  fix: 'spare' | 'bodge' | 'cool' | 'shore' | 'dig' | 'patch'
   /** True if the long-stage maths worked out the break rather than the sim driving that moment. */
   estimated: boolean
 }
@@ -137,6 +148,10 @@ export interface StageRecord {
   iceNotes?: IceNote[]
   /** The day's weather: the forecast and whether it came (null for a clear day; missing in older saves). */
   weather?: StageWeather | null
+  /** Rocks the guards took for you (missing in saves from before underside hits). */
+  guardHits?: number
+  /** Seconds lost topping up leaks from a dented oil pan, diff or fuel tank (in `time` already; missing likewise). */
+  leak?: number
 }
 
 export type RaidPhase = 'morning' | 'bivouac' | 'done'
@@ -155,6 +170,8 @@ export interface RaidState {
   cond: Condition
   /** Money spent on parts at the bivouacs so far (cr.). */
   spent: number
+  /** Dents in the oil pan, diff and fuel tank (underside hits; a raid saved before them starts with none). */
+  under: Underside
 }
 
 /** A leg of a stage: its ground, in metres. */
@@ -212,6 +229,11 @@ export interface StageRun {
   late: boolean
   /** The day's weather (null for a clear day). */
   weather: StageWeather | null
+  /** Dents under the truck, growing as rocks get through. */
+  under: Underside
+  /** Rocks the guards took, and seconds lost to leaks so far. */
+  guardHits: number
+  leak: number
 }
 
 // ── Speeds and times ──
@@ -409,6 +431,7 @@ export function enterRaid(
     results: [],
     cond: newCondition(),
     spent: 0,
+    under: newUnderside(),
   }
 }
 
@@ -472,6 +495,9 @@ export function startStage(state: RaidState, fresh: BuiltTruck, pace: PaceId): S
     status: 'driving',
     late: false,
     weather,
+    under: { ...state.under },
+    guardHits: 0,
+    leak: 0,
   }
 }
 
@@ -537,7 +563,8 @@ export function advanceStage(state: RaidState, run: StageRun): void {
       }
     }
     // In the weather the road past the turn is a new stretch, so it gets its own seed.
-    const seed = hashString(`${raidSeed(state)}:${run.stage}:${run.leg}:${run.seg}:${run.restarts}${wet ? ':w' : ''}`)
+    const key = `${raidSeed(state)}:${run.stage}:${run.leg}:${run.seg}:${run.restarts}${wet ? ':w' : ''}`
+    const seed = hashString(key)
     const mod = wet ? groundMod(w!.kind, ground) : undefined
     const res = runStage(
       run.truck.ride,
@@ -561,6 +588,8 @@ export function advanceStage(state: RaidState, run: StageRun): void {
       distance: driven, harsh: RAID.harshGround.includes(ground), pace: currentPace(run),
       oilWear: state.entry.oilWear, springSag: state.entry.springSag,
     })
+    // Rocks under the truck along this stretch, before any break at its end (the stops stay in order).
+    undersideHits(state, run, ground, driven, res.bottomOuts, key)
     // The shore track is longer than the ice road it stands in for.
     run.time += (driven / speed) * lineFactor(driver, ground) * (ground !== seg.ground ? ICE_ROAD.shoreLength : 1)
     run.at += driven
@@ -627,7 +656,10 @@ function slideOff(run: StageRun): void {
 
 function limp(run: StageRun, ground: RaidGround, distance: number): void {
   const speed = STEADY_KMH[run.truck.build.cls][ground] * KMH * RAID.limpShare
-  const time = distance / speed
+  // Limping picks its way round the rocks, but a dented part still leaks.
+  const leak = leakPerKm(run.under) * (distance / 1000)
+  run.leak += leak
+  const time = distance / speed + leak
   run.time += time
   run.at += distance
   run.segDone += distance
@@ -758,6 +790,38 @@ function roadsideFix(state: RaidState, run: StageRun, ev: BreakEvent): void {
   run.trace.wear.push(worstDamage(run.wear))
 }
 
+/**
+ * Rocks that reached the underside on a stretch just driven (`metres` long,
+ * from `run.at`). The guards take some; each one that gets through dents a
+ * part, and the crew stops to patch it. The oil isn't cooled for these stops:
+ * they happen partway along, and the truck heats up again before the end.
+ * Dented parts leak from where they were hit, which costs time to top up.
+ */
+function undersideHits(state: RaidState, run: StageRun, ground: RaidGround, metres: number, bottomOuts: readonly number[], key: string): void {
+  if (!(metres > 0)) return
+  const work = CLASS_WORK[run.truck.build.cls] * DRIVERS[state.entry.driver].fixTime * 3600
+  const bottoms = bottomOuts.reduce((a, b) => a + b, 0)
+  const strikes = rollStrikes(new Rng(hashString(`${key}:under`)), run.truck, ground, currentPace(run), metres, bottoms)
+  let leak = leakPerKm(run.under) * (metres / 1000)
+  for (const hit of strikes) {
+    if (!hit.part) {
+      run.guardHits++
+      continue
+    }
+    const before = run.under[hit.part]
+    const after = Math.min(1, before + hit.damage)
+    run.under[hit.part] = after
+    leak += (after - before) * UNDERSIDE.leakPerKm[hit.part] * ((metres - hit.at) / 1000)
+    const lost = patchHours(hit.part, before) * work
+    run.time += lost
+    run.stops.push({ leg: run.leg, at: run.at + hit.at, kind: hit.part, corner: -1, zone: null, lost, fix: 'patch', estimated: false })
+    run.legStops++
+    run.eased = Math.min(RAID.easeSteps, run.eased + 1)
+  }
+  run.time += leak
+  run.leak += leak
+}
+
 /** A new shock on one corner at the roadside: fresh oil in it, and the truck drives on with it. */
 function freshShock(run: StageRun, corner: number): void {
   const axle = axleOf(corner)
@@ -778,12 +842,15 @@ export function finishStage(state: RaidState, run: StageRun): StageRecord {
     rivals: run.rivals,
     iceNotes: run.iceNotes.slice(),
     weather: run.weather ? { ...run.weather } : null,
+    guardHits: run.guardHits,
+    leak: run.leak,
   }
   state.results.push(record)
   state.wear = structuredClone(run.wear)
   state.wear.broken = null
   state.spares = { ...run.spares }
   state.cond = structuredClone(run.cond)
+  state.under = { ...run.under }
   state.stage++
   state.phase = state.stage >= raidOf(state).stages.length ? 'done' : 'bivouac'
   return record
@@ -812,8 +879,8 @@ export function standings(state: RaidState, onlyStage?: number): Standing[] {
 
 export interface Job {
   kind: JobKind
-  part: JobPart | CondPart
-  /** Corner (0 to 3), frame zone (0 front, 1 centre, 2 rear), or axle (0 front, 1 rear) for oil, bushings and springs. */
+  part: JobPart | CondPart | UnderPart
+  /** Corner (0 to 3), frame zone (0 front, 1 centre, 2 rear), axle (0 front, 1 rear) for oil, bushings and springs, or 0 under the truck. */
   index: number
   /** Mechanic hours. */
   hours: number
@@ -825,17 +892,24 @@ export interface Job {
   after: number
 }
 
-const JOB_PARTS: readonly (JobPart | CondPart)[] = ['tire', 'bottoming', 'axle', 'mount', 'frame', 'oil', 'bushing', 'spring']
+const JOB_PARTS: readonly (JobPart | CondPart | UnderPart)[] = ['tire', 'bottoming', 'axle', 'mount', 'frame', 'oil', 'bushing', 'spring', ...UNDER_PARTS]
 
 const COND_SET = new Set<string>(['oil', 'bushing', 'spring'])
+const UNDER_SET = new Set<string>(UNDER_PARTS)
 
 /** True for oil, bushings and springs: jobs on a whole axle. */
-export function isCondPart(part: JobPart | CondPart): part is CondPart {
+export function isCondPart(part: JobPart | CondPart | UnderPart): part is CondPart {
   return COND_SET.has(part)
 }
 
+/** True for the oil pan, diff and fuel tank: one of each, under the truck. */
+export function isUnderPart(part: JobPart | CondPart | UnderPart): part is UnderPart {
+  return UNDER_SET.has(part)
+}
+
 /** How worn each of a part's corners (or zones, or axles) is now. */
-function levels(state: RaidState, part: JobPart | CondPart): number[] {
+function levels(state: RaidState, part: JobPart | CondPart | UnderPart): number[] {
+  if (isUnderPart(part)) return [state.under[part]]
   if (isCondPart(part)) return state.cond[part]
   return (part === 'frame' ? state.wear.frame : state.wear[part]).map((f) => f.damage)
 }
@@ -864,7 +938,7 @@ export type JobProblem =
   | { kind: 'hours'; over: number }
   | { kind: 'spare'; spare: SpareId }
   | { kind: 'money'; over: number }
-  | { kind: 'twice'; part: JobPart | CondPart; index: number }
+  | { kind: 'twice'; part: JobPart | CondPart | UnderPart; index: number }
 
 /** What's wrong with a night's plan, or null if the crew can do it all. */
 export function checkJobs(state: RaidState, jobs: readonly Job[]): JobProblem | null {
@@ -893,7 +967,9 @@ export function doJobs(state: RaidState, jobs: readonly Job[]): void {
   if (problem) throw new Error(`Can't do those jobs: ${problem.kind}`)
   for (const j of jobs) {
     const spec = JOBS[j.kind]
-    if (isCondPart(j.part)) {
+    if (isUnderPart(j.part)) {
+      state.under[j.part] *= spec.keep
+    } else if (isCondPart(j.part)) {
       const list = state.cond[j.part]
       list[j.index] = (list[j.index] as number) * spec.keep
     } else {

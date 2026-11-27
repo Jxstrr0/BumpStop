@@ -26,6 +26,7 @@ import type { CondPart } from './condition'
 import type { GroundId } from './ground'
 import type { SpareId } from './parts'
 import type { StringKey } from './strings'
+import type { UnderPart } from './underside'
 import type { FailureKind } from './wear'
 
 // ── Pace calls ──
@@ -168,10 +169,15 @@ export type JobPart = 'tire' | 'bottoming' | 'axle' | 'mount' | 'frame'
 export type JobKind =
   | 'newTire' | 'patchTire' | 'newShock' | 'rebuildShock' | 'newCv' | 'weldMount' | 'weldFrame'
   | 'freshOil' | 'newBushings' | 'resetSprings' | 'newSprings'
+  | 'weldSump' | 'sealDiff' | 'patchTank'
 
 export interface JobSpec {
-  /** A part by its fatigue count (per corner, or frame zone), or a kind of slow wear (per axle, `src/data/condition.ts`). */
-  part: JobPart | CondPart
+  /**
+   * A part by its fatigue count (per corner, or frame zone), a kind of slow
+   * wear (per axle, `src/data/condition.ts`), or a part under the truck
+   * (`src/data/underside.ts`).
+   */
+  part: JobPart | CondPart | UnderPart
   /** Mechanic hours (times `CLASS_WORK`). */
   hours: number
   /** The spare it uses, or null. */
@@ -187,9 +193,10 @@ export interface JobSpec {
 }
 
 /**
- * Every job, in the order the bivouac lists them for a part. The last four
+ * Every job, in the order the bivouac lists them for a part. Four of them
  * (bivouac breakdowns, after 1.2) work on a whole axle: both shocks' oil,
- * both sets of bushings, both springs.
+ * both sets of bushings, both springs. The last three (underside hits, after
+ * 1.13) put right a dented oil pan, diff or fuel tank, which stops it leaking.
  */
 export const JOBS: Readonly<Record<JobKind, JobSpec>> = {
   newTire: { part: 'tire', hours: 0.5, spare: 'tire', cost: 0, keep: 0, name: 'job.newTire' },
@@ -203,6 +210,9 @@ export const JOBS: Readonly<Record<JobKind, JobSpec>> = {
   newBushings: { part: 'bushing', hours: 1.5, spare: null, cost: 180, keep: 0, name: 'job.newBushings' },
   resetSprings: { part: 'spring', hours: 0.5, spare: null, cost: 0, keep: 0.5, name: 'job.resetSprings' },
   newSprings: { part: 'spring', hours: 2, spare: null, cost: 450, keep: 0, name: 'job.newSprings' },
+  weldSump: { part: 'sump', hours: 1, spare: null, cost: 140, keep: 0, name: 'job.weldSump' },
+  sealDiff: { part: 'diff', hours: 1.25, spare: null, cost: 220, keep: 0, name: 'job.sealDiff' },
+  patchTank: { part: 'tank', hours: 0.75, spare: null, cost: 110, keep: 0, name: 'job.patchTank' },
 }
 
 export const JOB_KINDS = Object.keys(JOBS) as JobKind[]

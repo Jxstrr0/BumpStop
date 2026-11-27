@@ -36,6 +36,7 @@ import { KITS, type AxleSettings, type TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR, PARTS, SLOTS, SPARE_IDS, type SlotId, type SpareId } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, JOBS, RAID, RAIDS, type DriverId, type PaceId, type RaidId, type Season } from '../data/raids'
 import type { StringKey } from '../data/strings'
+import { UNDER_PARTS } from '../data/underside'
 import {
   changeCost, checkBuild, massAndCost, partIn, partsFor, stockBuild, tidyBuild, type BuildProblem, type BuildRules,
 } from './build'
@@ -654,6 +655,9 @@ export function repairBill(c: CareerState, state: RaidState): { repairs: number;
     repairs += (state.cond.bushing[axle] ?? 0) * job('newBushings')
     repairs += (state.cond.spring[axle] ?? 0) * job('newSprings')
   }
+  // Dents under the truck left at the end (underside hits): the bivouac job that fixes each.
+  const fix = { sump: 'weldSump', diff: 'sealDiff', tank: 'patchTank' } as const
+  for (const part of UNDER_PARTS) repairs += (state.under[part] ?? 0) * JOBS[fix[part]].cost * CLASS_MONEY[cls]
   const carried = partIn(b, 'spares').carries
   // The parts truck's spares are restocked too.
   const more = state.entry.extraSpares
