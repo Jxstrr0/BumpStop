@@ -23,6 +23,7 @@ import type { BreakEvent } from '../sim/wear'
 import type { BreakFocus, TrackView } from '../render/trackView'
 import { el } from './dom'
 import { photoMode } from './photoMode'
+import { swingCamera } from './swingCamera'
 import { stanceOf } from './truckView'
 
 export interface RigRun {
@@ -67,6 +68,9 @@ export function rigView(onFail: () => void = () => {}): RigView {
   // Photo mode (plan PR 12): freeze the run and frame a shot.
   const photo = photoMode(box, canvas, () => view)
   caption.after(photo.button)
+  // The swing-around camera (v1.19): drag the picture to look round the truck as it drives.
+  const swing = swingCamera(box, canvas, () => view)
+  caption.after(swing.hint, swing.button)
   let loading: Promise<TrackView | null> | null = null
   let failed = false
   let current: RigRun | null = null
@@ -105,6 +109,7 @@ export function rigView(onFail: () => void = () => {}): RigView {
     const rate = r.beat ? Math.min(1, VIEW_3D.shakerShownHz / Math.max(0.1, r.beat())) : 1
     view.play(clip, { rate, loop: false, onEnd: next, ...ghostClip(r, VIEW_3D.clipSeconds) })
     photo.ready(true)
+    swing.ready(true)
   }
 
   return {
@@ -152,17 +157,20 @@ export function rigView(onFail: () => void = () => {}): RigView {
             : tf('view3d.replayFrame', { what, zone: t(`zone.${broken.zone ?? 'centre'}` as StringKey) })
           v.play(lastPoses(r.log, VIEW_3D.replaySeconds), { rate: VIEW_3D.slowMotion, loop: true, focus: { corner: broken.corner, kind: broken.kind }, ...ghostClip(r, VIEW_3D.replaySeconds) })
           photo.ready(true)
+          swing.ready(true)
         } else {
           if (r.road) caption.textContent = t('view3d.lasted')
           const rate = r.beat ? Math.min(1, VIEW_3D.shakerShownHz / Math.max(0.1, r.beat())) : 1
           v.play(lastPoses(r.log, VIEW_3D.clipSeconds), { rate, loop: false, ...ghostClip(r, VIEW_3D.clipSeconds) })
           photo.ready(true)
+          swing.ready(true)
         }
       })
     },
     reset() {
       photo.close()
       photo.ready(false)
+      swing.ready(false)
       live = false
       current = null
       window.clearTimeout(retry)
