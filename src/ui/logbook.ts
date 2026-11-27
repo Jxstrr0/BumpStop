@@ -30,6 +30,8 @@ export function momentText(m: TruckMoment): string {
     }
     case 'hit':
       return tf('log.m.hit', { ...vars, what: t(`log.h.${m.part}` as StringKey) })
+    case 'stuck':
+      return tf(m.fix === 'sweep' ? 'log.m.swept' : 'log.m.stuck', { ...vars, how: t(`log.s.${m.how}` as StringKey), tool: m.fix === 'sweep' ? '' : t(`log.t.${m.fix}` as StringKey) })
     case 'win': case 'longOne': case 'retired': case 'slide': case 'ice':
       return tf(`log.m.${m.kind}`, vars)
     case 'podium': case 'firstRaid':

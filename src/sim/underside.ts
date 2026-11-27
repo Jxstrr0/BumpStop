@@ -70,7 +70,7 @@ export function expectedStrikes(truck: BuiltTruck, ground: RaidGround, pace: Pac
 }
 
 /** A count from a Poisson spread with this average (Knuth's way: fine for the small averages here). */
-function poisson(rng: Rng, mean: number): number {
+export function poisson(rng: Rng, mean: number): number {
   if (!(mean > 0)) return 0
   const floor = detExp(-mean)
   let k = 0

@@ -45,6 +45,8 @@ import { guardShare, leakPerKm, stageOutlook } from '../sim/underside'
 import { FUEL_STOP } from '../data/load'
 import { fuelRangeKm, fuelStops } from '../sim/load'
 import { fuelWords } from './loadBlock'
+import { hasKit, stuckOutlook } from '../sim/recovery'
+import { RECOVERY } from '../data/recovery'
 import type { BuiltTruck } from '../sim/build'
 import type { Raid } from '../data/raids'
 import { checkBuild, partIn } from '../sim/build'
@@ -54,7 +56,7 @@ import { driverName } from '../sim/career'
 import { raidGrime } from '../sim/grime'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
-  advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isCondPart, isRestDay, isUnderPart, leaveCheckpoint,
+  advanceStage, bivouacHours, bivouacJobs, sweptIn, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isCondPart, isRestDay, isUnderPart, leaveCheckpoint,
   nightOutlook, partsBudget, partsMoney, parTime, raidOf, raidTruck, raidWeather, stageKm, standings, startStage,
   type IceNote, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
 } from '../sim/raid'
@@ -161,7 +163,16 @@ function stopText(st: Stop): string {
     return tf('raidUi.underStop', { km: num(st.at / 1000, 1), part: t(`raidUi.under.${st.kind}` as StringKey), lost: gap(st.lost).slice(1) })
   }
   if (st.kind === 'ice') return tf('raidUi.iceStop', { km: num(st.at / 1000, 1), lost: gap(st.lost).slice(1) })
-  if (st.kind === 'slide') return tf('raidUi.slideStop', { km: num(st.at / 1000, 1), lost: gap(st.lost).slice(1) })
+  if (st.kind === 'slide') {
+    if (st.fix === 'dig') return tf('raidUi.slideStop', { km: num(st.at / 1000, 1), lost: gap(st.lost).slice(1) })
+    return tf('raidUi.slideStopKit', { km: num(st.at / 1000, 1), out: t(`raidUi.slideOut.${st.fix}` as StringKey), lost: gap(st.lost).slice(1) })
+  }
+  if (st.kind === 'bogged' || st.kind === 'hungUp') {
+    const how = t(`raidUi.stuck.${st.kind}` as StringKey)
+    const depth = t(`raidUi.depth.${depthWord(st.depth ?? 0)}` as StringKey)
+    if (st.fix === 'sweep') return tf('raidUi.sweepStop', { km: num(st.at / 1000, 1), how, depth })
+    return tf('raidUi.stuckStop', { km: num(st.at / 1000, 1), how, depth, out: t(`raidUi.out.${st.fix}` as StringKey), lost: gap(st.lost).slice(1) })
+  }
   const where = st.kind === 'frame' ? `, ${t(`zone.${st.zone ?? 'centre'}` as StringKey)}` : `, ${t(`corner.${st.corner}` as StringKey)}`
   const text = tf('raidUi.stopLine', {
     km: num(st.at / 1000, 1),
@@ -171,6 +182,11 @@ function stopText(st: Stop): string {
     lost: gap(st.lost).slice(1),
   })
   return text + (st.estimated ? t('raidUi.stopLater') : '')
+}
+
+/** How badly stuck, in a word: the shovel reaches the shallow ones, boards or a jack the middling ones. */
+function depthWord(depth: number): 'light' | 'proper' | 'deep' {
+  return depth <= RECOVERY.reach.shovel.bogged ? 'light' : depth <= RECOVERY.reach.boards.bogged ? 'proper' : 'deep'
 }
 
 /** Upper case first letter, for a name that starts a sentence. */
@@ -201,6 +217,29 @@ export function raidRockLine(truck: BuiltTruck, raid: Raid): HTMLElement {
   const n = num(through, through < 10 ? 1 : 0)
   const text = guards ? tf('raidUi.underRaid', { n, guards }) : tf('raidUi.underRaidBare', { n })
   return el('p', `small ${bandOf(through, 1, 3)}-text`, text)
+}
+
+/** Below this many times stuck over a raid at Steady, the raid counts as firm ground. */
+const FIRM_RAID = 0.15
+
+/**
+ * Getting stuck over a raid at Steady, for the entry cards (recovery kit):
+ * how often, and how many of those the truck's kit (or the shovel alone)
+ * couldn't reach, so the sweep truck would tow it out and the stage is lost.
+ * Clear weather: a thaw or a whiteout makes it worse. Colours follow the trace rule.
+ */
+export function raidStuckLine(truck: BuiltTruck, raid: Raid): HTMLElement {
+  const o = stuckOutlook(truck, raid.stages.flatMap((st) => st.segments), 'steady')
+  if (o.stuck < FIRM_RAID) return el('p', 'small cool-text', t('raidUi.stuckFirm'))
+  const vars = { n: chanceOf(o.stuck), tows: chanceOf(o.tows) }
+  return el('p', `small ${bandOf(o.tows, 0.1, 0.3)}-text`, tf(hasKit(truck) ? 'raidUi.stuckRaidKit' : 'raidUi.stuckRaidBare', vars))
+}
+
+/** An expected count as the chance it happens at least once, in whole per cent (1 − e^(−count), at most 99). */
+function chanceOf(count: number): string {
+  const pct = Math.min(99, Math.round((1 - Math.exp(-count)) * 100))
+  // A real chance never reads as 0%.
+  return num(count > 0.001 ? Math.max(1, pct) : pct)
 }
 
 /** One line about the ice creaking but holding. */
@@ -342,7 +381,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       const raid = RAIDS[raidId]
       raidText.textContent = `${t(raid.text)} ${tf('raidUi.stagesLine', { n: String(raid.stages.length), km: num(raid.stages.reduce((s, st) => s + stageKm(st), 0)) })}`
       studsText.hidden = raid.season !== 'winter' || partIn(store.truck().build, 'tires').studded
-      rockBox.replaceChildren(raidRockLine(store.truck(), raid))
+      rockBox.replaceChildren(raidRockLine(store.truck(), raid), raidStuckLine(store.truck(), raid))
       driverText.textContent = tf('driver.about', { trade: t(DRIVERS[driver].name), text: t(DRIVERS[driver].text) })
     }
     const raidRow = picker(FREE_RAID_IDS, (id) => t(RAIDS[id].name), () => raidId, (id) => {
@@ -476,6 +515,16 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       const n = num(through, 1)
       rocks.textContent = guards ? tf('raidUi.underOutlook', { n, guards }) : tf('raidUi.underOutlookBare', { n })
     } else rocks.hidden = true
+    // Getting stuck (recovery kit): how likely today at Steady, and whether the kit (or the shovel) would get it out.
+    const stuck = el('p', 'small')
+    const day = stuckOutlook(standing, spec.segments, 'steady')
+    const wet = raidWeather(s)
+    const softens = wet && (wet.kind === 'thaw' || wet.kind === 'whiteout')
+    if (day.stuck >= 0.03 || softens) {
+      stuck.className = `small ${bandOf(day.tows, 0.03, 0.1)}-text`
+      stuck.textContent = tf(hasKit(standing) ? 'raidUi.stuckDayKit' : 'raidUi.stuckDayBare', { pct: chanceOf(day.stuck), tows: chanceOf(day.tows) })
+      if (softens) stuck.textContent += ` ${tf('raidUi.stuckWeather', { kind: weatherName(wet!.kind, true) })}`
+    } else stuck.hidden = true
 
     // The roadbook: each piece of ground with its distance, and the checkpoints.
     const total = stageKm(spec)
@@ -608,7 +657,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       stageScreen()
     })
     show(
-      head, facts, fuelLine, rocks,
+      head, facts, fuelLine, rocks, stuck,
       el('h4', 'raid-sub', t('raidUi.roadbook')), book, weatherBox, nightBox, iceBox,
       el('h4', 'raid-sub', t('raidUi.condition')), conditionList(s),
       el('p', 'small', tf('raidUi.sparesLine', { list: sparesList(s.spares) })), settings,
@@ -980,7 +1029,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     const head = el('h3', 'raid-day', tf('raidUi.stageDone', { n: String(n) }))
     const lines = el('div')
     lines.append(el('p', 'readout-line', tf('raidUi.stageTime', { time: clock(rec.time), pos: ordinal(pos), n: String(day.length) })))
-    if (late) lines.append(el('p', 'small hot-text', t('raidUi.towed')))
+    if (late) lines.append(el('p', 'small hot-text', t(rec.stops.some((st) => st.fix === 'sweep') ? 'raidUi.towedSweep' : 'raidUi.towed')))
     if (!rec.stops.length) lines.append(el('p', 'small', t('raidUi.noStops')))
     else {
       const stops = el('ul', 'raid-log')
@@ -1015,6 +1064,18 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       const jump = button(t('raidUi.toProtection'), 'btn small-btn')
       jump.addEventListener('click', () => jumpTo({ kind: 'slot', slot: 'protection' }))
       lines.append(el('p', 'small', t('raidUi.underHint')), jump)
+    }
+    // Stuck (recovery kit): a tow by the sweep truck says what would have got it out; a kit that did is a cool line.
+    const stuckStops = rec.stops.filter((st) => st.kind === 'bogged' || st.kind === 'hungUp')
+    if (stuckStops.length) {
+      const swept = stuckStops.some((st) => st.fix === 'sweep')
+      const usedKit = stuckStops.some((st) => st.fix === 'boards' || st.fix === 'jack' || st.fix === 'winch')
+      if (usedKit && !swept) lines.append(el('p', 'small cool-text', t('raidUi.kitSaved')))
+      if (swept || !usedKit) {
+        const jump = button(t('raidUi.toRecovery'), 'btn small-btn')
+        jump.addEventListener('click', () => jumpTo({ kind: 'slot', slot: 'recovery' }))
+        lines.append(el('p', 'small', t(swept ? 'raidUi.sweptHint' : 'raidUi.stuckHint')), jump)
+      }
     }
     const next = button(t(s.phase === 'done' ? 'raidUi.toFinal' : 'raidUi.toBivouac'), 'btn start-btn')
     next.addEventListener('click', () => (s.phase === 'done' ? finalScreen() : bivouacScreen()))
@@ -1112,6 +1173,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     show(
       head,
       el('p', 'small', tf(rest ? 'raidUi.restDayLead' : 'raidUi.bivouacLead', { hours: num(bivouacHours(s)) })),
+      ...(sweptIn(s) ? [el('p', 'small hot-text', tf('raidUi.sweptLate', { h: num(RECOVERY.sweepHours) }))] : []),
       counters,
       el('p', 'small', t('raidUi.slowWearNote')),
       jobs.length ? list : el('p', 'small', t('raidUi.noJobs')),

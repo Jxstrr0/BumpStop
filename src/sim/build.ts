@@ -29,7 +29,8 @@ import { SIM, TEST_MULES, type AxleSetup, type DamperSetup, type RideSetup } fro
 import { MULE_WEAR, type AxleWear, type FatigueSpec, type WearSetup } from '../data/wear'
 import { powInt } from './det'
 import { beamOf, type Beam } from './night'
-import { loadShift, tidyLoad } from './load'
+import { loadShift, tidyLoad, type KitWeights } from './load'
+import { RECOVERY } from '../data/recovery'
 
 /** How one axle's corners came out, for the build screen. */
 export interface CornerGeometry {
@@ -181,6 +182,14 @@ function scaleFatigue(f: FatigueSpec, k: number): FatigueSpec {
   return { ...f, ultimate: f.ultimate * k, endurance: f.endurance * k, gate: f.gate * k }
 }
 
+/** The recovery kit's weight by where it rides: the winch on the front bumper, the rest on the rear carrier (kg). */
+export function kitWeights(b: TruckBuild): KitWeights {
+  const kit = partIn(b, 'recovery')
+  const total = kit.mass[b.cls] as number
+  const front = kit.winch === 'none' ? 0 : (RECOVERY.winchMass[kit.winch][b.cls] ?? 0)
+  return { front, rear: total - front }
+}
+
 /** Total mass (kg) and cost (cr.) of a build. */
 export function massAndCost(b: TruckBuild): { mass: number; cost: number } {
   let mass = KITS[b.cls].baseMass
@@ -220,7 +229,8 @@ export function buildTruck(input: TruckBuild): BuiltTruck {
   const sprungMass = mass - 2 * (unsprung[0] as number) - 2 * (unsprung[1] as number)
   // The load (weight and balance): weight added or taken away, and where the centre of mass ends up.
   const load = b.load ?? { ...STOCK_LOAD }
-  const shift = loadShift(cls, b.load, partIn(b, 'spares').mass[cls] as number, sprungMass)
+  // The recovery kit rides where it's carried: a winch on the nose, boards and jack at the back.
+  const shift = loadShift(cls, b.load, partIn(b, 'spares').mass[cls] as number, sprungMass, kitWeights(b))
   const runSprung = sprungMass + shift.dMass
   const a0 = mule.cgToFront
   const r0 = mule.cgToRear

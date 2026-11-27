@@ -84,6 +84,8 @@ export const GRIME = {
   restDay: { mud: 0.2, dust: 0.15, snow: 0, chips: 1 } as Readonly<Record<GrimeKind, number>>,
   /** Extra load for each stop of a kind: digging out of a snowbank packs snow in; a cracked ice road splashes slush. */
   stops: { slide: { snow: 0.5 }, ice: { snow: 0.25, mud: 0.2 } } as Readonly<Record<'slide' | 'ice', PerKm>>,
+  /** Extra load for each time the truck bogged down (recovery kit): wheels spun in deep mud in summer, snow packed in in winter. */
+  bogged: { summer: { mud: 0.5 }, winter: { snow: 0.5 } } as Readonly<Record<Season, PerKm>>,
   /** Chips load for each rock the guards took. */
   guardHitChips: 0.05,
   /**

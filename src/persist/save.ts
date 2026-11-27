@@ -25,6 +25,7 @@ import { findPart, fitsClass, stockBuild, tidyBuild } from '../sim/build'
 import { tidyLoad } from '../sim/load'
 import type { CareerJob, CareerState, Contract, LongOneStory, NewsItem } from '../sim/career'
 import type { CareerHall, DriverTally, RivalTally, SeasonLine } from '../sim/hall'
+import { RECOVERY_TOOLS, STUCK_KINDS, type RecoveryTool, type StuckKind } from '../data/recovery'
 import { MOMENT_KINDS, newLog, tidyLogs, type TruckLog, type TruckMoment } from '../sim/logbook'
 import type { RaidState } from '../sim/raid'
 import { newCondition } from '../sim/condition'
@@ -429,6 +430,7 @@ function isMoment(m: unknown): m is TruckMoment {
   if (!isObj(m) || !MOMENT_KINDS.includes(m.kind as TruckMoment['kind'])) return false
   if (typeof m.raid !== 'string' || !Object.hasOwn(RAIDS, m.raid) || typeof m.year !== 'number') return false
   if (m.kind === 'hit') return UNDER_PARTS.includes(m.part as UnderPart)
+  if (m.kind === 'stuck') return STUCK_KINDS.includes(m.how as StuckKind) && (m.fix === 'sweep' || RECOVERY_TOOLS.includes(m.fix as RecoveryTool))
   if (m.kind !== 'broke') return true
   return FAILURE_KINDS.includes(m.part as FailureKind) && Number.isInteger(m.corner) && (m.corner as number) >= -1 && (m.corner as number) <= 3
 }

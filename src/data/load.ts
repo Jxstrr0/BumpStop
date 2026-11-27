@@ -51,7 +51,7 @@ export interface ClassLoad {
   rowX: Readonly<Record<SpotRow, number>>
   /** How far left of the centre line each column sits (m). */
   colY: Readonly<Record<SpotCol, number>>
-  /** Tools, jack, shovel and sand ladders: always carried, part of the base weight (kg). */
+  /** Tools, a bottle jack and the shovel: always carried, part of the base weight (kg). The recovery kit is a part of its own. */
   tools: number
   /** Fuel in a full tank (kg), part of the base weight. */
   fuelFull: number

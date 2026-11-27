@@ -45,6 +45,7 @@ export const SLOT_INFO: Readonly<Record<SlotId, InfoNote>> = {
   lightBar: { text: 'info.slot.lightBar' },
   spots: { text: 'info.slot.spots' },
   spares: { text: 'info.slot.spares' },
+  recovery: { text: 'info.slot.recovery', term: 'recoveryKit' },
 }
 
 /** The Load section's notes (weight and balance, 27 November 2026). */

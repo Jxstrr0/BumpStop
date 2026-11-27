@@ -43,6 +43,13 @@
  * stage longer than the tank's range has a stop to fill up (`FUEL_STOP`),
  * where the dampers get a couple of minutes to cool.
  *
+ * Getting stuck (Kelbo picked the recovery kit, 27 November 2026): soft
+ * snow, thawed gravel and rocks can bog the truck or hang it up. The shovel
+ * digs out the shallow ones; the recovery kit's boards, jack and winch reach
+ * deeper and work faster. A truck nothing on board can free waits for the
+ * sweep truck, which tows it out: the stage is lost, and the crew loses
+ * hours at that night's bivouac (`recovery.ts`).
+ *
  * Weather (Kelbo, 26 November 2026): some stages have a thaw, a whiteout or
  * a dust storm in the forecast, which comes in partway through or holds off
  * (`weather.ts`). From where it turns, the ground it changes is driven
@@ -82,6 +89,8 @@ import { fromCelsius } from './units'
 import { newFatigue, newWearState, worstDamage, type BreakEvent, type Fatigue, type WearState } from './wear'
 import { leakPerKm, newUnderside, patchHours, rollStrikes, type Underside } from './underside'
 import { UNDER_PARTS, UNDERSIDE, type UnderPart } from '../data/underside'
+import { jackFactor, recovery, rollStuck, snowbankRecovery } from './recovery'
+import { RECOVERY, type RecoveryTool, type StuckKind } from '../data/recovery'
 import { groundMod, stageWeather, weatherOn, weatherShare, weatherSpeed, type StageWeather } from './weather'
 
 /** What the player entered: the truck (parts locked for the raid) and the driver. */
@@ -122,18 +131,26 @@ export interface Stop {
   at: number
   /**
    * What broke, or 'ice' when the ice cracked under the truck, or 'slide'
-   * when it slid into a snowbank, or the part a rock dented under the truck.
+   * when it slid into a snowbank, or the part a rock dented under the truck,
+   * or the way it got stuck (bogged or hung up).
    */
-  kind: BreakEvent['kind'] | 'ice' | 'slide' | UnderPart
+  kind: BreakEvent['kind'] | 'ice' | 'slide' | UnderPart | StuckKind
   /** The corner (0 to 3), or -1 for the frame. */
   corner: number
   zone: BreakEvent['zone']
   /** Seconds lost. */
   lost: number
-  /** Fitted a spare, bodged it, let the dampers cool, backed off cracking ice onto the shore track, dug it out, or patched the underside. */
-  fix: 'spare' | 'bodge' | 'cool' | 'shore' | 'dig' | 'patch'
+  /**
+   * Fitted a spare, bodged it, let the dampers cool, backed off cracking ice
+   * onto the shore track, dug it out of the snowbank with the shovel, patched
+   * the underside; or got out with a tool of the recovery kit (the shovel too,
+   * when stuck), or waited for the sweep truck to tow it out.
+   */
+  fix: 'spare' | 'bodge' | 'cool' | 'shore' | 'dig' | 'patch' | RecoveryTool | 'sweep'
   /** True if the long-stage maths worked out the break rather than the sim driving that moment. */
   estimated: boolean
+  /** How badly it was stuck, 0 to 1 (only when stuck). */
+  depth?: number
 }
 
 /** The ice booming and creaking under the truck at the thinnest place of a stretch: close, but it held. */
@@ -460,9 +477,16 @@ export function isRestDay(state: RaidState): boolean {
   return state.phase === 'bivouac' && state.stage === raidOf(state).restAfter
 }
 
-/** Mechanic hours at this bivouac: a rest day gives the crew a whole day. */
+/** True if the sweep truck towed the truck out of the stage just driven (so it reaches the bivouac late). */
+export function sweptIn(state: RaidState): boolean {
+  const last = state.results[state.results.length - 1]
+  return state.phase === 'bivouac' && !!last?.stops.some((st) => st.fix === 'sweep')
+}
+
+/** Mechanic hours at this bivouac: a rest day gives the crew a whole day; a truck the sweep truck brought in has less. */
 export function bivouacHours(state: RaidState): number {
-  return (state.entry.hours ?? RAID.bivouacHours) * (isRestDay(state) ? RAID.restDayHours : 1)
+  const hours = (state.entry.hours ?? RAID.bivouacHours) * (isRestDay(state) ? RAID.restDayHours : 1)
+  return sweptIn(state) ? Math.max(RECOVERY.minHours, hours - RECOVERY.sweepHours) : hours
 }
 
 /** Money for parts over the whole raid (cr.). */
@@ -709,6 +733,12 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     })
     // Rocks under the truck along this stretch, before any break at its end (the stops stay in order).
     undersideHits(state, run, ground, driven, res.bottomOuts, key)
+    // Bogged or hung up along it: out with the kit, or towed out by the sweep truck (the stage is lost).
+    const towedAt = stuckOnStretch(state, run, ground, driven, key, wet ? w!.kind : null)
+    if (towedAt !== null) {
+      sweep(run, towedAt, (towedAt / speed) * lineFactor(driver, ground))
+      return
+    }
     // The shore track is longer than the ice road it stands in for.
     run.time += (driven / speed) * lineFactor(driver, ground) * (ground !== seg.ground ? ICE_ROAD.shoreLength : 1)
     if (night) {
@@ -756,7 +786,7 @@ function placeOn(state: RaidState, run: StageRun, what: string, from: number, to
 }
 
 /** A winter stop with nothing broken: lose the time, let the oil cool, ease off. */
-function winterStop(run: StageRun, kind: 'ice' | 'slide', fix: 'shore' | 'dig', lost: number): void {
+function winterStop(run: StageRun, kind: 'ice' | 'slide', fix: Stop['fix'], lost: number): void {
   coolFor(run, lost)
   run.time += lost
   run.stops.push({ leg: run.leg, at: run.at, kind, corner: -1, zone: null, lost, fix, estimated: false })
@@ -773,9 +803,10 @@ function iceCracks(run: StageRun): void {
   run.shore = true
 }
 
-/** Too fast for the grip at the tightest corner: wide into the snowbank, and dug out. */
+/** Too fast for the grip at the tightest corner: wide into the snowbank, and dug out (or pulled out with the kit). */
 function slideOff(run: StageRun): void {
-  winterStop(run, 'slide', 'dig', CORNERS.digOut)
+  const out = snowbankRecovery(run.truck)
+  winterStop(run, 'slide', out.tool === 'shovel' ? 'dig' : out.tool, out.seconds)
 }
 
 function limp(run: StageRun, ground: RaidGround, distance: number): void {
@@ -895,15 +926,17 @@ function roadsideFix(state: RaidState, run: StageRun, ev: BreakEvent): void {
     const index = ev.kind === 'frame' ? zoneIndex(ev.zone) : ev.corner
     const spare = r.spare
     const work = CLASS_WORK[cls] * driver.fixTime * 3600
+    // A high-lift jack gets a wheel off the ground quicker for a tire, shock or CV swap.
+    const lift = ev.kind === 'tire' || ev.kind === 'bottoming' || ev.kind === 'axle' ? jackFactor(run.truck) : 1
     if (spare && run.spares[spare] > 0) {
       run.spares[spare]--
       setFatigue(run.wear, ev.kind, index, newFatigue())
       if (spare === 'shock') freshShock(run, index)
-      lost = r.withSpare * work
+      lost = r.withSpare * work * lift
       fix = 'spare'
     } else {
       setFatigue(run.wear, ev.kind, index, worn(r.bodgeWear))
-      lost = r.bodge * work
+      lost = r.bodge * work * lift
       fix = 'bodge'
     }
   }
@@ -947,6 +980,56 @@ function undersideHits(state: RaidState, run: StageRun, ground: RaidGround, metr
   }
   run.time += leak
   run.leak += leak
+}
+
+/**
+ * Getting stuck on a stretch just driven (`metres` long, from `run.at`).
+ * Each time, the crew gets out with the quickest tool that reaches that deep
+ * (time on the stage, and the driver eases off). If nothing on the truck
+ * reaches, it waits for the sweep truck: returns how far along the stretch
+ * that happened (m), or null if the truck got out every time. Like the rocks,
+ * these stops don't cool the oil: the truck heats up again before the end.
+ */
+function stuckOnStretch(state: RaidState, run: StageRun, ground: RaidGround, metres: number, key: string, weather: StageWeather['kind'] | null): number | null {
+  if (!(metres > 0)) return null
+  const work = CLASS_WORK[run.truck.build.cls] * DRIVERS[state.entry.driver].fixTime * 3600
+  for (const st of rollStuck(new Rng(hashString(`${key}:stuck`)), run.truck, ground, currentPace(run), metres, weather)) {
+    const out = recovery(run.truck, st.kind, st.depth)
+    const at = run.at + st.at
+    if (!out) {
+      run.stops.push({ leg: run.leg, at, kind: st.kind, corner: -1, zone: null, lost: 0, fix: 'sweep', estimated: false, depth: st.depth })
+      return st.at
+    }
+    const lost = out.hours * work
+    run.time += lost
+    run.stops.push({ leg: run.leg, at, kind: st.kind, corner: -1, zone: null, lost, fix: out.tool, estimated: false, depth: st.depth })
+    run.legStops++
+    run.eased = Math.min(RAID.easeSteps, run.eased + 1)
+  }
+  return null
+}
+
+/**
+ * Stuck past what the kit can reach: the sweep truck tows the truck out and
+ * the stage is lost (towed in after closing, with the penalty). `metres` is
+ * how far along the stretch it stuck, and `seconds` the driving to get there.
+ */
+function sweep(run: StageRun, metres: number, seconds: number): void {
+  // A break at the end of the stretch never happened: the truck stuck before it got there. Keep the part just short of breaking.
+  const ev = run.wear.broken
+  if (ev && ev.kind !== 'fade') {
+    const f = fatigueOf(run.wear, ev.kind, ev.kind === 'frame' ? zoneIndex(ev.zone) : ev.corner)
+    f.damage = Math.min(f.damage, RECOVERY.unbroken)
+  }
+  run.time += seconds
+  run.at += metres
+  run.segDone += metres
+  run.wear.broken = null
+  run.late = true
+  run.status = 'finished'
+  run.trace.distance.push(run.at)
+  run.trace.oil.push(Math.max(...run.oil))
+  run.trace.wear.push(worstDamage(run.wear))
 }
 
 /** A new shock on one corner at the roadside: fresh oil in it, and the truck drives on with it. */

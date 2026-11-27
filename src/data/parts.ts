@@ -39,6 +39,7 @@ export type SlotId =
   | 'lightBar'
   | 'spots'
   | 'spares'
+  | 'recovery'
 
 /** The era the game covers: the first and last year a build can be set to. */
 export const FIRST_YEAR = 1985
@@ -59,6 +60,7 @@ export const SLOTS: readonly SlotId[] = [
   'lightBar',
   'spots',
   'spares',
+  'recovery',
 ]
 
 /** One number per class; a missing class means the part doesn't come in that size. */
@@ -205,6 +207,21 @@ export interface SparesPart extends PartCommon {
   carries: Readonly<Record<SpareId, number>>
 }
 
+/**
+ * The recovery kit (Kelbo picked it, 27 November 2026): what gets a stuck
+ * truck out besides the shovel every truck carries. How each piece helps,
+ * and how long it takes: `src/data/recovery.ts`.
+ */
+export interface RecoveryPart extends PartCommon {
+  slot: 'recovery'
+  /** Traction boards under the wheels: steel sand ladders, lighter nylon boards, or none. */
+  boards: 'none' | 'steel' | 'nylon'
+  /** A high-lift jack. */
+  jack: boolean
+  /** A winch on the front bumper: steel cable, synthetic rope, or none. */
+  winch: 'none' | 'cable' | 'rope'
+}
+
 export type Part =
   | FramePart
   | SuspensionPart
@@ -218,6 +235,7 @@ export type Part =
   | EnginePart
   | LightPart
   | SparesPart
+  | RecoveryPart
 
 /** The part type that fits a slot. */
 export type PartIn<S extends SlotId> =
@@ -443,4 +461,26 @@ export const PARTS: readonly Part[] = [
   { slot: 'spares', id: 'fullKit', name: 'part.fullKit', text: 'part.fullKitText', year: 1985,
     mass: { light4x4: 110, heavy: 500, sxs: 60 }, cost: { light4x4: 5000, heavy: 20000, sxs: 3000 },
     carries: { tire: 2, shock: 2, cv: 2 } },
+
+  // ── Recovery kit (Kelbo, 27 November 2026; see src/data/recovery.ts) ──
+  // Every truck carries a shovel. Sand ladders were steel in 1985; nylon boards (2005) are lighter and quicker to use.
+  // A winch is the heavy one: about 35 kg on a pickup's bumper with its cable, less with synthetic rope (2005).
+  { slot: 'recovery', id: 'shovelOnly', name: 'part.shovelOnly', text: 'part.shovelOnlyText', year: 1985,
+    mass: { light4x4: 0, heavy: 0, sxs: 0 }, cost: { light4x4: 0, heavy: 0, sxs: 0 },
+    boards: 'none', jack: false, winch: 'none' },
+  { slot: 'recovery', id: 'sandLadders', name: 'part.sandLadders', text: 'part.sandLaddersText', year: 1985,
+    mass: { light4x4: 22, heavy: 60, sxs: 14 }, cost: { light4x4: 600, heavy: 1800, sxs: 400 },
+    boards: 'steel', jack: false, winch: 'none' },
+  { slot: 'recovery', id: 'laddersJack', name: 'part.laddersJack', text: 'part.laddersJackText', year: 1985,
+    mass: { light4x4: 37, heavy: 105, sxs: 22 }, cost: { light4x4: 1100, heavy: 3400, sxs: 700 },
+    boards: 'steel', jack: true, winch: 'none' },
+  { slot: 'recovery', id: 'cableWinch', name: 'part.cableWinch', text: 'part.cableWinchText', year: 1985,
+    mass: { light4x4: 75, heavy: 230, sxs: 40 }, cost: { light4x4: 3200, heavy: 9000, sxs: 1800 },
+    boards: 'steel', jack: true, winch: 'cable' },
+  { slot: 'recovery', id: 'boardsJack', name: 'part.boardsJack', text: 'part.boardsJackText', year: 2005,
+    mass: { light4x4: 26, heavy: 80, sxs: 15 }, cost: { light4x4: 1700, heavy: 4800, sxs: 1000 },
+    boards: 'nylon', jack: true, winch: 'none' },
+  { slot: 'recovery', id: 'ropeWinch', name: 'part.ropeWinch', text: 'part.ropeWinchText', year: 2005,
+    mass: { light4x4: 52, heavy: 170, sxs: 27 }, cost: { light4x4: 5600, heavy: 15000, sxs: 3200 },
+    boards: 'nylon', jack: true, winch: 'rope' },
 ]
