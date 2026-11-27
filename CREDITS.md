@@ -62,3 +62,46 @@ web.
 | `pop.mp3` | Tire cut | ElevenLabs | Made for Bump Stop | https://elevenlabs.io/sound-effects |
 | `groan.mp3` | Frame groan | ElevenLabs | Made for Bump Stop | https://elevenlabs.io/sound-effects |
 | `hiss-loop.mp3` | Hot shock hiss | ElevenLabs | Made for Bump Stop | https://elevenlabs.io/sound-effects |
+
+### The radio co-driver
+
+The co-driver's calls on a raid stage (Kelbo picked them, 27 November 2026;
+`src/data/radio.ts`, files in `public/radio/`). Each line is one take made
+for Bump Stop with ElevenLabs' text to speech, in the "Joe English" voice
+from the ElevenLabs voice library, then trimmed, made mono and shrunk for
+the web. The intercom sound is added live by the game (`src/audio/radio.ts`).
+
+| File in `public/radio/` | Line | Voice | Licence | Page |
+| --- | --- | --- | --- | --- |
+| `flat.mp3` | Flat out. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `washboard.mp3` | Washboard. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `rough.mp3` | Rough gravel. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `ice.mp3` | Ice. Easy on it. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `snow.mp3` | Deep snow. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `whoops.mp3` | Whoops. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `whoops-big.mp3` | Caution. Big whoops. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `rocks.mp3` | Rocks. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `rocks-big.mp3` | Caution. Rocks. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `jump.mp3` | Jump. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `jump-big.mp3` | Caution. Big jump. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `heave.mp3` | Frost heave. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `heave-step.mp3` | Caution. Heave, step up. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `d30.mp3` | Thirty. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `d50.mp3` | Fifty. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `d80.mp3` | Eighty. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `d100.mp3` | One hundred. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `d200.mp3` | Two hundred. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `thaw.mp3` | Here comes the thaw. It's going soft. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `whiteout.mp3` | Whiteout! Can't see a thing. Ease off. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `dust.mp3` | Dust storm coming in. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `go.mp3` | Three, two, one... go! | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `go-on.mp3` | Right. Off we go. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `checkpoint.mp3` | Into the checkpoint. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `finish.mp3` | Flying finish! Nicely done. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `stop.mp3` | We're stopping. Let's sort it. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `cool.mp3` | Shocks are cooked. Let them cool. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `under.mp3` | Hit something underneath. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `slide.mp3` | Into the bank! Dig us out. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `crack.mp3` | The ice is going! Shore track! | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `creak.mp3` | Ice is creaking. Easy now. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
+| `hot.mp3` | Shocks are getting hot. | Joe English (ElevenLabs) | Made for Bump Stop | https://elevenlabs.io/text-to-speech |
