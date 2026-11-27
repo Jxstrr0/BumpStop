@@ -129,3 +129,15 @@ export function lastPoses(log: PoseLog, seconds: number): Pose[] {
   for (let i = n - 1; i >= 0; i--) out.push(poseAgo(log, i))
   return out
 }
+
+/** Every pose newer than `after` (s into the run), oldest first: what's come in since a live view last looked. */
+export function posesSince(log: PoseLog, after: number): Pose[] {
+  const out: Pose[] = []
+  const held = posesHeld(log)
+  for (let i = 0; i < held; i++) {
+    const p = poseAgo(log, i)
+    if (p.t <= after) break
+    out.push(p)
+  }
+  return out.reverse()
+}

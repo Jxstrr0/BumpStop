@@ -116,7 +116,7 @@ export const RIGS: Readonly<Record<RigId, Rig>> = {
   // about 50 to 55 km/h; from 60 they fly past the slope and bottom out.
   jumpRig: {
     id: 'jumpRig',
-    pieces: [{ ground: 'graded', length: 75, pace: 1, table: { at: 20, entry: 8, slope: 0.18, height: 1, top: 4, landing: 12 } }],
+    pieces: [{ ground: 'graded', length: 200, pace: 1, table: { at: 90, entry: 8, slope: 0.18, height: 1, top: 4, landing: 12 } }],
     startSpeed: 45 * KMH,
     speedStep: 5 * KMH,
     maxLaps: 6,
@@ -235,10 +235,10 @@ export const VIEW_3D = {
   slowMotion: 0.3,
   /** The shaker is slowed so no beat looks faster than this many a second (Hz). */
   shakerShownHz: 2.5,
-  /** The jump ramp's landing replay starts this long before take-off (s)... */
+  /** The jump ramp's landing replay starts this long before take-off (s). */
   landingBefore: 0.6,
-  /** ...and its verdict stays on screen this long before the run carries on (real s). */
-  landingHold: 1.4,
+  /** The jump ramp's live shot plays this far behind the sim (s), so it never catches up and stops (v1.28). */
+  streamLead: 0.25,
 } as const
 
 /**

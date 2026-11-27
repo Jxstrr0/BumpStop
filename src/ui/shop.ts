@@ -36,9 +36,11 @@
  * see-through truck in 3D, and the report says who lasted longer.
  *
  * The jump ramp (v1.22, Kelbo picked it, 27 November 2026) runs at true
- * speed, one jump a lap. After each landing the run holds while the 3D view
- * replays it in slow motion (not on Fast or Skip), and a line over the view
- * gives its score. Its report is `jumpReport.ts`.
+ * speed, one jump a lap, and a line over the view gives each landing's
+ * score. Since v1.28 (Kelbo asked for it smoother and more continuous) the
+ * 3D shows the whole run as one unbroken shot and never stops for a replay:
+ * each landing's moments are kept as it's scored, and the report's Watch
+ * buttons replay them in slow motion. Its report is `jumpReport.ts`.
  */
 import { heatShare } from '../audio/cues'
 import { makeSound } from '../audio/sound'
@@ -49,6 +51,7 @@ import { t, tf, type StringKey } from '../data/strings'
 import { buildTruck, type BuiltTruck } from '../sim/build'
 import { scopeOf, scoped, unscoped } from '../persist/ghost'
 import { ghostFromRun } from '../sim/ghost'
+import type { LandingScore } from '../sim/landing'
 import { advanceLaps, lapLength, lapResult, rollOut, startLaps, takeFeel, type LapRunner, type RunHistory } from '../sim/laps'
 import { advanceShaker, shakerSteps, startShaker, type ShakerPoint, type ShakerRunner } from '../sim/shaker'
 import { fromCelsius, msToKmh } from '../sim/units'
@@ -62,7 +65,7 @@ import { distanceText, ghostRace, raceText, type GhostPick } from './ghostRace'
 import { jumpReport } from './jumpReport'
 import { gradeChip, landingSummary } from './landingText'
 import { lapReport, shakerReport, type LapGhost } from './report'
-import { rigView } from './rigView'
+import { posesBetween, rigView, type LandingClip } from './rigView'
 
 const AIR = fromCelsius(20)
 const C0 = 273.15
@@ -130,9 +133,9 @@ type Active =
       runner: LapRunner
       ghost: LapGhostRun | null
       race: Race | null
-      /** The jump ramp: landings already shown, and whether the run is held while one is replayed. */
+      /** The jump ramp: landings already shown, and each one's moments for its replay, by jump number. */
       shown: number
-      held: boolean
+      clips: Map<number, LandingClip>
     }
   | { kind: 'shaker'; cls: ClassId; truck: BuiltTruck; runner: ShakerRunner; ghost: ShakerPoint[] | null; total: number; taken: number }
 
@@ -475,7 +478,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
         const ghostRunner = startLaps(ghostTruck.ride, ghostTruck.wear, RIGS[rig], seedFor(cls, rig), { airTemp: AIR, poses: VIEW_3D.poseSeconds, trace: false })
         rival = { pick, truck: ghostTruck, runner: ghostRunner, said: '' }
       }
-      active = { kind: 'laps', rig, cls, truck, runner, ghost: ghost?.kind === 'laps' ? ghost : null, race: rival, shown: 0, held: false }
+      active = { kind: 'laps', rig, cls, truck, runner, ghost: ghost?.kind === 'laps' ? ghost : null, race: rival, shown: 0, clips: new Map() }
       sound.startLaps(truck.build.parts.engine, cls)
     }
     fast = false
@@ -523,9 +526,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     // A long pause (the tab was hidden) shouldn't jump the run ahead.
     const dt = Math.min(0.1, (now - last) / 1000)
     last = now
-    if (a.kind === 'laps' && a.held) {
-      // A landing replay has the screen: the run waits for it.
-    } else if (skipping) {
+    if (skipping) {
       const until = performance.now() + RIG_VIEW.skipBudgetMs
       while (!a.runner.done && performance.now() < until) step(a, 2000)
     } else {
@@ -544,24 +545,13 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     else raf = requestAnimationFrame(tick)
   }
 
-  /**
-   * The jump ramp: a new landing has been scored. Say so over the view, and
-   * (unless the run is on Fast or Skip, or it just ended) hold the run while
-   * the 3D view replays it in slow motion.
-   */
+  /** The jump ramp: a new landing has been scored. Say so over the view; the run carries straight on. */
   function landed(a: Extract<Active, { kind: 'laps' }>): void {
     const all = a.runner.landings
     if (all.length <= a.shown) return
     a.shown = all.length
     const score = all[all.length - 1]!
     landingLine.replaceChildren(gradeChip(score), ' ', tf('jump.liveLast', { n: String(score.lap), speed: num(msToKmh(score.speed)), score: String(score.score), what: landingSummary(score) }))
-    if (skipping || fast || a.runner.done || !view3d.works()) return
-    a.held = true
-    view3d.landing(score, () => {
-      if (active !== a) return
-      a.held = false
-      carry = 0
-    })
   }
 
   /** Tell the sound what the truck did this frame. */
@@ -594,10 +584,25 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
 
   function step(a: Active, n: number): void {
     if (a.kind === 'laps') {
-      const taken = advanceLaps(a.runner, n)
-      // The ghost takes exactly as many steps, so the two stay side by side in time.
-      if (a.race && !a.race.runner.done) advanceLaps(a.race.runner, taken)
+      // The jump ramp goes in short bites, so each landing's moments are still in the pose log when it's scored.
+      const bite = a.rig === 'jumpRig' ? STEPS_PER_SECOND / 2 : n
+      for (let left = n; left > 0 && !a.runner.done; left -= bite) {
+        const taken = advanceLaps(a.runner, Math.min(bite, left))
+        // The ghost takes exactly as many steps, so the two stay side by side in time.
+        if (a.race && !a.race.runner.done) advanceLaps(a.race.runner, taken)
+        if (a.rig === 'jumpRig') keepLandings(a)
+      }
     } else a.taken += advanceShaker(a.runner, n)
+  }
+
+  /** The jump ramp: keep the moments of any landing just scored, from just before take-off, for its replay after the run. */
+  function keepLandings(a: Extract<Active, { kind: 'laps' }>): void {
+    for (const l of a.runner.landings) {
+      if (a.clips.has(l.lap)) continue
+      const from = l.from - VIEW_3D.landingBefore
+      const g = a.race?.runner.poses
+      a.clips.set(l.lap, { mine: posesBetween(a.runner.poses!, from, l.to), ghost: g ? posesBetween(g, from, l.to) : null })
+    }
   }
 
   /** The line under the chart while racing a ghost: who it is, and what happened to it. */
@@ -755,7 +760,17 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     } else {
       const run = lapResult(a.runner)
       const rival = a.race ? { who: t(a.race.pick.source === 'best' ? 'ghost.whoBest' : 'ghost.whoFriend'), landings: a.race.runner.landings } : null
-      report = a.rig === 'jumpRig' ? jumpReport(run, stopped, a.ghost, ctx, rival) : lapReport(run, stopped, a.ghost, ctx)
+      // Each landing's Watch button replays it in the 3D view above, and brings the view up to see it.
+      const watch = (score: LandingScore): boolean => {
+        const clip = a.clips.get(score.lap)
+        if (!clip || !view3d.replay(score, clip)) return false
+        reveal(view3d.element, { behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
+        return true
+      }
+      report =
+        a.rig === 'jumpRig'
+          ? jumpReport(run, stopped, a.ghost, ctx, rival, view3d.works() && a.clips.size > 0 ? watch : null)
+          : lapReport(run, stopped, a.ghost, ctx)
       if (!stopped) raceVerdict(report, a, ghostFromRun(a.cls, a.rig, a.truck.build, run))
       const lastLap = run.laps[run.laps.length - 1]
       ghosts.set(ghostKey(a.cls, a.rig), {

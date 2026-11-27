@@ -380,8 +380,8 @@ export function lapResult(r: LapRunner): LapRun {
 /**
  * The finish, for the 3D view only (v1.26): carry on from where the run
  * ended, through the start-line arch at full speed, then brake to a stop
- * and sit for a moment. Over the jump ramp's tabletop it holds its speed
- * until it has landed, so it never brakes in the air.
+ * and sit for a moment. It never brakes on the jump ramp's tabletop, so
+ * never in the air; since the run-up grew to 90 m (v1.28) it pulls up first.
  *
  * Works on a copy of the truck's state, so the run (and its result) is
  * untouched. Returns poses as the log would have written them, carrying on
@@ -412,7 +412,9 @@ export function rollOut(r: LapRunner): Pose[] {
   for (let step = 1; step <= ROLL_OUT.most * SIM.stepsPerSecond && still < ROLL_OUT.settle; step++) {
     if (atEnd()) next()
     const table = (r.rig.pieces[piece] as RigPiece).table
-    const overJump = table !== undefined && s.x + p.setup.cgToFront < tableMarks(table).landEnd + 3
+    // Never brake on the tabletop itself (since v1.28 the long run-up means it pulls up before reaching it).
+    const front = s.x + p.setup.cgToFront
+    const overJump = table !== undefined && front > table.at - 2 && front < tableMarks(table).landEnd + 3
     const braking = speed > 0 && travelled >= ROLL_OUT.through && !overJump
     const slow = braking ? Math.min(speed, ROLL_OUT.brake * DT) : 0
     speed -= slow

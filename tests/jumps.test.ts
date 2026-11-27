@@ -25,7 +25,7 @@ const run = (cls: (typeof CLASSES)[number]['id'], change?: (b: ReturnType<typeof
 
 describe('the tabletop', () => {
   it('rises to the lip, stays flat on top, and comes back down to the ground', () => {
-    const p = buildProfile('graded', 100, new Rng(1))
+    const p = buildProfile('graded', RIG.pieces[0]!.length, new Rng(1))
     const before = p.left.slice()
     stampTable(p, JUMP)
     const m = tableMarks(JUMP)

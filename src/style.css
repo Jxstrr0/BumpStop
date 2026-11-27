@@ -1450,6 +1450,7 @@ body:has(.tab-page:not([hidden]) .live.full) { overflow: hidden; }
 .jump-row p { margin: 0; }
 .jump-row-what { margin-top: 4px !important; }
 .jump-row-vs { margin-top: 4px !important; color: var(--muted); }
+.jump-watch { margin-top: 6px; }
 .jump-compare { font-weight: 600; }
 
 /* ── Truck, X-ray or Both (v1.27.0.0) ──

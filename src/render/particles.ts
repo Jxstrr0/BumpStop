@@ -79,6 +79,12 @@ export class Puffs {
     this.puffs.push({ ...p, age: 0 })
   }
 
+  /** Move every puff along the road by `dx` metres (a streamed lap going round to its start). */
+  shift(dx: number): void {
+    for (const p of this.puffs) p.x += dx
+    this.update(0)
+  }
+
   clear(): void {
     this.puffs = []
     this.update(0)
