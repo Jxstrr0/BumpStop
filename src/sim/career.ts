@@ -38,7 +38,7 @@ import { DRIVER_IDS, DRIVERS, JOBS, RAID, RAIDS, type DriverId, type PaceId, typ
 import type { StringKey } from '../data/strings'
 import { UNDER_PARTS } from '../data/underside'
 import {
-  changeCost, checkBuild, massAndCost, partIn, partsFor, stockBuild, tidyBuild, type BuildProblem, type BuildRules,
+  changeCost, checkBuild, massAndCost, partIn, partOnSale, partsFor, stockBuild, tidyBuild, type BuildProblem, type BuildRules,
 } from './build'
 import {
   bivouacJobs, checkJobs, doJobs, driveStage, enterRaid, finishStage, harshShare, raidTruck, stageKm, stageLegs, standings,
@@ -453,7 +453,7 @@ export function fitOwn(c: CareerState, b: TruckBuild): number {
   if (!c.own) throw new Error('No truck yet')
   if (c.job?.kind === 'own') throw new Error("The parts are locked during a raid")
   const cost = changeCost(c.own, b, CAREER.resale, discountOf(c))
-  for (const slot of SLOTS) if (partIn(b, slot).year > c.year) throw new Error(`The ${slot} part isn't out yet`)
+  for (const slot of SLOTS) if (!partOnSale(partIn(b, slot), c.year)) throw new Error(`The ${slot} part isn't out yet`)
   if (cost > 0 && cost > c.money) throw new Error('Not enough money for those parts')
   c.money -= cost
   logParts(c, c.own, b)
@@ -467,7 +467,7 @@ export function cheapestBuild(b: TruckBuild, year: number): TruckBuild {
   let out = structuredClone(b)
   for (const slot of SLOTS) {
     const cheaper = partsFor(b.cls, slot)
-      .filter((p) => p.year <= year)
+      .filter((p) => partOnSale(p, year))
       .sort((a, z) => (a.cost[b.cls] as number) - (z.cost[b.cls] as number))
     for (const p of cheaper) {
       if (p.id === out.parts[slot]) break

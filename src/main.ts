@@ -17,6 +17,7 @@ import './style.css'
 import { t } from './data/strings'
 import { buildPanel } from './ui/buildScreen'
 import { careerPanel } from './ui/career'
+import { applyDev, devPanel } from './ui/devMode'
 import { el, reveal } from './ui/dom'
 import { openGarage, type Garage } from './ui/garage'
 import { helpPanel } from './ui/help'
@@ -80,7 +81,7 @@ function gameScreen(app: HTMLElement, garage: Garage): void {
     build: [buildPanel(store, help.showTerm)],
     test: [shopPanel(store, garage.shop)],
     raid: [raidPanel(store, garage.raid, career.raid)],
-    more: [help.element, savesPanel(garage), settingsPanel(), roadbookStrip(), el('p', 'note', t('preview.note'))],
+    more: [help.element, savesPanel(garage), settingsPanel(), devPanel(), roadbookStrip(), el('p', 'note', t('preview.note'))],
   })
   app.append(footer(), tabs.bar)
 }
@@ -90,6 +91,8 @@ async function boot(): Promise<void> {
     const app = document.getElementById('app')
     if (!app) throw new Error('No #app element')
     loading.progress(0.4)
+    // Dev mode's switches (More tab) go in before the garage opens and the screens draw.
+    applyDev()
     const garage = await openGarage()
     loading.progress(0.6)
     gameScreen(app, garage)

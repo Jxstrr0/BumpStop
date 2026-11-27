@@ -11,7 +11,7 @@
 import type { FixTarget } from '../data/failures'
 import type { AxleSettings, TruckBuild } from '../data/kit'
 import type { DamperPart, SlotId } from '../data/parts'
-import { partIn, partsFor } from '../sim/build'
+import { partIn, partOnSale, partsFor } from '../sim/build'
 import { reveal } from './dom'
 
 export type End = 'front' | 'rear'
@@ -74,7 +74,7 @@ export function fixJump(target: FixTarget, end: End, b: TruckBuild): Jump | null
 
 /** The dampers this class can buy by `year`. */
 function dampersOnSale(b: TruckBuild, year: number): DamperPart[] {
-  return partsFor(b.cls, 'dampers').filter((p): p is DamperPart => p.slot === 'dampers' && p.year <= year)
+  return partsFor(b.cls, 'dampers').filter((p): p is DamperPart => p.slot === 'dampers' && partOnSale(p, year))
 }
 
 /**
@@ -108,7 +108,7 @@ export function fixUseful(target: FixTarget, end: End, b: TruckBuild, year: numb
       return !fitted.spool && dampersOnSale(b, year).some((p) => p.spool !== undefined)
     case 'lighterWheels': {
       const wheels = partIn(b, 'wheels')
-      return partsFor(b.cls, 'wheels').some((p) => p.year <= year && (p.mass[b.cls] ?? Infinity) < (wheels.mass[b.cls] ?? 0))
+      return partsFor(b.cls, 'wheels').some((p) => partOnSale(p, year) && (p.mass[b.cls] ?? Infinity) < (wheels.mass[b.cls] ?? 0))
     }
     default:
       return true
