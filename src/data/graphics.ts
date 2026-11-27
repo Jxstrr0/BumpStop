@@ -45,12 +45,18 @@ export interface TierSettings {
    * keeps the model it has; the next truck loaded follows the tier.
    */
   liteModels: boolean
+  /**
+   * Damage you can see in full: stone chips, dents that catch the light and
+   * a finer mud pattern. Off, the grime is a simpler version (one layer of
+   * pattern, dents as scraped paint only).
+   */
+  grimeDetail: boolean
 }
 
 export const TIERS: Record<TierId, TierSettings> = {
-  lite: { pixelRatioCap: 1, maxPixels: 1_500_000, antialias: false, shadows: false, shadowMap: 512, shadowBlur: 1, cover: 0.3, dust: 0.4, roadStep: 0.15, liteModels: true },
-  full: { pixelRatioCap: 2, maxPixels: 2_500_000, antialias: true, shadows: true, shadowMap: 1024, shadowBlur: 1, cover: 0.85, dust: 1, roadStep: 0.1, liteModels: false },
-  ultra: { pixelRatioCap: 3, maxPixels: 4_500_000, antialias: true, shadows: true, shadowMap: 2048, shadowBlur: 3, cover: 1.3, dust: 1.4, roadStep: 0.07, liteModels: false },
+  lite: { pixelRatioCap: 1, maxPixels: 1_500_000, antialias: false, shadows: false, shadowMap: 512, shadowBlur: 1, cover: 0.3, dust: 0.4, roadStep: 0.15, liteModels: true, grimeDetail: false },
+  full: { pixelRatioCap: 2, maxPixels: 2_500_000, antialias: true, shadows: true, shadowMap: 1024, shadowBlur: 1, cover: 0.85, dust: 1, roadStep: 0.1, liteModels: false, grimeDetail: true },
+  ultra: { pixelRatioCap: 3, maxPixels: 4_500_000, antialias: true, shadows: true, shadowMap: 2048, shadowBlur: 3, cover: 1.3, dust: 1.4, roadStep: 0.07, liteModels: false, grimeDetail: true },
 }
 
 /** Auto's frame-rate watcher (see TierGovernor in src/render/tiers.ts). */

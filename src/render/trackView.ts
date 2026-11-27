@@ -30,6 +30,7 @@ import { PHOTO_LIFT, TRACK_CAMERA } from '../data/graphics'
 import { LAND, LAND_COLOUR, SHAKER_FLOOR, SKY } from '../data/scenery'
 import type { FailureKind } from '../data/wear'
 import { WEATHER_LOOK, type WeatherId } from '../data/weather'
+import type { Grime } from '../sim/grime'
 import type { Profile } from '../sim/ground'
 import type { Pose } from '../sim/poses'
 import { GHOST_LOOK } from '../data/rigs'
@@ -75,6 +76,8 @@ export interface RunSetup {
   ghost?: { stance: Stance; parts: FittedParts } | null
   /** The road is a rig's loop, driven lap after lap: it gets a start line, and the same scenery every lap. */
   loop?: boolean
+  /** Mud, dust, snow and dents to show on the truck (a raid's); left out for a clean truck. */
+  grime?: Grime | null
 }
 
 /** Photo mode's camera and moment (plan PR 12). */
@@ -104,6 +107,8 @@ export interface TrackView {
   photoEnd(): void
   /** The sky for a raid's weather (the fog closes in and changes colour); 'clear' for a clear day. */
   setWeather(kind: WeatherId | 'clear'): void
+  /** The truck's mud, dust, snow and dents as the raid goes on (`src/sim/grime.ts`); null for a clean truck. */
+  setGrime(g: Grime | null): void
   /** The view as it stands, drawn with its longer side `longSide` pixels and copied onto a plain canvas. */
   snapshot(longSide: number): HTMLCanvasElement | null
   dispose(): void
@@ -646,6 +651,9 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       weather = kind
       look()
     },
+    setGrime(g) {
+      truck?.setGrime(g)
+    },
     async setRun(next) {
       const mine = ++ticket
       // The scenery kit too. If it can't be fetched the truck still drives, on bare land.
@@ -689,6 +697,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       truck.stance = next.stance
       truck.fit(next.parts)
       truck.breakCorner(null)
+      truck.setGrime(next.grime ?? null)
       clip = []
       ghostClip = []
       dust.clear()

@@ -13,6 +13,7 @@
 import { t, tf, type StringKey } from '../data/strings'
 import type { WeatherId } from '../data/weather'
 import type { BuiltTruck } from '../sim/build'
+import type { Grime } from '../sim/grime'
 import type { Clip } from '../sim/highlight'
 import type { Pose } from '../sim/poses'
 import type { TrackView } from '../render/trackView'
@@ -27,8 +28,12 @@ export interface RaidView {
   element: HTMLElement
   /** Get ready for a leg's clips (loads the truck and lays their road). */
   setLeg(truck: BuiltTruck, clips: readonly Clip[]): Promise<void>
-  /** Play clip `i` of the leg: true speed, or slow motion closing in on a break; `weather` sets the sky if it had turned there. */
-  show(i: number, weather?: WeatherId | null): void
+  /**
+   * Play clip `i` of the leg: true speed, or slow motion closing in on a
+   * break; `weather` sets the sky if it had turned there, and `grime` is how
+   * muddy and dented the truck is by then (`src/sim/grime.ts`).
+   */
+  show(i: number, weather?: WeatherId | null, grime?: Grime | null): void
   stop(): void
   /** False once the phone turned out not to do WebGL. */
   works(): boolean
@@ -90,11 +95,12 @@ export function raidView(onFail: () => void = () => {}): RaidView {
         fail(err)
       }
     },
-    show(i, weather) {
+    show(i, weather, grime) {
       const c = clips[i]
       const p = poses[i]
       if (!view || !ready || !c || !p || p.length < 2) return
       view.setWeather(weather ?? 'clear')
+      view.setGrime(grime ?? null)
       const b = c.broken
       if (b) {
         const what = t(`fail.${b.kind}` as StringKey).toLowerCase()
