@@ -12,6 +12,10 @@
  * Each suspension layout's own shock mounts (`MountTop_FL_wishbone`) must
  * hold the shock at exactly the stock length at rest, so one set of shocks
  * fits every layout, and every arm needs the end on the hub it points at.
+ *
+ * Every class has two files: the full model and a lighter one for the Lite
+ * graphics tier (`truck-<class>-lite.glb.gz`). Every check runs on both, and
+ * the two must have exactly the same node names, so the game can move either.
  */
 import { readFileSync, statSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
@@ -26,10 +30,23 @@ interface GltfNode {
   rotation?: [number, number, number, number]
   scale?: [number, number, number]
   children?: number[]
+  /** Index into `meshes`, for a node that draws something. */
+  mesh?: number
+}
+
+interface GltfMesh {
+  name?: string
+  /** Each primitive lists its vertex data by name (POSITION, NORMAL, COLOR_0…). */
+  primitives: { attributes: Record<string, number> }[]
+}
+
+interface Gltf {
+  nodes: GltfNode[]
+  meshes?: GltfMesh[]
 }
 
 /** The JSON part of a zipped .glb file (its first chunk). */
-function gltfJson(path: string): { nodes: GltfNode[] } {
+function gltfJson(path: string): Gltf {
   const buf = gunzipSync(readFileSync(path))
   expect(buf.readUInt32LE(0)).toBe(0x46546c67) // "glTF"
   const length = buf.readUInt32LE(12)
@@ -44,8 +61,31 @@ const NOTHING_TO_SEE = new Set(['noGuards', 'noSpares', 'noBars'])
 /** Slots drawn once per corner. */
 const PER_CORNER: readonly SlotId[] = ['dampers', 'wheels', 'tires']
 
-describe.each(CLASSES.map((c) => c.id))('the %s model', (cls) => {
-  const path = `public/models/truck-${cls}.glb.gz`
+/** The two files each class has, and how big each may be. */
+type Build = 'full' | 'lite'
+
+// Size caps, in KB: the download (zipped) and what the phone holds once it's
+// unzipped. The HD models aren't final, so these are roomy for now.
+const FULL_MAX_ZIPPED_KB = 1000
+const FULL_MAX_UNZIPPED_KB = 4500
+const LITE_MAX_ZIPPED_KB = 600
+const LITE_MAX_UNZIPPED_KB = 2800
+
+const SIZE_CAPS: Record<Build, { zippedKb: number; unzippedKb: number }> = {
+  full: { zippedKb: FULL_MAX_ZIPPED_KB, unzippedKb: FULL_MAX_UNZIPPED_KB },
+  lite: { zippedKb: LITE_MAX_ZIPPED_KB, unzippedKb: LITE_MAX_UNZIPPED_KB },
+}
+
+/** Where a class's model is: `truck-<class>.glb.gz`, or `truck-<class>-lite.glb.gz`. */
+function modelPath(cls: string, build: Build): string {
+  return `public/models/truck-${cls}${build === 'lite' ? '-lite' : ''}.glb.gz`
+}
+
+/** Every class with each of its two files. */
+const MODELS = CLASSES.flatMap((c) => (['full', 'lite'] as const).map((build) => ({ cls: c.id, build })))
+
+describe.each(MODELS)('the $cls model ($build)', ({ cls, build }) => {
+  const path = modelPath(cls, build)
   const json = gltfJson(path)
   const byName = new Map(json.nodes.map((n) => [n.name ?? '', n]))
   const mule = TEST_MULES[cls]
@@ -143,9 +183,38 @@ describe.each(CLASSES.map((c) => c.id))('the %s model', (cls) => {
     }
   })
 
+  it('paints every mesh with vertex colours', () => {
+    // The trucks share one material and get their colours from COLOR_0: a mesh without it would draw plain white.
+    const meshes = json.meshes ?? []
+    expect(meshes.length).toBeGreaterThan(0)
+    const bare: string[] = []
+    meshes.forEach((mesh, m) => {
+      mesh.primitives.forEach((prim, p) => {
+        if (prim.attributes.COLOR_0 === undefined) bare.push(`${mesh.name ?? `mesh ${m}`} (primitive ${p})`)
+      })
+    })
+    expect(bare, 'meshes with no COLOR_0').toEqual([])
+  })
+
   it('stays small enough for a phone', () => {
     // The download (zipped) and what the phone holds once it's unzipped.
-    expect(statSync(path).size).toBeLessThan(300 * 1024)
-    expect(gunzipSync(readFileSync(path)).length).toBeLessThan(1500 * 1024)
+    const cap = SIZE_CAPS[build]
+    expect(statSync(path).size / 1024, 'zipped KB').toBeLessThanOrEqual(cap.zippedKb)
+    expect(gunzipSync(readFileSync(path)).length / 1024, 'unzipped KB').toBeLessThanOrEqual(cap.unzippedKb)
+  })
+})
+
+describe.each(CLASSES.map((c) => c.id))('the %s lite model', (cls) => {
+  it('has exactly the same node names as the full model', () => {
+    // The game finds every part by name, so a node in one file and not the other is a part that goes missing on one tier.
+    const names = (build: Build) => gltfJson(modelPath(cls, build)).nodes.map((n) => n.name ?? '').sort()
+    const full = names('full')
+    const lite = names('lite')
+    const inLite = new Set(lite)
+    const inFull = new Set(full)
+    expect(full.filter((n) => !inLite.has(n)), 'in the full model only').toEqual([])
+    expect(lite.filter((n) => !inFull.has(n)), 'in the lite model only').toEqual([])
+    // The same count of each name too (a set alone would miss a doubled node).
+    expect(lite).toEqual(full)
   })
 })

@@ -22,17 +22,30 @@ export function cacheName(hash: string): string {
 }
 
 /**
+ * The full-detail truck models (`models/truck-<class>.glb.gz`, not the
+ * `-lite` ones). They're the biggest files in the game, and a phone on the
+ * Lite graphics tier never draws them, so they aren't fetched up front: the
+ * worker keeps each one the first time the game loads it instead.
+ */
+export function isFullTruckModel(path: string): boolean {
+  return /(^|\/)models\/truck-[a-z0-9]+\.glb\.gz$/.test(path)
+}
+
+/**
  * The files to fetch when the worker installs, from every path in dist/
- * (forward slashes, relative). Everything the game needs is small (the three
- * zipped trucks and the scenery are about 940 KB together), so it all goes in up front,
- * models included: a truck you've never looked at still shows with no
- * signal. Left out: the worker itself, the CNAME file, source maps and the
- * older `.woff` fonts (every phone that runs the game reads `.woff2`).
+ * (forward slashes, relative). Nearly everything goes in up front, the
+ * scenery and the lite truck models included (about 1.6 MB of models), so a
+ * truck you've never looked at still shows with no signal: in lite detail
+ * until its full model has been seen once online (`loadScene` in
+ * src/render/truckModel.ts falls back to it). Left out: the full truck
+ * models (see above), the worker itself, the CNAME file, source maps and
+ * the older `.woff` fonts (every phone that runs the game reads `.woff2`).
  */
 export function precacheList(paths: readonly string[]): string[] {
   return paths
     .filter((p) => p !== 'sw.js' && p !== 'CNAME')
     .filter((p) => !p.endsWith('.map') && !p.endsWith('.woff'))
+    .filter((p) => !isFullTruckModel(p))
     .slice()
     .sort()
 }

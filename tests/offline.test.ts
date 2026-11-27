@@ -1,7 +1,7 @@
 // Offline play (plan PR 12): what the worker keeps, and that it only ever deletes this game's caches.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { CACHE_PREFIX, cacheName, precacheList, staleCaches } from '../src/pwa/precache'
+import { CACHE_PREFIX, cacheName, isFullTruckModel, precacheList, staleCaches } from '../src/pwa/precache'
 
 describe('offline cache', () => {
   it('names every cache with the bumpstop- prefix', () => {
@@ -9,7 +9,7 @@ describe('offline cache', () => {
     expect(cacheName('0123456789abcdef')).toBe('bumpstop-0123456789')
   })
 
-  it('keeps the game and the trucks, and leaves out the worker, CNAME, maps and old fonts', () => {
+  it('keeps the game and the lite trucks, and leaves out the full trucks, the worker, CNAME, maps and old fonts', () => {
     const list = precacheList([
       'index.html',
       'sw.js',
@@ -19,6 +19,8 @@ describe('offline cache', () => {
       'assets/font-400.woff',
       'assets/font-400.woff2',
       'models/truck-heavy.glb.gz',
+      'models/truck-heavy-lite.glb.gz',
+      'models/scenery.glb.gz',
       'brand/longlight-logo-dark.svg',
     ])
     expect(list).toEqual([
@@ -26,8 +28,14 @@ describe('offline cache', () => {
       'assets/index-abc.js',
       'brand/longlight-logo-dark.svg',
       'index.html',
-      'models/truck-heavy.glb.gz',
+      'models/scenery.glb.gz',
+      'models/truck-heavy-lite.glb.gz',
     ])
+    // The full models are kept the first time the game loads them instead (src/pwa/sw.js).
+    expect(isFullTruckModel('models/truck-heavy.glb.gz')).toBe(true)
+    expect(isFullTruckModel('models/truck-light4x4.glb.gz')).toBe(true)
+    expect(isFullTruckModel('models/truck-light4x4-lite.glb.gz')).toBe(false)
+    expect(isFullTruckModel('models/scenery.glb.gz')).toBe(false)
   })
 
   it("deletes only this game's old caches, never another game's", () => {

@@ -1,9 +1,11 @@
 /**
  * The Blender-made trucks (plan PR 5), loaded and moved.
  *
- * `scripts/blender/make-trucks.py` builds one model per class with every
- * moving part as its own named node (the list is at the top of that
- * script). This file loads a model and poses it from the ride sim's numbers:
+ * `scripts/blender/make-trucks.py` builds two models per class (the full one,
+ * and a lighter one for the Lite graphics tier) with every moving part as
+ * its own named node (the list is at the top of that script). This file
+ * loads the one the tier in play asks for and poses it from the ride sim's
+ * numbers:
  *
  * - the body bounces, pitches and rolls,
  * - each wheel rides up and down on its own and spins with the distance,
@@ -36,6 +38,8 @@ import type { ClassId } from '../data/classes'
 import { KITS } from '../data/kit'
 import type { SlotId } from '../data/parts'
 import { loadGlb } from './glb'
+import { truckReflections } from './look'
+import { tierSettings } from './tiers'
 
 const CORNERS = ['FL', 'FR', 'RL', 'RR'] as const
 
@@ -99,18 +103,51 @@ function shown(o: THREE.Object3D): boolean {
 /** The part in each slot, as a build lists them (`TruckBuild.parts`). */
 export type FittedParts = Readonly<Partial<Record<SlotId, string>>>
 
-const cache = new Map<ClassId, Promise<THREE.Group>>()
+/** One entry per model file, so a class's full and lite models can both be loaded in one visit. */
+const cache = new Map<string, Promise<THREE.Group>>()
 
-/** Load a class's model once; each call after that gets a fresh copy to pose. */
-async function loadScene(cls: ClassId): Promise<THREE.Group> {
-  let p = cache.get(cls)
+/**
+ * The model file for a class at the graphics tier in play: the lighter
+ * `truck-<class>-lite` on a tier with `liteModels` (src/data/graphics.ts),
+ * the full `truck-<class>` otherwise. Both have the same parts and node names.
+ */
+function modelFile(cls: ClassId): string {
+  return tierSettings().liteModels ? `truck-${cls}-lite` : `truck-${cls}`
+}
+
+/** Load one model file, once; a failed load (offline, say) doesn't stick. */
+function loadFile(file: string): Promise<THREE.Group> {
+  let p = cache.get(file)
   if (!p) {
-    p = loadGlb(`truck-${cls}`)
-    cache.set(cls, p)
-    // A failed load (offline, say) shouldn't stick: try again next time.
-    p.catch(() => cache.delete(cls))
+    p = loadGlb(file).then((scene) => {
+      // Paint and metal need the world to mirror; the copies share these materials.
+      truckReflections(scene)
+      return scene
+    })
+    cache.set(file, p)
+    p.catch(() => cache.delete(file))
   }
-  return (await p).clone(true)
+  return p
+}
+
+/**
+ * Load a class's model once per file; each call after that gets a fresh copy
+ * to pose. The tier is read when a truck is loaded: a truck already on
+ * screen keeps its model if the tier changes, and the next one loaded gets
+ * the new tier's file.
+ *
+ * The offline copy always holds the lite models, and a full one only once
+ * it's been seen (src/pwa/precache.ts). So if the full model can't be
+ * fetched, the lite one stands in rather than showing no truck.
+ */
+async function loadScene(cls: ClassId): Promise<THREE.Group> {
+  const file = modelFile(cls)
+  const lite = `truck-${cls}-lite`
+  const scene = await loadFile(file).catch((err: unknown) => {
+    if (file === lite) throw err
+    return loadFile(lite)
+  })
+  return scene.clone(true)
 }
 
 const DOWN = new THREE.Vector3(0, -1, 0)
@@ -337,6 +374,16 @@ export class TruckModel {
         c.depthTest = false
         const coloured = c as THREE.Material & { color?: THREE.Color }
         if (coloured.color instanceof THREE.Color) coloured.color.lerp(tint, mix)
+        // The real truck's colours and finishes are painted on its meshes. A
+        // ghost is one flat colour all over, so its copy ignores the paint.
+        c.vertexColors = false
+        if (c instanceof THREE.MeshStandardMaterial) {
+          c.metalnessMap = null
+          c.roughnessMap = null
+          c.metalness = 0
+          c.roughness = 0.6
+          c.envMap = null
+        }
         made.set(m, c)
         this.owned.push(c)
       }
