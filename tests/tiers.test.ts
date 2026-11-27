@@ -28,6 +28,12 @@ describe('graphics tiers', () => {
     expect(TIERS.full.shadows).toBe(true)
   })
 
+  it('only Lite loads the lighter truck models', () => {
+    expect(TIERS.lite.liteModels).toBe(true)
+    expect(TIERS.full.liteModels).toBe(false)
+    expect(TIERS.ultra.liteModels).toBe(false)
+  })
+
   it('guesses Full on phones, Lite with little memory, Ultra on a big computer', () => {
     expect(guessTier(true, 8, 8)).toBe('full')
     expect(guessTier(true, 8, 2)).toBe('lite')

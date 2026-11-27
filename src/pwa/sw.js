@@ -10,7 +10,9 @@
  * - Activate: delete this game's old caches. Only names that start
  *   `bumpstop-` are touched; other Longlight games can share the origin.
  * - Fetch: the page itself and every built file come from the cache, so the
- *   game opens with no signal. Anything else goes to the network untouched.
+ *   game opens with no signal. The full-detail truck models are added to
+ *   the cache as the game loads them. Anything else goes to the network
+ *   untouched.
  *
  * Adapted from Laminar src/pwa/sw.js (26 November 2026).
  */
@@ -60,10 +62,19 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // The full-detail truck models aren't in the install list (a phone on the
+  // Lite tier never needs them): keep each one the first time it's loaded.
+  const keep = /\/models\/truck-[a-z0-9]+\.glb\.gz$/.test(new URL(req.url).pathname)
   event.respondWith(
-    caches
-      .open(CACHE)
-      .then((cache) => cache.match(req, MATCH))
-      .then((hit) => hit || fetch(req)),
+    caches.open(CACHE).then((cache) =>
+      cache.match(req, MATCH).then(
+        (hit) =>
+          hit ||
+          fetch(req).then((res) => {
+            if (keep && res.ok) cache.put(req, res.clone()).catch(() => {})
+            return res
+          }),
+      ),
+    ),
   )
 })

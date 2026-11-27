@@ -4,10 +4,11 @@
  * from here. `src/render/tiers.ts` picks the tier and steps it down on a
  * slow phone.
  *
- * Full is how the game has always looked. The trucks are 35,000 to 50,000
- * triangles each since the Blender pass (PR 5c), so the biggest saving on a
- * slow phone is not drawing them twice: Lite turns the sun's shadow off,
- * which skips the whole shadow pass, and draws at one pixel per CSS pixel.
+ * Full is how the game is meant to look. Since the HD pass a stock truck
+ * shows 50,000 to 65,000 triangles (the lite models about 30,000), so the
+ * biggest savings on a slow phone are not drawing it twice and drawing
+ * less of it: Lite turns the sun's shadow off, which skips the whole shadow
+ * pass, loads the lite truck models, and draws at one pixel per CSS pixel.
  */
 
 export type TierId = 'lite' | 'full' | 'ultra'
@@ -33,12 +34,18 @@ export interface TierSettings {
   dust: number
   /** Metres between rows of the road strip (finer shows small washboard better). */
   roadStep: number
+  /**
+   * Load the lighter truck models (`truck-<class>-lite.glb.gz`: the same parts
+   * with fewer triangles) in place of the full ones. A truck already on screen
+   * keeps the model it has; the next truck loaded follows the tier.
+   */
+  liteModels: boolean
 }
 
 export const TIERS: Record<TierId, TierSettings> = {
-  lite: { pixelRatioCap: 1, antialias: false, shadows: false, shadowMap: 512, shadowBlur: 1, cover: 0.3, dust: 0.4, roadStep: 0.15 },
-  full: { pixelRatioCap: 2, antialias: true, shadows: true, shadowMap: 1024, shadowBlur: 1, cover: 0.85, dust: 1, roadStep: 0.1 },
-  ultra: { pixelRatioCap: 3, antialias: true, shadows: true, shadowMap: 2048, shadowBlur: 3, cover: 1.3, dust: 1.4, roadStep: 0.07 },
+  lite: { pixelRatioCap: 1, antialias: false, shadows: false, shadowMap: 512, shadowBlur: 1, cover: 0.3, dust: 0.4, roadStep: 0.15, liteModels: true },
+  full: { pixelRatioCap: 2, antialias: true, shadows: true, shadowMap: 1024, shadowBlur: 1, cover: 0.85, dust: 1, roadStep: 0.1, liteModels: false },
+  ultra: { pixelRatioCap: 3, antialias: true, shadows: true, shadowMap: 2048, shadowBlur: 3, cover: 1.3, dust: 1.4, roadStep: 0.07, liteModels: false },
 }
 
 /** Auto's frame-rate watcher (see TierGovernor in src/render/tiers.ts). */
