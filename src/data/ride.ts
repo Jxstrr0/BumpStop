@@ -196,6 +196,12 @@ export interface RideSetup {
   cgToRear: number
   /** Distance between left and right wheels (m). */
   track: number
+  /**
+   * How far left of the centre line the centre of mass sits (m): a load
+   * off to one side (weight and balance, `src/data/load.ts`). Missing is 0,
+   * square in the middle.
+   */
+  cgLeft?: number
   front: AxleSetup
   rear: AxleSetup
 }

@@ -17,6 +17,7 @@ export interface GlossaryEntry {
 
 export const GLOSSARY = [
   { id: 'antiRoll' },
+  { id: 'balance' },
   { id: 'beadlock', see: 'beadlocks' },
   { id: 'bivouac' },
   { id: 'bottoming', see: 'bumpStops' },

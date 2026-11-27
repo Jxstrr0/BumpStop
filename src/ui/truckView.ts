@@ -26,10 +26,13 @@ function stockOf(cls: ClassId): BuiltTruck {
   return s
 }
 
-/** How much higher (+) or lower (−) each end sits than the stock build (m). */
-export function stanceOf(truck: BuiltTruck): { front: number; rear: number } {
+/**
+ * How much higher (+) or lower (−) each end sits than the stock build (m),
+ * and how far the load leans it (rad, weight and balance).
+ */
+export function stanceOf(truck: BuiltTruck): { front: number; rear: number; roll: number } {
   const stock = stockOf(truck.build.cls)
-  return { front: stock.front.sag - truck.front.sag, rear: stock.rear.sag - truck.rear.sag }
+  return { front: stock.front.sag - truck.front.sag, rear: stock.rear.sag - truck.rear.sag, roll: truck.balance.roll }
 }
 
 /** Millimetres with their sign: +12, −5 or ±0. */

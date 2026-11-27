@@ -289,7 +289,7 @@ them, plus room for the camera. If something broke in the sample, the clip
 is the last 3.5 seconds before the break. Recording never changes a result;
 a test checks it.
 
-Since the radio co-driver (v1.21.0.0) a clip starts up to two seconds
+Since the radio co-driver (v1.23.0.0) a clip starts up to two seconds
 before its busiest stretch (`CLIP.lead`), still five seconds long, so the
 truck is seen coming up to the jump and the co-driver has time to call it
 (`docs/SOUND.md`, "The radio co-driver").
