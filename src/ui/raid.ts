@@ -33,6 +33,9 @@ import type { WeatherId } from '../data/weather'
 import type { WearState } from '../sim/wear'
 import { UNDER_PARTS } from '../data/underside'
 import { guardShare, leakPerKm, stageOutlook } from '../sim/underside'
+import { FUEL_STOP } from '../data/load'
+import { fuelRangeKm, fuelStops } from '../sim/load'
+import { fuelWords } from './loadBlock'
 import type { BuiltTruck } from '../sim/build'
 import type { Raid } from '../data/raids'
 import { checkBuild, partIn } from '../sim/build'
@@ -423,6 +426,9 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     return list
   }
 
+  /** The morning screen's fuel line, kept up to date with the Tune screen (a no-op on other screens). */
+  let refreshFuel = (): void => {}
+
   function morningScreen(): void {
     stopTimers()
     saveRaid()
@@ -434,6 +440,18 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     const head = el('h3', 'raid-day', `${tf('raidUi.day', { n: String(s.stage + 1), total: String(raid.stages.length) })} · ${t(spec.tag)}`)
     const par = parTime(cls, spec.segments.map((x) => ({ ground: x.ground, length: x.km * 1000 })))
     const facts = el('p', 'readout-line', tf('raidUi.stageFacts', { km: num(stageKm(spec)), air: num(spec.airC), par: clock(par) }))
+    // Fuel (weight and balance): how far the tank goes, and the stops that costs today. Set in Tune's Load section,
+    // so the line follows a retune made while this screen waits.
+    const fuelLine = el('p')
+    refreshFuel = () => {
+      const fuel = raidTruck(s, store.build()).load.fuel
+      const stops = fuelStops(cls, fuel, stageKm(spec) * 1000)
+      fuelLine.className = stops > 0 ? 'small warm-text' : 'small'
+      fuelLine.textContent = tf(stops === 0 ? 'raidUi.fuelNone' : stops === 1 ? 'raidUi.fuelOne' : 'raidUi.fuelMany', {
+        fuel: fuelWords(fuel), km: num(fuelRangeKm(cls, fuel)), n: String(stops), min: num(FUEL_STOP / 60),
+      })
+    }
+    refreshFuel()
     // Underside hits: how many rocks today's stage should get past the guards, on the truck as it stands (sagged springs sit lower).
     const rocks = el('p', 'small')
     const standing = wornTruck(truck, s.cond)
@@ -535,7 +553,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       stageScreen()
     })
     show(
-      head, facts, rocks,
+      head, facts, fuelLine, rocks,
       el('h4', 'raid-sub', t('raidUi.roadbook')), book, weatherBox, iceBox,
       el('h4', 'raid-sub', t('raidUi.condition')), conditionList(s),
       el('p', 'small', tf('raidUi.sparesLine', { list: sparesList(s.spares) })), settings,
@@ -870,6 +888,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       lines.append(el('p', 'small cool-text', upFirst(took === 1 ? tf('raidUi.guardHit', { guards }) : tf('raidUi.guardHits', { guards, n: String(took) }))))
     }
     if ((rec.leak ?? 0) >= 1) lines.append(el('p', 'small warm-text', tf('raidUi.leakLine', { lost: gap(rec.leak ?? 0).slice(1) })))
+    if ((rec.fuelStops ?? 0) > 0) lines.append(el('p', 'small', tf('raidUi.fuelLine', { n: String(rec.fuelStops), lost: gap(rec.fuel ?? 0).slice(1) })))
     if (rec.stops.some((st) => isUnderPart(st.kind as Job['part']))) {
       const jump = button(t('raidUi.toProtection'), 'btn small-btn')
       jump.addEventListener('click', () => jumpTo({ kind: 'slot', slot: 'protection' }))
@@ -1001,6 +1020,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
   // A new class or part on the build screen changes what the entry screen shows.
   store.onChange(() => {
     if (!state) entryScreen()
+    else if (state.phase === 'morning' && !run) refreshFuel()
   })
 
   career?.register((next) => {

@@ -66,6 +66,8 @@ export const REST_POSE: TruckPose = { z: 0, pitch: 0, roll: 0, wheelZ: [0, 0, 0,
 export interface Stance {
   front: number
   rear: number
+  /** How far the load leans the body at rest (rad, + is left side up; weight and balance). Missing is level. */
+  roll?: number
 }
 
 /** A pair of shock mounts: the plain ones, or one suspension layout's own. */
@@ -288,7 +290,7 @@ export class TruckModel {
     const lift = (front * b + rear * a) / (a + b)
     const tilt = (front - rear) / (a + b)
     this.body.position.y = p.z + lift
-    this.body.rotation.set(p.roll, 0, p.pitch + tilt, 'ZXY')
+    this.body.rotation.set(p.roll + (this.stance.roll ?? 0), 0, p.pitch + tilt, 'ZXY')
 
     for (let i = 0; i < 4; i++) {
       const hub = this.hubs[i]!

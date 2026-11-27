@@ -18,6 +18,7 @@
  * wheel has moved up towards the body from ride height (negative = droop).
  * Positions are measured from where the truck sits at rest on flat ground.
  */
+import { LEAN } from '../data/load'
 import { DAMPER_OIL, SIM, type AxleSetup, type BypassZones, type DamperSetup, type PositionDamping, type RideSetup } from '../data/ride'
 import { detExp } from './det'
 import { heightAt, type Profile } from './ground'
@@ -70,6 +71,19 @@ export interface RideParams {
   staticCompression: number[]
   /** Tire squash at rest (m). */
   staticTire: number[]
+  /**
+   * Each corner's bump and droop travel from its own ride height (m). Both
+   * corners of an axle match unless the load leans the truck (`cgLeft`):
+   * then the low side has less bump travel and more droop.
+   */
+  bumpTravel: number[]
+  droopTravel: number[]
+  /**
+   * The anti-roll bar's twist at rest (m of left-minus-right travel): a
+   * leaning truck sits with its bars already wound up a little, holding
+   * part of the lean. 0 on a truck loaded evenly.
+   */
+  barRest: number[]
   /** Where the bump stop starts, as compression (m). */
   bumpStopStart: number[]
   /** The bump stop's extra stiffness that grows with squash (N/m²). */
@@ -134,21 +148,37 @@ export function rideParams(setup: RideSetup): RideParams {
   const a = setup.cgToFront
   const b = setup.cgToRear
   const w = setup.track / 2
+  const y = setup.cgLeft ?? 0
   const axle = [setup.front, setup.front, setup.rear, setup.rear]
   // Each front corner carries the body's weight times b / (a + b), split two ways; the rear the rest.
-  const cornerLoad = [0, 1, 2, 3].map((i) => (setup.sprungMass * G * (i < 2 ? b : a)) / (a + b) / 2)
+  const axleCorner = [0, 1, 2, 3].map((i) => (setup.sprungMass * G * (i < 2 ? b : a)) / (a + b) / 2)
+  // A centre of mass off to the left puts more on the left wheels: each axle's share leans by y / w.
+  const lean = axleCorner.map((f, i) => (i % 2 === 0 ? 1 : -1) * ((f * y) / w))
+  const cornerLoad = axleCorner.map((f, i) => f + (lean[i] as number))
+  // The springs and the anti-roll bar share the lean between them: the bar takes k_bar·twist each side.
+  const twist = axle.map((ax, i) => (2 * (lean[i] as number)) / (ax.springRate + 2 * ax.antiRollRate))
+  // (A level truck keeps its travel exactly as set.)
+  const lift = (base: number, i: number, sign: number) => {
+    const d = twist[i] as number
+    return d === 0 ? base : Math.max(LEAN.minTravel, base + (sign * d) / 2)
+  }
+  const bumpTravel = axle.map((ax, i) => lift(ax.bumpTravel, i, -1))
+  const droopTravel = axle.map((ax, i) => lift(ax.droopTravel, i, 1))
   return {
     setup,
     sprungMass: setup.sprungMass,
     pitchInertia: setup.pitchInertia,
     rollInertia: setup.rollInertia,
     cornerX: [a, a, -b, -b],
-    cornerY: [w, -w, w, -w],
+    cornerY: [w - y, -w - y, w - y, -w - y],
     axle,
     damper: axle.map((ax) => ax.damper),
-    staticCompression: axle.map((ax, i) => (cornerLoad[i] as number) / ax.springRate),
+    staticCompression: axle.map((ax, i) => ((cornerLoad[i] as number) - ax.antiRollRate * (twist[i] as number)) / ax.springRate),
     staticTire: axle.map((ax, i) => ((cornerLoad[i] as number) + ax.unsprungMass * G) / ax.tireRate),
-    bumpStopStart: axle.map((ax) => ax.bumpTravel - ax.bumpStopLength),
+    bumpTravel,
+    droopTravel,
+    barRest: twist,
+    bumpStopStart: axle.map((ax, i) => (bumpTravel[i] as number) - ax.bumpStopLength),
     bumpStopRise: axle.map((ax) => (ax.bumpStopRate * (ax.bumpStopProgression - 1)) / (2 * ax.bumpStopLength)),
   }
 }
@@ -340,17 +370,19 @@ export function stepRide(
     const dm = p.damper[i] as DamperSetup
     const c = comp[i] as number
     const v = compSpeed[i] as number
+    const bump = p.bumpTravel[i] as number
+    const droop = p.droopTravel[i] as number
 
     // Spring: pushes while it is still compressed at all (a coil can fall loose at full droop).
     const springLen = (p.staticCompression[i] as number) + c
     let load = springLen > 0 ? ax.springRate * springLen : 0
     // Limit strap at full droop pulls the wheel back up.
-    if (c < -ax.droopTravel) load -= ax.limitStrapRate * (-ax.droopTravel - c)
+    if (c < -droop) load -= ax.limitStrapRate * (-droop - c)
     // Bump stop: soft at first touch, stiffer as it squashes.
     const e = c - (p.bumpStopStart[i] as number)
     if (e > 0) load += ax.bumpStopRate * e + (p.bumpStopRise[i] as number) * e * e
     // Hard limit: metal to metal. Bottoming out.
-    const hard = c - ax.bumpTravel
+    const hard = c - bump
     const hardForce = hard > 0 ? ax.hardStopRate * hard : 0
     if (hard > 0) {
       load += hardForce
@@ -363,16 +395,17 @@ export function stepRide(
       // so one hard landing that rattles on the limit counts once.
       s.bottomed[i] = false
     }
-    // Anti-roll bar: resists the left and right wheels on one axle moving differently.
+    // Anti-roll bar: resists the left and right wheels on one axle moving differently
+    // (plus any twist it holds at rest on a leaning truck).
     const other = i % 2 === 0 ? i + 1 : i - 1
-    const bar = ax.antiRollRate * (c - (comp[other] as number))
+    const bar = ax.antiRollRate * (c - (comp[other] as number) + (p.barRest[i] as number))
 
     // Damper: force from shaft speed, scaled by how thin the oil is right now.
     const temp = s.oilTemp[i] as number
     const mult = dampingMultiplier(temp, dm)
     // Spool-valve and bypass dampers also damp by where the wheel is in its travel.
     const damp =
-      damperForce(v, dm) * mult * (dm.position || dm.zones ? positionScale(c, v, dm, ax.bumpTravel, ax.droopTravel) : 1)
+      damperForce(v, dm) * mult * (dm.position || dm.zones ? positionScale(c, v, dm, bump, droop) : 1)
     const power = damp * v // always >= 0: a damper only ever turns motion into heat
 
     const strut = load + bar + damp // pushes the body up and the wheel down
@@ -491,13 +524,14 @@ export function rideEnergy(s: RideState, p: RideParams, profile: Profile): numbe
     e += 0.5 * ax.unsprungMass * wv * wv + ax.unsprungMass * G * (s.wheelZ[i] as number)
     const len = (p.staticCompression[i] as number) + ci
     if (len > 0) e += 0.5 * ax.springRate * len * len
-    if (ci < -ax.droopTravel) e += 0.5 * ax.limitStrapRate * (-ax.droopTravel - ci) * (-ax.droopTravel - ci)
+    const droop = p.droopTravel[i] as number
+    if (ci < -droop) e += 0.5 * ax.limitStrapRate * (-droop - ci) * (-droop - ci)
     const bs = ci - (p.bumpStopStart[i] as number)
     if (bs > 0) e += 0.5 * ax.bumpStopRate * bs * bs + ((p.bumpStopRise[i] as number) * bs * bs * bs) / 3
-    const hard = ci - ax.bumpTravel
+    const hard = ci - (p.bumpTravel[i] as number)
     if (hard > 0) e += 0.5 * ax.hardStopRate * hard * hard
     if (i % 2 === 0) {
-      const diff = ci - (c[i + 1] as number)
+      const diff = ci - (c[i + 1] as number) + (p.barRest[i] as number)
       e += 0.5 * ax.antiRollRate * diff * diff
     }
     const road = roadUnder(profile, i, s.x + (p.cornerX[i] as number), ax.footprint)
