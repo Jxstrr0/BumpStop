@@ -42,5 +42,7 @@ export const SLOT_INFO: Readonly<Record<SlotId, InfoNote>> = {
   tires: { text: 'info.slot.tires', term: 'studs' },
   protection: { text: 'info.slot.protection' },
   engine: { text: 'info.slot.engine' },
+  lightBar: { text: 'info.slot.lightBar' },
+  spots: { text: 'info.slot.spots' },
   spares: { text: 'info.slot.spares' },
 }

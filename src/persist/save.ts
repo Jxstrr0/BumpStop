@@ -175,6 +175,11 @@ function readRaid(raw: unknown): RaidState {
       for (const k of ['chance', 'from', 'to', 'at'] as const) finite(w[k], `stage ${n + 1} weather ${k}`)
       if (typeof w.comes !== 'boolean') fail(`stage ${n + 1} weather has no answer`)
     }
+    // A night stage's ruts (missing for daylight stages and in saves from before night stages).
+    if (r.night !== undefined) {
+      const nt = isObj(r.night) ? r.night : fail(`stage ${n + 1} night is not a night`)
+      for (const k of ['dark', 'seen', 'unseen'] as const) finite(nt[k], `stage ${n + 1} night ${k}`)
+    }
   }
   const w = isObj(raw.wear) ? raw.wear : fail('raid wear is missing')
   for (const part of ['bottoming', 'mount', 'axle', 'tire'] as const) {

@@ -43,10 +43,11 @@ import { raidGrime } from '../sim/grime'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
   advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isCondPart, isRestDay, isUnderPart, leaveCheckpoint,
-  partsBudget, partsMoney, parTime, raidOf, raidTruck, raidWeather, stageKm, standings, startStage,
+  nightOutlook, partsBudget, partsMoney, parTime, raidOf, raidTruck, raidWeather, stageKm, standings, startStage,
   type IceNote, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
 } from '../sim/raid'
 import { forecastAt, forecastWord, weatherOn, type StageWeather } from '../sim/weather'
+import { darkAt, darkFrom } from '../sim/night'
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, bandOf, lineChart, type Band, type LineChart } from './charts'
 import { el, num, showTabFor } from './dom'
@@ -468,13 +469,20 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
         kind: weatherName(forecast!.kind, true), word: t(`forecast.${forecastWord(forecast!.chance)}` as StringKey), to: num(forecast!.to / 1000),
       }), 'warm-text')
     }
-    /** The checkpoints and the forecast note that come before km `k`, in order. */
+    // Where it gets dark, if it does: a pencil note too.
+    const darkKm = (() => { const d = darkFrom(spec); return d === null ? null : d / 1000 })()
+    let darkNoted = darkKm === null
+    /** The checkpoints, the forecast note and nightfall that come before km `k`, in order. */
     const marksBefore = (k: number) => {
       for (;;) {
         const cpAt = cp < cps.length && (cps[cp] as number) <= k ? (cps[cp] as number) : Infinity
         const noteAt = !noted && forecast!.from / 1000 < k ? forecast!.from / 1000 : Infinity
-        if (cpAt === Infinity && noteAt === Infinity) return
-        if (noteAt < cpAt) note()
+        const darkAt = !darkNoted && (darkKm as number) < k ? (darkKm as number) : Infinity
+        if (cpAt === Infinity && noteAt === Infinity && darkAt === Infinity) return
+        if (darkAt <= noteAt && darkAt <= cpAt) {
+          darkNoted = true
+          row(Math.round(darkAt), t('raidUi.bookDark'), 'warm-text')
+        } else if (noteAt < cpAt) note()
         else {
           row(cpAt, tf('raidUi.checkpoint', { n: String(cp + 1) }), 'rb-cp')
           cp++
@@ -482,7 +490,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       }
     }
     for (const seg of spec.segments) {
-      marksBefore(km)
+      // Nightfall right at the start of a piece goes before it.
+      marksBefore(km + (darkKm === km ? 1e-6 : 0))
       row(km, tf('raidUi.segment', { ground: t(`ground.${seg.ground}` as StringKey), km: num(seg.km) }))
       km += seg.km
     }
@@ -518,6 +527,37 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       )
     }
 
+    // After dark: how far the lamps reach, what that does to the speed, and how many ruts they should show.
+    const nightBox = el('div')
+    const outlook = nightOutlook(spec, wornTruck(truck, s.cond), s.entry.driver, 'steady')
+    if (outlook) {
+      const beam = truck.beam
+      const darkKmNow = num(outlook.length / 1000)
+      const unseen = outlook.ruts > 0 ? 1 - outlook.seen / outlook.ruts : 0
+      const band: Band = unseen <= 0.3 ? 'cool' : unseen <= 0.55 ? 'warm' : 'hot'
+      const slowed = outlook.slowed.map((x) => tf('raidUi.nightSlowItem', {
+        ground: t(`ground.${x.ground}` as StringKey), night: num(x.night * 3.6), day: num(x.day * 3.6),
+      }))
+      const ruts = el('p', 'readout-line')
+      ruts.append(
+        tf('raidUi.nightRuts', { ruts: num(outlook.ruts), seen: num(outlook.seen) }), ' ',
+        el('span', `chip ${band}`, BAND_WORD[band]),
+      )
+      const lampsJump = button(t('raidUi.toLights'), 'btn small-btn')
+      lampsJump.addEventListener('click', () => jumpTo({ kind: 'slot', slot: 'lightBar' }))
+      nightBox.append(
+        el('h4', 'raid-sub', t('raidUi.nightHead')),
+        el('p', 'readout-line', outlook.dark <= 0 ? tf('raidUi.nightAll', { dark: darkKmNow }) : tf('raidUi.nightFrom', { km: num(outlook.dark / 1000), dark: darkKmNow })),
+        el('p', 'readout-line', tf('raidUi.nightLamps', { reach: num(beam.reach), spread: num(beam.spread * 100) })),
+        el('p', 'small', slowed.length
+          ? tf('raidUi.nightSlowed', { list: slowed.join(', '), pace: t('pace.steady').toLowerCase(), lost: gap(outlook.lost).slice(1) })
+          : tf('raidUi.nightFast', { pace: t('pace.steady').toLowerCase() })),
+        ruts,
+        el('p', 'small', t('raidUi.nightNote')),
+        lampsJump,
+      )
+    }
+
     // The pace check (playtest, 26 November 2026): what each pace call does to this truck on today's rough ground.
     const checkBox = paceCheckBlock(wornTruck(truck, s.cond), s.entry.driver, groundsToCheck(spec.segments.map((x) => x.ground)), spec.airC, 'paceCheck.leadRaid')
 
@@ -537,7 +577,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     })
     show(
       head, facts, rocks,
-      el('h4', 'raid-sub', t('raidUi.roadbook')), book, weatherBox, iceBox,
+      el('h4', 'raid-sub', t('raidUi.roadbook')), book, weatherBox, nightBox, iceBox,
       el('h4', 'raid-sub', t('raidUi.condition')), conditionList(s),
       el('p', 'small', tf('raidUi.sparesLine', { list: sparesList(s.spares) })), settings,
       checkBox, el('h4', 'raid-sub', t('raidUi.paceCall')), paceRow, paceText, start, retireButton(),
@@ -611,6 +651,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     let logged = 0
     let creaks = 0
     let turned = false
+    let nightfall = false
 
     /** Draw the trace up to `upTo` metres (rebuilt when the sim adds to it). */
     function draw(upTo: number): void {
@@ -659,6 +700,11 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       while (logged < r.stops.length && (r.stops[logged] as Stop).at <= upTo + 1) addStop(r.stops[logged++] as Stop)
       while (creaks < r.iceNotes.length && (r.iceNotes[creaks] as IceNote).at <= upTo + 1) {
         log.append(el('li', 'warm-text', iceNoteText(r.iceNotes[creaks++] as IceNote)))
+      }
+      // Nightfall, as the highlight passes the place.
+      if (!nightfall && r.dark !== null && r.dark <= upTo + 1 && r.dark > 0) {
+        nightfall = true
+        log.append(el('li', 'warm-text', tf('raidUi.darkFalls', { km: num(r.dark / 1000, 1) })))
       }
       // The weather turning, as the highlight passes the place.
       const w = r.weather
@@ -716,7 +762,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
           return
         }
         // The truck as muddy, snowy and dented as the raid has made it by this moment.
-        view3d.show(i, r.weather && weatherOn(r.weather, c.at) ? r.weather.kind : null, raidGrime(s, r, c.at))
+        view3d.show(i, r.weather && weatherOn(r.weather, c.at) ? r.weather.kind : null, raidGrime(s, r, c.at), darkAt(r.dark, c.at))
         const span = c.poses[c.poses.length - 1]!.t - c.poses[0]!.t
         duration = c.broken ? span / BREAK_RATE + BREAK_HOLD : span
         clipStart = performance.now()
@@ -865,6 +911,17 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     if (w?.comes) lines.append(el('p', 'small warm-text', tf('raidUi.resWeather', { kind: weatherName(w.kind), km: num(w.at / 1000) })))
     else if (w) lines.append(el('p', 'small', tf('raidUi.cpWeatherHeld', { kind: weatherName(w.kind, true) })))
     if (rec.limped) lines.append(el('p', 'small hot-text', t('raidUi.limped')))
+    // Night: what the lamps showed, and the way to the lamps if ruts came up unseen.
+    const nt = rec.night
+    if (nt) {
+      const unseen = Math.round(nt.unseen)
+      if (unseen >= 1) {
+        lines.append(el('p', 'small warm-text', tf('raidUi.resNight', { seen: num(nt.seen), unseen: num(unseen) })))
+        const jump = button(t('raidUi.toLights'), 'btn small-btn')
+        jump.addEventListener('click', () => jumpTo({ kind: 'slot', slot: 'lightBar' }))
+        lines.append(jump)
+      } else lines.append(el('p', 'small cool-text', tf('raidUi.resNightClean', { seen: num(nt.seen) })))
+    }
     // Underside hits: what the guards took, what the leaks cost, and where to fix it for next time.
     const guards = guardWords(raidTruck(s))
     const took = rec.guardHits ?? 0

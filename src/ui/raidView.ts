@@ -12,7 +12,8 @@
  */
 import { t, tf, type StringKey } from '../data/strings'
 import type { WeatherId } from '../data/weather'
-import type { BuiltTruck } from '../sim/build'
+import { partIn, type BuiltTruck } from '../sim/build'
+import type { NightLamps } from '../render/lamps'
 import type { Grime } from '../sim/grime'
 import type { Clip } from '../sim/highlight'
 import type { Pose } from '../sim/poses'
@@ -32,12 +33,25 @@ export interface RaidView {
   /**
    * Play clip `i` of the leg: true speed, or slow motion closing in on a
    * break; `weather` sets the sky if it had turned there, and `grime` is how
-   * muddy and dented the truck is by then (`src/sim/grime.ts`).
+   * muddy and dented the truck is by then (`src/sim/grime.ts`). `dark`
+   * turns the night on, with the truck's own lamps lighting the road.
    */
-  show(i: number, weather?: WeatherId | null, grime?: Grime | null): void
+  show(i: number, weather?: WeatherId | null, grime?: Grime | null, dark?: boolean): void
   stop(): void
   /** False once the phone turned out not to do WebGL. */
   works(): boolean
+}
+
+/** The build's lamps, as the 3D draws them (`src/render/lamps.ts`). */
+export function nightLamps(truck: BuiltTruck): NightLamps {
+  const bar = partIn(truck.build, 'lightBar')
+  const spots = partIn(truck.build, 'spots')
+  return {
+    reach: truck.beam.reach,
+    spread: truck.beam.spread,
+    bar: bar.reach > 0 ? { reach: bar.reach, spread: bar.spread } : null,
+    spots: spots.reach > 0 ? { reach: spots.reach, spread: spots.spread } : null,
+  }
 }
 
 /** `onFail` is called if the 3D can't start, so the stage can go back to the page with the trace. */
@@ -63,6 +77,7 @@ export function raidView(onFail: () => void = () => {}): RaidView {
   let poses: Pose[][] = []
   let clips: readonly Clip[] = []
   let ready = false
+  let lamps: NightLamps | null = null
 
   function load(): Promise<TrackView | null> {
     // The catch covers both ways it can go wrong: the 3D code not arriving, and the phone refusing WebGL when the view is made.
@@ -92,6 +107,7 @@ export function raidView(onFail: () => void = () => {}): RaidView {
       const v = await load()
       if (!v || clips !== legClips) return
       const ride = truck.ride
+      lamps = nightLamps(truck)
       try {
         await v.setRun({ cls: truck.build.cls, stance: stanceOf(truck), parts: truck.build.parts, road: legClips.map((c) => c.road), wheelbase: ride.cgToFront + ride.cgToRear })
         ready = true
@@ -99,12 +115,13 @@ export function raidView(onFail: () => void = () => {}): RaidView {
         fail(err)
       }
     },
-    show(i, weather, grime) {
+    show(i, weather, grime, dark) {
       const c = clips[i]
       const p = poses[i]
       if (!view || !ready || !c || !p || p.length < 2) return
       view.setWeather(weather ?? 'clear')
       view.setGrime(grime ?? null)
+      view.setNight(dark ? lamps : null)
       const b = c.broken
       if (b) {
         const what = t(`fail.${b.kind}` as StringKey).toLowerCase()
@@ -115,8 +132,10 @@ export function raidView(onFail: () => void = () => {}): RaidView {
         box.dataset.state = 'ended'
         view.play(p, { rate: BREAK_RATE, loop: false, focus: { corner: b.corner, kind: b.kind } })
       } else {
-        caption.textContent = weather ? tf('raidUi.viewWeather', { kind: t(`weather.${weather}` as StringKey) }) : t('raidUi.viewLive')
-        box.dataset.state = weather ? 'note' : 'live'
+        caption.textContent = weather
+          ? tf('raidUi.viewWeather', { kind: t(`weather.${weather}` as StringKey) })
+          : t(dark ? 'raidUi.viewNight' : 'raidUi.viewLive')
+        box.dataset.state = weather || dark ? 'note' : 'live'
         view.play(p, { rate: 1, loop: false })
       }
       photo.ready(true)

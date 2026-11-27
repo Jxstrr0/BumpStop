@@ -33,6 +33,11 @@
  * the diff or the fuel tank, which the crew patches at the roadside, and a
  * dented part leaks until the bivouac fixes it (`underside.ts`).
  *
+ * Night stages (Kelbo, 27 November 2026): some stages run into the dark
+ * (`RaidStage.dark`). From there the driver goes no faster than the lamps
+ * let the truck stop, and the ruts the beam doesn't show are hit at speed:
+ * they go into the ground the ride sim drives (`night.ts`).
+ *
  * Weather (Kelbo, 26 November 2026): some stages have a thaw, a whiteout or
  * a dust storm in the forecast, which comes in partway through or holds off
  * (`weather.ts`). From where it turns, the ground it changes is driven
@@ -52,7 +57,9 @@ import {
   type DriverId, type JobKind, type JobPart, type PaceId, type Raid, type RaidGround, type RaidId, type RaidStage, type Rival,
 } from '../data/raids'
 import type { TruckBuild } from '../data/kit'
-import { WEATHER } from '../data/weather'
+import { CLEAR, WEATHER } from '../data/weather'
+import { NIGHT, RUTS_PER_KM } from '../data/night'
+import { braking, darkAt, darkFrom, sightSpeed, unseenRuts, unseenShare } from './night'
 import { CORNERS, ICE_ROAD, type IceSheet } from '../data/winter'
 import { CLASS_MONEY } from '../data/career'
 import { CONDITION, FREE_PLAY_PARTS_MONEY, type CondPart } from '../data/condition'
@@ -152,6 +159,16 @@ export interface StageRecord {
   guardHits?: number
   /** Seconds lost topping up leaks from a dented oil pan, diff or fuel tank (in `time` already; missing likewise). */
   leak?: number
+  /** A night stage: where it got dark, and the ruts the lamps showed and didn't (missing for daylight and older saves). */
+  night?: NightTally
+}
+
+/** Ruts on the dark part of a stage: how many the lamps showed the driver, and how many came up unseen (estimates). */
+export interface NightTally {
+  /** Where it got dark (m from the start). */
+  dark: number
+  seen: number
+  unseen: number
 }
 
 export type RaidPhase = 'morning' | 'bivouac' | 'done'
@@ -234,6 +251,10 @@ export interface StageRun {
   /** Rocks the guards took, and seconds lost to leaks so far. */
   guardHits: number
   leak: number
+  /** Where it gets dark (m from the start), or null for a stage that finishes in daylight. */
+  dark: number | null
+  /** The ruts so far in the dark, seen and unseen. */
+  ruts: { seen: number; unseen: number }
 }
 
 // ── Speeds and times ──
@@ -370,6 +391,45 @@ export function weatherLegs(cls: ClassId, legs: readonly Leg[], w: StageWeather 
   })
 }
 
+/** What the dark part of a stage looks like for this truck at one pace call, for the morning's roadbook. */
+export interface NightOutlook {
+  /** Where it gets dark (m from the start) and how much of the stage is in the dark (m). */
+  dark: number
+  length: number
+  /** Seconds the dark adds against driving the same road in daylight. */
+  lost: number
+  /** Ruts out there in the dark, and how many the beam should show the driver (estimates). */
+  ruts: number
+  seen: number
+  /** Each kind of ground in the dark the lamps slow the driver on: the speed by day and in the dark (m/s). */
+  slowed: { ground: RaidGround; day: number; night: number }[]
+}
+
+/** How the dark part of `stage` goes for this truck (no weather, no stops), or null if the stage finishes in daylight. */
+export function nightOutlook(spec: RaidStage, truck: BuiltTruck, driver: DriverId, pace: PaceId): NightOutlook | null {
+  const dark = darkFrom(spec)
+  if (dark === null) return null
+  const out: NightOutlook = { dark, length: 0, lost: 0, ruts: 0, seen: 0, slowed: [] }
+  const lit = powerFactor({ ...truck, power: truck.power - truck.beam.draw })
+  let pos = 0
+  for (const seg of spec.segments) {
+    const from = Math.max(pos, dark)
+    pos += seg.km * 1000
+    const m = pos - from
+    if (m <= 0) continue
+    const day = groundSpeed(truck, driver, seg.ground, pace)
+    const brake = braking(seg.ground, truck.wear.front.tire.studded)
+    const night = Math.min(groundSpeed(truck, driver, seg.ground, pace, lit), sightSpeed(truck.beam.reach, brake) * PACE_SPEED[pace])
+    const unseen = unseenShare(truck.beam, night, brake)
+    out.length += m
+    out.lost += m / night - m / day
+    out.ruts += (RUTS_PER_KM[seg.ground] * m) / 1000
+    out.seen += (RUTS_PER_KM[seg.ground] * (1 - unseen) * m) / 1000
+    if (night < day * 0.995 && !out.slowed.some((x) => x.ground === seg.ground)) out.slowed.push({ ground: seg.ground, day, night })
+  }
+  return out
+}
+
 // ── Entering ──
 
 export function raidOf(state: RaidState): Raid {
@@ -464,7 +524,10 @@ export function startStage(state: RaidState, fresh: BuiltTruck, pace: PaceId): S
   const airTemp = fromCelsius(spec.airC)
   // The rivals get into more trouble the more of the stage the weather covers.
   const covered = weather?.comes ? 1 - weather.at / (stageKm(spec) * 1000) : 0
-  const harsh = harshShare(spec) * (1 + covered * ((weather ? WEATHER[weather.kind].rivalRisk : 1) - 1))
+  // And in the dark, likewise.
+  const dark = darkFrom(spec)
+  const night = dark === null ? 0 : 1 - dark / (stageKm(spec) * 1000)
+  const harsh = harshShare(spec) * (1 + covered * ((weather ? WEATHER[weather.kind].rivalRisk : 1) - 1)) * (1 + night * (NIGHT.rivalRisk - 1))
   return {
     stage: state.stage,
     spec,
@@ -498,6 +561,8 @@ export function startStage(state: RaidState, fresh: BuiltTruck, pace: PaceId): S
     under: { ...state.under },
     guardHits: 0,
     leak: 0,
+    dark,
+    ruts: { seen: 0, unseen: 0 },
   }
 }
 
@@ -539,7 +604,21 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     const wet = weatherOn(w, run.at)
     let length = remaining
     if (w?.comes && !wet && w.at < run.at + remaining) length = w.at - run.at
-    const speed = groundSpeed(run.truck, driver, ground, currentPace(run)) * (wet ? weatherSpeed(w!.kind, run.truck.build.cls, ground) : 1)
+    // Night: if it gets dark partway along, drive up to there first too.
+    const night = darkAt(run.dark, run.at)
+    if (run.dark !== null && !night && run.dark < run.at + length) length = run.dark - run.at
+    const weatherMod = wet ? groundMod(w!.kind, ground) : undefined
+    let speed = groundSpeed(run.truck, driver, ground, currentPace(run)) * (wet ? weatherSpeed(w!.kind, run.truck.build.cls, ground) : 1)
+    // In the dark: the lamps draw on the engine, the driver goes no faster than the truck can stop in the beam,
+    // and the ruts the beam doesn't show come up unseen.
+    let unseen = 0
+    if (night) {
+      const lit = { ...run.truck, power: run.truck.power - run.truck.beam.draw }
+      const day = groundSpeed(run.truck, driver, ground, currentPace(run), powerFactor(lit)) * (wet ? weatherSpeed(w!.kind, run.truck.build.cls, ground) : 1)
+      const brake = braking(ground, run.truck.wear.front.tire.studded, weatherMod?.grip ?? 1)
+      speed = Math.min(day, sightSpeed(run.truck.beam.reach, brake) * PACE_SPEED[currentPace(run)])
+      unseen = unseenShare(run.truck.beam, speed, brake)
+    }
     const blind = wet ? WEATHER[w!.kind].corner : 1
     let hazard: 'ice' | 'slide' | null = null
     const sheet = iceSheet(run.spec)
@@ -563,9 +642,11 @@ export function advanceStage(state: RaidState, run: StageRun): void {
       }
     }
     // In the weather the road past the turn is a new stretch, so it gets its own seed.
-    const key = `${raidSeed(state)}:${run.stage}:${run.leg}:${run.seg}:${run.restarts}${wet ? ':w' : ''}`
+    // So is the road after dark.
+    const key = `${raidSeed(state)}:${run.stage}:${run.leg}:${run.seg}:${run.restarts}${wet ? ':w' : ''}${night ? ':n' : ''}`
     const seed = hashString(key)
-    const mod = wet ? groundMod(w!.kind, ground) : undefined
+    const ruts = night ? unseenRuts(ground, unseen) : 0
+    const mod = ruts > 0 ? { ...(weatherMod ?? CLEAR), ruts } : weatherMod
     const res = runStage(
       run.truck.ride,
       { airTemp: airNow(run), oilTemp: run.oil, segments: [{ ground, length, speed, ...(mod ? { mod } : {}) }] },
@@ -592,6 +673,10 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     undersideHits(state, run, ground, driven, res.bottomOuts, key)
     // The shore track is longer than the ice road it stands in for.
     run.time += (driven / speed) * lineFactor(driver, ground) * (ground !== seg.ground ? ICE_ROAD.shoreLength : 1)
+    if (night) {
+      run.ruts.seen += RUTS_PER_KM[ground] * (1 - unseen) * (driven / 1000)
+      run.ruts.unseen += ruts * (driven / 1000)
+    }
     run.at += driven
     run.segDone += driven
     const broken = res.wear!.broken
@@ -714,7 +799,9 @@ function coolFor(run: StageRun, seconds: number): void {
 /** The air where the truck is now (K): the morning's, or the weather's once it has turned. */
 export function airNow(run: StageRun): number {
   const w = run.weather
-  return weatherOn(w, run.at) ? run.airTemp + WEATHER[w!.kind].airK : run.airTemp
+  const air = weatherOn(w, run.at) ? run.airTemp + WEATHER[w!.kind].airK : run.airTemp
+  // It cools once the sun's down.
+  return darkAt(run.dark, run.at) ? air + NIGHT.airK : air
 }
 
 /** How long a faded damper takes to cool to its warm line, standing still (s). */
@@ -845,6 +932,7 @@ export function finishStage(state: RaidState, run: StageRun): StageRecord {
     guardHits: run.guardHits,
     leak: run.leak,
   }
+  if (run.dark !== null) record.night = { dark: run.dark, seen: run.ruts.seen, unseen: run.ruts.unseen }
   state.results.push(record)
   state.wear = structuredClone(run.wear)
   state.wear.broken = null

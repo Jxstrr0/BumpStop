@@ -245,6 +245,13 @@ roll: `src/sim/weather.ts`; driving it: `advanceStage` in `src/sim/raid.ts`.
 - **Saves:** each stage result keeps the day's weather (`StageRecord.weather`);
   saves from before have none and load as they are.
 
+## Night stages (v1.23)
+
+Some winter stages run into the dark, and the Polar Night Raid gets darker
+every day. The stage splits where it gets dark; after that the driver only
+goes as fast as the lamps let them stop, and ruts outside the beam are hit
+blind. All of it: `docs/NIGHT.md`.
+
 ## The pace check and what Push costs
 
 Playtest, 26 November 2026: "Push is always right, and the rigs don't

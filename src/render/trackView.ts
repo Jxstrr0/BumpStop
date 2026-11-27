@@ -42,6 +42,8 @@ import type { Pose } from '../sim/poses'
 import { GHOST_LOOK } from '../data/rigs'
 import { pixelRatioFor, trackFov } from './framing'
 import { addLights, applyLook, applyTier, cssColour, isDark, makeRenderer, onLookChange } from './look'
+import { TruckLamps, type NightLamps } from './lamps'
+import { NIGHT_LOOK } from '../data/graphics'
 import { Puffs } from './particles'
 import { loadKit, plant, Props, Wires, type Kit } from './scenery'
 import { Sky, SKY_RADIUS, SUN_DIRECTION } from './sky'
@@ -133,6 +135,8 @@ export interface TrackView {
   setWeather(kind: WeatherId | 'clear'): void
   /** The truck's mud, dust, snow and dents as the raid goes on (`src/sim/grime.ts`); null for a clean truck. */
   setGrime(g: Grime | null): void
+  /** Night (night stages, after 1.20): the dark, and the build's lamps lighting the road; null for daylight. */
+  setNight(lamps: NightLamps | null): void
   /** The view as it stands, drawn with its longer side `longSide` pixels and copied onto a plain canvas. */
   snapshot(longSide: number): HTMLCanvasElement | null
   dispose(): void
@@ -279,10 +283,19 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
 
   // The raid's weather, if any: it sets the sky colour and how near the fog closes in.
   let weather: WeatherId | 'clear' = 'clear'
+  // A night stage: the build's lamps, and their lights on the truck. Night looks dark whatever the phone's theme.
+  let night: NightLamps | null = null
+  let lamps: TruckLamps | null = null
+  const darkNow = () => night !== null || isDark()
+  /** Hang the lamps' lights on the truck as it is now (or take them off for daylight). */
+  function fitLamps(): void {
+    lamps?.dispose()
+    lamps = night && truck ? new TruckLamps(truck, night) : null
+  }
 
   function look(): void {
     applyLook(scene, lights)
-    const dark = isDark()
+    const dark = darkNow()
     // A pale northern sky by day; a deep blue one for night stages. Weather greys it, whitens it or browns it.
     const w = WEATHER_LOOK[weather]
     const haze = new THREE.Color(dark ? w.dark : w.light)
@@ -298,6 +311,18 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       fog.near = w.near
       fog.far = w.far
     }
+    if (night) {
+      // Night: only the moon, and the dark closes in past the lamps (sooner still in weather).
+      lights.hemi.color.set(0x9fb4d8)
+      lights.hemi.groundColor.set(0x2a2a30)
+      lights.hemi.intensity = 0.9 * NIGHT_LOOK.moon
+      lights.sun.color.set(0xc8d6ff)
+      lights.sun.intensity = 1.1 * NIGHT_LOOK.moon
+      fog.color.setHex(NIGHT_LOOK.fog).lerp(haze, weather === 'clear' ? 0 : 0.25)
+      fog.near = Math.min(w.near, NIGHT_LOOK.fogNear)
+      fog.far = Math.min(w.far, NIGHT_LOOK.fogFar)
+      if (run?.road) scene.background = fog.color.clone()
+    }
     sky.setLook(weather, dark)
     // Still water takes the colour of the sky above it.
     waterMat.color.setHex(dark ? LAND_COLOUR.waterNight : LAND_COLOUR.water).lerp(new THREE.Color(dark ? SKY[weather].zenithDark : SKY[weather].zenith), 0.3)
@@ -311,7 +336,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   /** Dust off gravel; a white spray off snow and ice. */
   function dustColour(): void {
     const snow = !!run?.road && isWinter(run.road)
-    if (isDark()) dust.setColour(snow ? 0x8e99a8 : 0x6b6457)
+    if (darkNow()) dust.setColour(snow ? 0x8e99a8 : 0x6b6457)
     else dust.setColour(snow ? 0xf2f5f8 : 0xc8b89a)
   }
   const stopLook = onLookChange(look)
@@ -341,7 +366,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const first = clip[0]!
     const last = clip[clip.length - 1]!
     origin = first.distance
-    const night = isDark()
+    const night = darkNow()
     if (!run.road) {
       outdoors.visible = false
       shop.visible = true
@@ -733,6 +758,12 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     setGrime(g) {
       truck?.setGrime(g)
     },
+    setNight(next) {
+      if (JSON.stringify(next) === JSON.stringify(night)) return
+      night = next
+      fitLamps()
+      look()
+    },
     async setRun(next) {
       const mine = ++ticket
       // The scenery kit too. If it can't be fetched the truck still drives, on bare land.
@@ -744,9 +775,12 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       if (truck?.cls !== next.cls) {
         const model = await TruckModel.load(next.cls)
         if (mine !== ticket) return
+        lamps?.dispose()
+        lamps = null
         truck?.dispose()
         truck = model
         scene.add(truck.root)
+        fitLamps()
       }
       if (next.ghost && ghost?.cls !== next.cls) {
         const model = await TruckModel.load(next.cls)
@@ -924,6 +958,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       waterMat.dispose()
       shopMat.dispose()
       props?.dispose()
+      lamps?.dispose()
       wires.dispose()
       sky.dispose()
       dust.dispose()
