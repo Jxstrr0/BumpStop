@@ -1,17 +1,19 @@
 # The rigs and the report
 
-How the shop's three rigs, the report and the ghost runs work (plan PR 4).
+How the shop's rigs, the report and the ghost runs work (plan PR 4; the
+jump ramp came in v1.20).
 The sim is in `src/sim/laps.ts` and `src/sim/shaker.ts`; the screens are in
 `src/ui/shop.ts`, `src/ui/report.ts`, `src/ui/charts.ts` and
 `src/ui/fixes.ts`; every number is in `src/data/rigs.ts`.
 
-## The three rigs
+## The rigs
 
 | Rig | What it does | What it finds |
 | --- | --- | --- |
 | Shaker rig | Four posts shake the parked truck, slow to fast (0.6 to 18 bounces a second) | Where the body bounces most (about 1 to 1.3 a second) and where the wheels hop (about 7 to 10 a second). Nothing breaks |
 | Washboard ladder | 600 m of washboard and 1.2 km of rough gravel, from 40 km/h, 5 km/h faster each lap | The speed where the dampers fade |
 | Torture loop | Whoops, a rock garden, a graded bit and jumps, from 30 km/h, 5 km/h faster each lap | Bottoming, cracked mounts, snapped axles, cut tires, cracked frames |
+| Jump ramp | One tabletop jump a lap, six jumps from 45 to 70 km/h | How cleanly the truck lands: a score out of 100 for each landing |
 
 Each class and rig always drives the same road, so running again after a
 fix shows exactly what the fix changed.
@@ -48,6 +50,78 @@ compared with the posts. The report turns the wheel hop into a washboard
 speed (beats a second × 0.8 m, typical washboard crest to crest): for the
 light 4x4 that's about 28 km/h, right where `docs/RIDE-SIM.md` found the
 wheels hop and the dampers work hardest.
+
+## The jump ramp
+
+Added in v1.20 (Kelbo picked it, 27 November 2026). A 75 m lap with one
+built tabletop on it (`RIGS.jumpRig` and `TableJump` in `src/data/rigs.ts`,
+laid on the road by `stampTable` in `src/sim/ground.ts`): 20 m of run-up,
+an 8 m entry curve that bends the road up to a straight face (slope 0.18),
+a lip 1 m up, a 4 m flat top and a 12 m landing slope back down. The first
+jump is at 45 km/h and each one is 5 km/h faster, up to 70.
+
+The stock trucks land it best at about 45 to 55 km/h. Slower, they hardly
+leave the top; faster, they fly further down the slope, land harder and
+nose down more, and from about 65 km/h they clear the slope altogether and
+come down on the flat, where every truck bottoms out.
+
+**Nose dives come out of the physics.** The front wheels leave the lip a
+moment before the rear, and the rear is still being pushed up the face, so
+the truck rotates nose down in the air, more the faster it goes. More rebound
+at the rear holds the tail down a little; the side-by-side, the lightest
+in pitch, dives the most.
+
+**The score** (`src/sim/landing.ts`, numbers in `LANDING`). The lap runner
+hands each step on the jump to `watchLanding`, which only reads the sim. It
+counts the take-off once all four wheels have been off for 0.06 s near the
+lip, times the flight, and at touch-down notes where the first wheels came
+down (short on the top, on the slope, or past it on the flat), which end
+touched first and the body's angle against the ground under it. For 1.2 s
+after that it watches each end's bump stops, every bottom-out, the body's
+hardest jolt and any bounce (all four wheels off again). Each landing starts
+at 100 and loses:
+
+| What | Points |
+| --- | --- |
+| Nose or tail more than 4° off the ground's angle | 1.5 a degree past that |
+| Each end that reached its bump stops | 4 |
+| Each corner that bottomed out (up to 3) | 8 |
+| Each bounce | 6 |
+| The body's jolt past 3 g | 1.5 a g, up to 15 |
+| Landing short on the top, or on the flat past the slope | 8 |
+
+80 and up is **Clean** (cool blue), 50 and up **Firm** (amber), below that
+**Hard** (red), always with the word. A stock light 4x4 scores about 96,
+87, 79, 69, 29 and 16 from 45 to 70 km/h. Longer bump stops are the biggest
+fix (69 to 78 at 60 km/h, 29 to 57 at 65), then softer springs (the lip
+throws the truck less high) and more rebound. The harness
+`scripts/harness/jumps.harness.ts` prints every landing for any tune.
+
+**On screen** the jump ramp runs at true speed, so the 3D jump is the jump
+as it happened, and each clip picks up where the last one ended. After each
+landing the run holds while the 3D view replays it from the side in slow
+motion (0.3×): a dust puff where the wheels touch, an amber puff at a corner
+when that end reaches its bump stops, a red one and a jolt for a
+bottom-out, and the caption saying each as it comes ("Nose first: 11°
+down against the slope", "Rear bump stops hit", "Bottomed out: rear left,
+metal to metal"), then the verdict ("Clean landing: 87 out of 100"). A line
+over the view keeps the last landing's score and what happened. Fast and
+Skip don't stop for the replays.
+
+**The report** (`src/ui/jumpReport.ts`) says how far up the speeds it landed
+clean and the best landing, has a crew note on the worst habit (bottoming,
+nose dives, bounces, or flying past the slope), and lists every landing with
+its score and what happened. **Before and after:** beside each landing is
+the same jump on the last run here (its scores are saved with the last-run
+line, `landings` in the save's `ghosts` record) and, when racing a ghost
+truck, the ghost's own landing, each with Better, Same or Worse (within 3
+points is the same), and a count of each. Then up to three fixes (longer
+bump stops and softer springs for bottoming, rear rebound for nose dives or
+bounces), what broke if something did, and the pace check over the raids'
+jump ground.
+
+The ghost truck works on the jump ramp like on the loops: your best run is
+the one that took the most jumps.
 
 ## Live
 
@@ -167,6 +241,11 @@ the *last* run; the ghost truck is the *best* (or a friend's).
   last-run lines.
 
 ## Tests
+
+`tests/jumps.test.ts`: the tabletop's shape; one scored landing a jump for
+every class; every stock truck clean on the slope at 50 km/h and on the flat,
+bottoming, at 70; nose dives growing with speed; longer bump stops scoring
+better; a run in pieces scoring the same as one all at once.
 
 `tests/ghost.test.ts`: ghosts drive again exactly, best and race results,
 ghost codes. `tests/rigs.test.ts`: step by step equals all at once; the history; the

@@ -15,7 +15,8 @@ import { RIG_HISTORY_STEP, type Rig, type RigPiece } from '../data/rigs'
 import { SIM, type AxleSetup, type RideSetup } from '../data/ride'
 import { FEEL } from '../data/sound'
 import type { WearSetup } from '../data/wear'
-import { buildProfile, type Profile } from './ground'
+import { buildProfile, stampTable, type Profile } from './ground'
+import { finishLanding, newLandingWatch, watchLanding, type LandingScore, type LandingWatch } from './landing'
 import { emptyStats, enterSection, restingState, rideParams, stepRide, type RideParams, type RideState, type RideStats } from './ride'
 import { newPoseLog, notePose, type PoseLog } from './poses'
 import { Rng } from './rng'
@@ -39,6 +40,8 @@ export interface LapSummary {
   damage: DamageSnapshot
   /** Metres into the run at the end of the lap (or at the break). */
   endDistance: number
+  /** The jump ramp: this lap's landing, scored (`landing.ts`). */
+  landing?: LandingScore
 }
 
 /**
@@ -90,6 +93,8 @@ export interface LapRun {
   trace: BreakTrace | null
   wear: WearState
   history: RunHistory
+  /** The jump ramp's landings, one a lap (empty on the other rigs). */
+  landings: LandingScore[]
 }
 
 export interface LapOptions {
@@ -134,13 +139,20 @@ export interface LapRunner {
   wasBottomed: boolean[]
   /** The last few seconds of poses for the 3D view, if asked for. Read only; never changes a result. */
   poses: PoseLog | null
+  /** The jump ramp: the watch over this lap's jump (null off the jump's piece), and every landing scored so far. */
+  landing: LandingWatch | null
+  landings: LandingScore[]
 }
 
 /** The loop's road, built once: the same every lap. */
 export function rigRoad(rig: Rig, setup: RideSetup, seed: number): Profile[] {
   const root = new Rng(seed)
   const wheelbase = setup.cgToFront + setup.cgToRear
-  return rig.pieces.map((piece, i) => buildProfile(piece.ground, piece.length + wheelbase, root.fork(`piece-${i}`)))
+  return rig.pieces.map((piece, i) => {
+    const profile = buildProfile(piece.ground, piece.length + wheelbase, root.fork(`piece-${i}`))
+    if (piece.table) stampTable(profile, piece.table)
+    return profile
+  })
 }
 
 /** One lap's length (m). */
@@ -160,7 +172,18 @@ function enterPiece(r: LapRunner, k: number): void {
   r.step = 0
   const profile = r.road[k] as Profile
   enterSection(r.s, r.p, profile)
-  r.steps = stepsFor(r.p, profile, r.lapSpeed * (r.rig.pieces[k] as RigPiece).pace)
+  const piece = r.rig.pieces[k] as RigPiece
+  r.steps = stepsFor(r.p, profile, r.lapSpeed * piece.pace)
+  closeLanding(r)
+  r.landing = piece.table ? newLandingWatch(piece.table, r.lap, r.lapSpeed * piece.pace, r.s) : null
+}
+
+/** Score the jump's landing if it's still being watched (the lap or the run ended part-way through). */
+function closeLanding(r: LapRunner): void {
+  if (!r.landing) return
+  const score = finishLanding(r.landing, r.s.t)
+  if (score) r.landings.push(score)
+  r.landing = null
 }
 
 function startLap(r: LapRunner, lap: number): void {
@@ -172,6 +195,7 @@ function startLap(r: LapRunner, lap: number): void {
 }
 
 function endLap(r: LapRunner): void {
+  closeLanding(r)
   const { s, stats, run } = r
   const peakTemp = stats.peakTemp.map((t, i) => Math.max(t, s.oilTemp[i] as number))
   const bottomOuts = stats.bottomOuts.reduce((a, b) => a + b, 0)
@@ -183,7 +207,13 @@ function endLap(r: LapRunner): void {
     peakCompression: stats.peakCompression.slice(),
     damage: damageOf(run.w),
     endDistance: run.w.distance,
+    ...landingOf(r),
   })
+}
+
+function landingOf(r: LapRunner): { landing?: LandingScore } {
+  const last = r.landings[r.landings.length - 1]
+  return last && last.lap === r.lap ? { landing: last } : {}
 }
 
 function sample(r: LapRunner): void {
@@ -223,6 +253,8 @@ export function startLaps(setup: RideSetup, wear: WearSetup, rig: Rig, seed: num
     strikeArmed: [true, true, true, true],
     wasBottomed: [false, false, false, false],
     poses: opts.poses ? newPoseLog(opts.poses) : null,
+    landing: null,
+    landings: [],
   }
   if (!r.done) {
     startLap(r, 1)
@@ -260,6 +292,13 @@ export function advanceLaps(r: LapRunner, maxSteps: number): number {
     const speed = r.lapSpeed * (r.rig.pieces[r.piece] as RigPiece).pace
     stepRide(s, p, profile, speed, r.stats, forces)
     stepWear(w, wp, s, p, forces, profile, speed, readings)
+    if (r.landing) {
+      const score = watchLanding(r.landing, s, p, forces, profile)
+      if (score) {
+        r.landings.push(score)
+        r.landing = null
+      }
+    }
     if (rec) {
       record(rec, s.oilTemp, forces, readings, w)
       // If it broke between samples, keep the breaking step too.
@@ -334,6 +373,7 @@ export function lapResult(r: LapRunner): LapRun {
     trace: broken && r.run.rec ? breakTrace(r.run.rec, broken) : null,
     wear: r.run.w,
     history: r.history,
+    landings: r.landings,
   }
 }
 
