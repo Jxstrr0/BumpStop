@@ -83,6 +83,8 @@ export interface ClipOptions {
   ghostBroken?: BreakFocus | null
   /** Hold the side-on shot (the jump ramp's landing replays). */
   side?: boolean
+  /** The finish of a run that lasted: watch from where the truck pulls up as it comes through the arch. */
+  finish?: boolean
   /** Moments to mark as the clip passes them, and who to tell. */
   marks?: readonly ClipMark[]
   onMark?: (mark: ClipMark) => void
@@ -160,9 +162,11 @@ export interface TrackView {
 }
 
 
-type Shot = 'side' | 'front' | 'chase' | 'wheel' | 'high'
+type Shot = 'side' | 'front' | 'chase' | 'wheel' | 'high' | 'finish'
 const SHOTS: readonly Shot[] = ['side', 'front', 'chase', 'wheel', 'high']
 
+/** The finish camera stands at least this far out from the middle of the road (m): clear of the arch's legs (5.2 m) and the tire stacks. */
+const FINISH_SIDE = 7.5
 /** Seconds a break holds on screen before the replay starts again. */
 const HOLD = 1.8
 /** Strip margins behind and ahead of the clip (m). */
@@ -480,6 +484,18 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
         target.set(tx + t.frontX, 1.1 * R, -t.track / 2)
         break
       case 'high': out.set(tx - 0.4 * L, 1.6 * L, -1.5 * L); break
+      case 'finish': {
+        // A camera on the cameras' side of the road, four truck lengths ahead, looking back at it: the
+        // truck comes through the arch towards it. As the truck brakes the camera eases to a stop just past
+        // where the truck pulls up, so the run ends on the truck from the front, the arch behind it.
+        // (d² / (d + lead) is about d − lead far off, and comes to rest smoothly at 0.)
+        const stop = clip.length > 0 ? clip[clip.length - 1]!.distance - origin : tx
+        const d = Math.max(0, stop - tx)
+        const ease = 2.5 * L
+        out.set(stop + 1.5 * L - (d * d) / (d + ease), 1.6 + 0.1 * L, -Math.max(1.35 * L, FINISH_SIDE))
+        target.set(tx + 0.1 * L, 1.5 * R, 0)
+        break
+      }
     }
   }
 
@@ -554,7 +570,8 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   /** The TV-style shot for this clip, closing in on a break. */
   function placeShot(tx: number, progress: number): void {
     const t = truck!
-    shotCamera(reduced.matches ? 'side' : shot, tx, camPos, camTarget)
+    // The finish camera stands still, so it stays on with reduced motion too.
+    shotCamera(reduced.matches && shot !== 'finish' ? 'side' : shot, tx, camPos, camTarget)
     const focus = opts.focus
     if (focus && focus.corner >= 0) {
       // Close in on the corner that broke, from its own side.
@@ -877,7 +894,9 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       ghostCursor = 0
       if (ghost && ghostClip.length === 0) ghost.root.visible = false
       restart()
-      if (!o.focus && !o.side) {
+      if (o.finish) {
+        shot = 'finish'
+      } else if (!o.focus && !o.side) {
         shot = SHOTS[shotIndex++ % SHOTS.length]!
       } else {
         shot = 'side'

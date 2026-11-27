@@ -241,6 +241,27 @@ export const VIEW_3D = {
   landingHold: 1.4,
 } as const
 
+/**
+ * After a run that lasts every lap, the 3D view shows the truck finish
+ * properly (v1.26, Kelbo asked, 27 November 2026): it holds its speed through
+ * the start-line arch, then brakes to a stop and settles. Only the show: the
+ * run's result is already in, and none of this touches it.
+ */
+export const ROLL_OUT = {
+  /** Metres past the end of the last lap the truck keeps its speed: the arch stands at 8, so the whole truck is through. */
+  through: 14,
+  /** Braking after that (m/s², about 0.7 g on gravel). */
+  brake: 7,
+  /** Height the braking pulls at to nod the nose down (m, about the centre of mass). */
+  lever: 0.7,
+  /** Seconds it sits still at the end, rocking back on its springs. */
+  settle: 1.3,
+  /** Never more than this many seconds in all, whatever happens. */
+  most: 14,
+  /** The finish clip starts this long before the end of the last lap (s). */
+  before: 1.2,
+} as const
+
 /** How the ghost truck looks on the 3D test track: a blue copy you can see through, drawn over everything like an X-ray. */
 export const GHOST_LOOK = {
   /** Every colour on the ghost is pulled this far (0 to 1) towards this one. */

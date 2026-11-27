@@ -19,11 +19,11 @@
  * three.js loads the first time a run starts. If the phone can't do WebGL,
  * the view hides itself and the rigs carry on in 2D.
  */
-import { VIEW_3D } from '../data/rigs'
+import { ROLL_OUT, VIEW_3D } from '../data/rigs'
 import { t, tf, type StringKey } from '../data/strings'
 import type { BuiltTruck } from '../sim/build'
 import type { Profile } from '../sim/ground'
-import { lastPoses, poseAgo, posesHeld, POSES_PER_SECOND, type PoseLog } from '../sim/poses'
+import { lastPoses, poseAgo, posesHeld, POSES_PER_SECOND, type Pose, type PoseLog } from '../sim/poses'
 import type { LandingMark, LandingScore } from '../sim/landing'
 import type { BreakEvent } from '../sim/wear'
 import type { BreakFocus, TrackView } from '../render/trackView'
@@ -58,6 +58,16 @@ function poseNewest(log: PoseLog): number {
   return posesHeld(log) > 0 ? poseAgo(log, 0).t : 0
 }
 
+/**
+ * A run that lasted every lap, carried on past its end (`rollOut` in
+ * `src/sim/laps.ts`): your truck's poses through the arch to a stop, and the
+ * ghost's (empty if it broke, or there's none).
+ */
+export interface RunFinish {
+  mine: readonly Pose[]
+  ghost: readonly Pose[]
+}
+
 export interface RigView {
   element: HTMLElement
   begin(run: RigRun): void
@@ -66,8 +76,12 @@ export interface RigView {
    * shop holds the run meanwhile). Calls `done` straight away if there's no 3D.
    */
   landing(score: LandingScore, done: () => void): void
-  /** The run ended: replay the break (if there was one), or show the last clip. */
-  finish(broken: BreakEvent | null): void
+  /**
+   * The run ended: replay the break (if there was one), or show the last
+   * clip. A run that lasted every lap brings its `rollOut`, and the truck
+   * drives through the finish and pulls up.
+   */
+  finish(broken: BreakEvent | null, done?: RunFinish | null): void
   reset(): void
   /** False once the phone turned out not to do WebGL. */
   works(): boolean
@@ -209,7 +223,7 @@ export function rigView(onFail: () => void = () => {}): RigView {
         ...ghostClip(r, seconds),
       })
     },
-    finish(broken) {
+    finish(broken, done) {
       turn++
       live = false
       window.clearTimeout(retry)
@@ -226,6 +240,19 @@ export function rigView(onFail: () => void = () => {}): RigView {
             ? tf('view3d.replay', { what, where: t(`cornerName.${broken.corner}` as StringKey).toLowerCase() })
             : tf('view3d.replayFrame', { what, zone: t(`zone.${broken.zone ?? 'centre'}` as StringKey) })
           v.play(lastPoses(r.log, VIEW_3D.replaySeconds), { rate: VIEW_3D.slowMotion, loop: true, focus: { corner: broken.corner, kind: broken.kind }, ...ghostClip(r, VIEW_3D.replaySeconds) })
+          photo.ready(true)
+          swing.ready(true)
+        } else if (r.road && done && done.mine.length > 0) {
+          // Lasted every lap: the last moments before the line, then on through the arch to a stop.
+          caption.textContent = t('view3d.finished')
+          const { ghost, ghostBroken } = ghostClip(r, ROLL_OUT.before)
+          v.play([...lastPoses(r.log, ROLL_OUT.before), ...done.mine], {
+            rate: 1,
+            loop: false,
+            finish: true,
+            ghost: ghost ? [...ghost, ...done.ghost] : null,
+            ghostBroken,
+          })
           photo.ready(true)
           swing.ready(true)
         } else {

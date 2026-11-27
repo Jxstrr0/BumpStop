@@ -11,14 +11,14 @@
  * Every step runs in full detail (no sampling), because a break needs the
  * exact moment and its trace.
  */
-import { RIG_HISTORY_STEP, type Rig, type RigPiece } from '../data/rigs'
+import { RIG_HISTORY_STEP, ROLL_OUT, tableMarks, type Rig, type RigPiece } from '../data/rigs'
 import { SIM, type AxleSetup, type RideSetup } from '../data/ride'
 import { FEEL } from '../data/sound'
 import type { WearSetup } from '../data/wear'
 import { buildProfile, stampTable, type Profile } from './ground'
 import { finishLanding, newLandingWatch, watchLanding, type LandingScore, type LandingWatch } from './landing'
 import { emptyStats, enterSection, restingState, rideParams, stepRide, type RideParams, type RideState, type RideStats } from './ride'
-import { newPoseLog, notePose, type PoseLog } from './poses'
+import { newPoseLog, notePose, POSES_PER_SECOND, type Pose, type PoseLog } from './poses'
 import { Rng } from './rng'
 import { breakTrace, record, type BreakTrace } from './trace'
 import { damageOf, newWearRun, stepWear, worstDamage, type BreakEvent, type DamageSnapshot, type WearRun, type WearState } from './wear'
@@ -375,6 +375,58 @@ export function lapResult(r: LapRunner): LapRun {
     history: r.history,
     landings: r.landings,
   }
+}
+
+/**
+ * The finish, for the 3D view only (v1.26): carry on from where the run
+ * ended, through the start-line arch at full speed, then brake to a stop
+ * and sit for a moment. Over the jump ramp's tabletop it holds its speed
+ * until it has landed, so it never brakes in the air.
+ *
+ * Works on a copy of the truck's state, so the run (and its result) is
+ * untouched. Returns poses as the log would have written them, carrying on
+ * its clock and distance. Empty if something broke.
+ */
+export function rollOut(r: LapRunner): Pose[] {
+  if (r.run.w.broken || r.road.length === 0) return []
+  const p = r.p
+  const s: RideState = structuredClone(r.s)
+  let piece = r.piece
+  let profile = r.road[piece] as Profile
+  // The speed it crossed the line at; from here on the truck sets its own pace, whatever the loop's pieces say.
+  let speed = r.lapSpeed * (r.rig.pieces[piece] as RigPiece).pace
+  // A finished lap leaves the truck at the very end of its last piece: start the next one.
+  const atEnd = () => s.x + p.setup.cgToFront >= profile.length
+  const next = () => {
+    piece = (piece + 1) % r.road.length
+    profile = r.road[piece] as Profile
+    enterSection(s, p, profile)
+  }
+  if (r.step >= r.steps) next()
+  const every = Math.max(1, Math.round(SIM.stepsPerSecond / POSES_PER_SECOND))
+  const nod = (p.sprungMass * ROLL_OUT.lever) / p.pitchInertia
+  const out: Pose[] = []
+  let distance = r.run.w.distance
+  let travelled = 0
+  let still = 0
+  for (let step = 1; step <= ROLL_OUT.most * SIM.stepsPerSecond && still < ROLL_OUT.settle; step++) {
+    if (atEnd()) next()
+    const table = (r.rig.pieces[piece] as RigPiece).table
+    const overJump = table !== undefined && s.x + p.setup.cgToFront < tableMarks(table).landEnd + 3
+    const braking = speed > 0 && travelled >= ROLL_OUT.through && !overJump
+    const slow = braking ? Math.min(speed, ROLL_OUT.brake * DT) : 0
+    speed -= slow
+    stepRide(s, p, profile, speed)
+    // Braking pulls the nose down onto the front springs; when it stops, the body rocks back.
+    s.vPitch -= nod * slow
+    distance += speed * DT
+    travelled += speed * DT
+    if (speed <= 0) still += DT
+    if (step % every === 0) {
+      out.push({ t: s.t, distance, piece, x: s.x, speed, ground: 0, z: s.z, pitch: s.pitch, roll: s.roll, wheelZ: [s.wheelZ[0] as number, s.wheelZ[1] as number, s.wheelZ[2] as number, s.wheelZ[3] as number] })
+    }
+  }
+  return out
 }
 
 /** Drive the whole run at once. */

@@ -49,7 +49,7 @@ import { t, tf, type StringKey } from '../data/strings'
 import { buildTruck, type BuiltTruck } from '../sim/build'
 import { scopeOf, scoped, unscoped } from '../persist/ghost'
 import { ghostFromRun } from '../sim/ghost'
-import { advanceLaps, lapLength, lapResult, startLaps, takeFeel, type LapRunner, type RunHistory } from '../sim/laps'
+import { advanceLaps, lapLength, lapResult, rollOut, startLaps, takeFeel, type LapRunner, type RunHistory } from '../sim/laps'
 import { advanceShaker, shakerSteps, startShaker, type ShakerPoint, type ShakerRunner } from '../sim/shaker'
 import { fromCelsius, msToKmh } from '../sim/units'
 import type { BuildStore } from './buildStore'
@@ -777,18 +777,22 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     sync()
     const head = report.querySelector<HTMLElement>('.report-head')
     const broken = a.kind === 'laps' ? a.runner.run.w.broken : null
+    // A run that lasted every lap drives on through the finish arch in 3D (v1.26), and so does a ghost that lasted too.
+    const done = a.kind === 'laps' && !stopped && !broken && view3d.works()
+      ? { mine: rollOut(a.runner), ghost: a.race ? rollOut(a.race.runner) : [] }
+      : null
     if (live.classList.contains('full')) {
       // Full page: the replay keeps the screen, with the report's own headline and the way to the rest of it.
       ended = true
       endHead.replaceChildren(...(head ? [...head.childNodes].map((n) => n.cloneNode(true)) : []))
       layout()
-      view3d.finish(broken)
+      view3d.finish(broken, done)
       seeReport.focus({ preventScroll: true })
       return
     }
     layout()
     head?.after(view3d.element)
-    view3d.finish(broken)
+    view3d.finish(broken, done)
     head?.focus({ preventScroll: true })
     report.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
   }
