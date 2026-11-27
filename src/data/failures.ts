@@ -86,6 +86,7 @@ export type FixTarget =
   | 'lessRebound'
   | 'lighterWheels'
   | 'spoolValve'
+  | 'recoveryKit'
 
 /**
  * The report's traces turn amber at this share of a limit, for channels

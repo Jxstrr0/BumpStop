@@ -62,6 +62,8 @@ export function fixJump(target: FixTarget, end: End, b: TruckBuild): Jump | null
       return { kind: 'slot', slot: 'frame' }
     case 'lighterWheels':
       return { kind: 'slot', slot: 'wheels' }
+    case 'recoveryKit':
+      return { kind: 'slot', slot: 'recovery' }
     case 'rebound':
     case 'lessRebound': {
       const clicks = partIn(b, 'dampers').clicks

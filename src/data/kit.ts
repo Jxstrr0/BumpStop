@@ -132,7 +132,7 @@ export const KITS: Readonly<Record<ClassId, ClassKit>> = {
       parts: {
         frame: 'ladder', frontSusp: 'solidAxleCoil', rearSusp: 'coilLink', dampers: 'monotube', bumpStops: 'rubber',
         antiRoll: 'fixedBars', axles: 'standardAxles', wheels: 'steelWheels', tires: 'rallyTires',
-        protection: 'skidPlates', engine: 'petrolSix', spares: 'noSpares',
+        protection: 'skidPlates', engine: 'petrolSix', spares: 'noSpares', recovery: 'shovelOnly',
       },
       front: axle(32000, 5 * mm, 60 * mm, 180 * kPa, 200 * mm),
       rear: axle(30000, 0, 60 * mm, 180 * kPa, 200 * mm),
@@ -157,7 +157,7 @@ export const KITS: Readonly<Record<ClassId, ClassKit>> = {
       parts: {
         frame: 'ladder', frontSusp: 'beamLeaf', rearSusp: 'rearBeamLeaf', dampers: 'monotube', bumpStops: 'rubber',
         antiRoll: 'fixedBars', axles: 'standardAxles', wheels: 'steelWheels', tires: 'rallyTires',
-        protection: 'skidPlates', engine: 'dieselSix', spares: 'noSpares',
+        protection: 'skidPlates', engine: 'dieselSix', spares: 'noSpares', recovery: 'shovelOnly',
       },
       front: axle(130000, 16 * mm, 60 * mm, 350 * kPa, 200 * mm),
       rear: axle(140000, 20 * mm, 60 * mm, 350 * kPa, 200 * mm),
@@ -183,7 +183,7 @@ export const KITS: Readonly<Record<ClassId, ClassKit>> = {
       parts: {
         frame: 'tubeFrame', frontSusp: 'sxsWishbone', rearSusp: 'sxsTrailing', dampers: 'monotube', bumpStops: 'rubber',
         antiRoll: 'fixedBars', axles: 'standardAxles', wheels: 'steelWheels', tires: 'rallyTires',
-        protection: 'skidPlates', engine: 'twin', spares: 'noSpares',
+        protection: 'skidPlates', engine: 'twin', spares: 'noSpares', recovery: 'shovelOnly',
       },
       front: axle(13000, 0, 70 * mm, 100 * kPa, 300 * mm),
       rear: axle(12500, 0, 70 * mm, 100 * kPa, 300 * mm),

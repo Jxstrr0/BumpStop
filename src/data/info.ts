@@ -43,6 +43,7 @@ export const SLOT_INFO: Readonly<Record<SlotId, InfoNote>> = {
   protection: { text: 'info.slot.protection' },
   engine: { text: 'info.slot.engine' },
   spares: { text: 'info.slot.spares' },
+  recovery: { text: 'info.slot.recovery', term: 'recoveryKit' },
 }
 
 /** The Load section's notes (weight and balance, 27 November 2026). */

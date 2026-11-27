@@ -25,6 +25,7 @@ import { SLOTS } from '../data/parts'
 import { RAIDS, type RaidId } from '../data/raids'
 import type { FailureKind } from '../data/wear'
 import type { UnderPart } from '../data/underside'
+import type { RecoveryTool, StuckKind } from '../data/recovery'
 import { stageKm, type RaidState, type Stop } from './raid'
 
 /** A line worth telling in a truck's logbook. The screens turn it into words. */
@@ -37,8 +38,10 @@ export type TruckMoment =
   | { kind: 'slide' | 'ice'; year: number; raid: RaidId }
   /** A rock got past the guards and dented the oil pan, diff or fuel tank (underside hits, after 1.13). */
   | { kind: 'hit'; year: number; raid: RaidId; part: UnderPart }
+  /** Bogged or hung up, and got out with the kit or towed out by the sweep truck (recovery kit, after 1.20). */
+  | { kind: 'stuck'; year: number; raid: RaidId; how: StuckKind; fix: RecoveryTool | 'sweep' }
 
-export const MOMENT_KINDS: readonly TruckMoment['kind'][] = ['win', 'podium', 'longOne', 'firstRaid', 'retired', 'broke', 'slide', 'ice', 'hit']
+export const MOMENT_KINDS: readonly TruckMoment['kind'][] = ['win', 'podium', 'longOne', 'firstRaid', 'retired', 'broke', 'slide', 'ice', 'hit', 'stuck']
 
 export interface TruckLog {
   /** The garage's truck number: 1 for its first truck, 2 for the next, and so on. */
@@ -142,7 +145,13 @@ function addMoment(log: TruckLog, m: TruckMoment): void {
 /** The stop that cost the most time, or null with none. */
 function worstStop(state: RaidState): Stop | null {
   let worst: Stop | null = null
-  for (const r of state.results) for (const s of r.stops) if (!worst || s.lost > worst.lost) worst = s
+  for (const r of state.results) {
+    for (const s of r.stops) {
+      // A tow by the sweep truck lost the whole stage, so it's the worst of all (its own `lost` is 0).
+      if (s.fix === 'sweep') return s
+      if (!worst || s.lost > worst.lost) worst = s
+    }
+  }
   return worst
 }
 
@@ -175,6 +184,9 @@ export function logRaid(c: HasTrucks, state: RaidState, pos: number | null, reti
     const year = c.year
     if (stop.kind === 'ice' || stop.kind === 'slide') addMoment(log, { kind: stop.kind, year, raid })
     else if (stop.kind === 'sump' || stop.kind === 'diff' || stop.kind === 'tank') addMoment(log, { kind: 'hit', year, raid, part: stop.kind })
+    else if (stop.kind === 'bogged' || stop.kind === 'hungUp') {
+      addMoment(log, { kind: 'stuck', year, raid, how: stop.kind, fix: stop.fix as RecoveryTool | 'sweep' })
+    }
     else addMoment(log, { kind: 'broke', year, raid, part: stop.kind, corner: stop.corner })
   }
   const year = c.year
