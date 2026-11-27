@@ -82,10 +82,26 @@ export function fuelStops(cls: ClassId, fuel: number, metres: number): number {
 }
 
 /**
- * The weights that move, now and in the stock load: each with its mass (kg)
- * and place. `sparesMass` is the build's spares kit (0 with no spares).
+ * The recovery kit's weight by where it's carried (kg): a winch on the front
+ * bumper, and the boards and jack on the rear carrier. It's in the build's
+ * mass already (lumped at the centre), so here it only moves.
  */
-export function loadWeights(cls: ClassId, load: TruckLoad, sparesMass: number): { item: LoadItem | 'fuel'; m: number; x: number; y: number; m0: number; x0: number; y0: number }[] {
+export interface KitWeights {
+  front: number
+  rear: number
+}
+
+export const NO_KIT: Readonly<KitWeights> = { front: 0, rear: 0 }
+
+/**
+ * The weights that move, now and in the stock load: each with its mass (kg)
+ * and place. `sparesMass` is the build's spares kit (0 with no spares), and
+ * `kit` the recovery kit's weight (counted at the centre in the stock load,
+ * where the build's mass already has it).
+ */
+export function loadWeights(
+  cls: ClassId, load: TruckLoad, sparesMass: number, kit: Readonly<KitWeights> = NO_KIT,
+): { item: LoadItem | 'fuel' | 'winch' | 'kit'; m: number; x: number; y: number; m0: number; x0: number; y0: number }[] {
   const c = CLASS_LOAD[cls]
   const at = (spot: SpotId) => spotPlace(cls, spot)
   const sNow = at(load.spares)
@@ -96,6 +112,8 @@ export function loadWeights(cls: ClassId, load: TruckLoad, sparesMass: number): 
     { item: 'spares', m: sparesMass, x: sNow.x, y: sNow.y, m0: sparesMass, x0: s0.x, y0: s0.y },
     { item: 'tools', m: c.tools, x: tNow.x, y: tNow.y, m0: c.tools, x0: t0.x, y0: t0.y },
     { item: 'fuel', m: fuelMass(cls, load.fuel), x: c.tankX, y: c.tankY, m0: fuelMass(cls, STOCK_LOAD.fuel), x0: c.tankX, y0: c.tankY },
+    { item: 'winch', m: kit.front, x: c.rowX.front, y: 0, m0: kit.front, x0: 0, y0: 0 },
+    { item: 'kit', m: kit.rear, x: c.rowX.rear, y: 0, m0: kit.rear, x0: 0, y0: 0 },
   ]
 }
 
@@ -104,14 +122,16 @@ export function loadWeights(cls: ClassId, load: TruckLoad, sparesMass: number): 
  * board, its centre of mass at 0, 0). The weights are points, which is close
  * enough for a spare wheel or a tool box.
  */
-export function loadShift(cls: ClassId, load: TruckLoad | undefined, sparesMass: number, sprungMass: number): LoadShift {
-  if (isStockLoad(load)) return { ...NO_SHIFT }
+export function loadShift(
+  cls: ClassId, load: TruckLoad | undefined, sparesMass: number, sprungMass: number, kit: Readonly<KitWeights> = NO_KIT,
+): LoadShift {
+  if (isStockLoad(load) && kit.front === 0 && kit.rear === 0) return { ...NO_SHIFT }
   let dMass = 0
   let sx = 0
   let sy = 0
   let sxx = 0
   let syy = 0
-  for (const w of loadWeights(cls, load as TruckLoad, sparesMass)) {
+  for (const w of loadWeights(cls, load ?? STOCK_LOAD, sparesMass, kit)) {
     dMass += w.m - w.m0
     sx += w.m * w.x - w.m0 * w.x0
     sy += w.m * w.y - w.m0 * w.y0

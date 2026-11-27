@@ -1381,6 +1381,121 @@ def jerry_can(p, centre, s, yaw=0.0):
     p.tube((x, y, z + 0.22 * s), (x, y, z + 0.27 * s), 0.025 * s, 'Graphite', segments=8)
 
 
+# --- The kit: recovery ----------------------------------------------------------------
+# Traction boards (steel sand ladders or orange nylon boards), a high-lift jack
+# and a winch (the recovery kit, src/data/recovery.ts). Boards and jacks are
+# drawn in a frame of their own: `axes` names the world axis for the length,
+# the width and the thickness, so one helper lays a board flat, on its side or
+# upright.
+
+STEEL_BOARDS = ['sandLadders', 'laddersJack', 'cableWinch']
+NYLON_BOARDS = ['boardsJack', 'ropeWinch']
+JACKS = ['laddersJack', 'cableWinch', 'boardsJack', 'ropeWinch']
+
+
+def kit_frame(centre, axes):
+    """Two helpers for a part drawn along `axes`: a point at (length, width,
+    thickness) from `centre`, and a box size in that frame."""
+    idx = {'X': 0, 'Y': 1, 'Z': 2}
+    order = [idx[a] for a in axes]
+
+    def at(u, v=0.0, w=0.0):
+        c = list(centre)
+        for k, d in zip(order, (u, v, w)):
+            c[k] += d
+        return tuple(c)
+
+    def size(lu, lv, lw):
+        out = [0.0, 0.0, 0.0]
+        for k, d in zip(order, (lu, lv, lw)):
+            out[k] = d
+        return tuple(out)
+
+    return at, size
+
+
+def traction_board(p, centre, length, width, nylon, axes=('X', 'Z', 'Y'), out=1):
+    """One board: a steel ladder (two rails and rungs) or a nylon board with
+    rows of cleats and a handle slot at each end. `out` is the side that faces
+    outwards (+1 or -1 along the thickness)."""
+    at, size = kit_frame(centre, axes)
+    if nylon:
+        th = 0.024
+        p.box(at(0), size(length, width, th), 'Urethane', bevel=0.01)
+        n = seg(7, 4)
+        for k in range(n):
+            u = -length * 0.36 + length * 0.72 * k / (n - 1)
+            p.box(at(u, 0, out * th * 0.6), size(0.028, width * 0.82, 0.014), 'Urethane', bevel=0.004)
+        for u in (-length * 0.44, length * 0.44):
+            p.box(at(u, 0, out * th * 0.52), size(0.03, width * 0.42, 0.004), 'Shadow')
+    else:
+        for v in (-width / 2 + 0.016, width / 2 - 0.016):
+            p.box(at(0, v), size(length, 0.032, 0.034), 'Steel', bevel=0.006)
+        n = seg(10, 6)
+        for k in range(n):
+            u = -length / 2 + 0.05 + (length - 0.1) * k / (n - 1)
+            p.box(at(u, 0, out * 0.004), size(0.045, width - 0.03, 0.018), 'Steel', bevel=0.004)
+
+
+def board_pair(p, centre, length, width, nylon, axes=('X', 'Z', 'Y'), out=1, strap='Graphite'):
+    """Two boards stacked face to face, strapped down at two places."""
+    at, size = kit_frame(centre, axes)
+    gap = 0.03 if not nylon else 0.028
+    for k in (0, 1):
+        traction_board(p, at(0, 0, out * k * gap), length, width, nylon, axes, out)
+    for u in (-length * 0.28, length * 0.28):
+        p.box(at(u, 0, out * gap * 0.5), size(0.035, width + 0.02, gap + 0.05), strap)
+
+
+def high_lift_jack(p, centre, length, axes=('Z', 'X', 'Y'), out=1):
+    """A high-lift jack: the tall bar with its row of holes, the foot, the
+    climbing jack and its handle folded along the bar, and the top clamp."""
+    at, size = kit_frame(centre, axes)
+    p.box(at(0), size(length, 0.055, 0.026), 'Jerry', bevel=0.004)
+    n = seg(14, 0)
+    for k in range(n):
+        u = -length * 0.4 + length * 0.82 * k / max(1, n - 1)
+        p.box(at(u, 0, out * 0.0135), size(0.02, 0.018, 0.004), 'Shadow')
+    p.box(at(-length / 2 + 0.012), size(0.024, 0.16, 0.12), 'Graphite', bevel=0.006)
+    p.box(at(-length * 0.18, 0, out * 0.03), size(0.17, 0.085, 0.06), 'Steel', bevel=0.008)
+    p.box(at(-length * 0.18 + 0.1, 0.05, out * 0.03), size(0.06, 0.03, 0.03), 'Graphite')
+    p.box(at(length * 0.12, 0, out * 0.068), size(length * 0.55, 0.026, 0.026), 'Steel', bevel=0.006)
+    p.box(at(length / 2 - 0.02), size(0.04, 0.075, 0.045), 'Graphite', bevel=0.006)
+
+
+def winch(p, centre, width, rope, s, face=1):
+    """A winch facing forward (+X when `face` is 1): the drum with its cable or
+    rope wound on, the motor on one end and the gearbox on the other, tie
+    bars over the drum, the fairlead in front, the hook, and a cradle under it."""
+    x, y, z = centre
+    r = 0.06 * s
+    h = width / 2
+    p.tube((x, y - h * 0.52, z), (x, y + h * 0.52, z), r * 0.75, 'Graphite', segments=seg(14, 8))
+    p.tube((x, y - h * 0.48, z), (x, y + h * 0.48, z), r, 'Magenta' if rope else 'Steel', segments=seg(16, 8))
+    if HD:
+        for k in range(7):
+            yy = y - h * 0.42 + h * 0.84 * k / 6
+            p.tube((x, yy - 0.004, z), (x, yy + 0.004, z), r * 1.04, 'Graphite' if not rope else 'Shadow', segments=16)
+    p.tube((x, y + h * 0.5, z), (x, y + h, z), r * 1.1, 'Graphite', segments=seg(16, 8))
+    p.tube((x, y + h, z), (x, y + h + 0.012 * s, z), r * 0.7, 'Steel', segments=seg(12, 6))
+    p.box((x, y - h * 0.72, z), (r * 2.3, h * 0.42, r * 2.3), 'Graphite', bevel=0.012 * s)
+    for dz in (-1, 1):
+        p.tube((x - face * r * 0.6, y - h * 0.52, z + dz * r * 1.15), (x - face * r * 0.6, y + h * 0.5, z + dz * r * 1.15),
+               0.008 * s, 'Steel', segments=6)
+    fx = x + face * r * 1.6
+    if rope:
+        p.box((fx, y, z), (0.018 * s, 0.2 * s, 0.09 * s), 'Alloy', bevel=0.006 * s)
+        p.box((fx + face * 0.01 * s, y, z), (0.01 * s, 0.11 * s, 0.03 * s), 'Shadow', bevel=0.004 * s)
+    else:
+        for dz in (-1, 1):
+            p.tube((fx, y - 0.08 * s, z + dz * 0.025 * s), (fx, y + 0.08 * s, z + dz * 0.025 * s), 0.014 * s, 'Steel', segments=seg(10, 6))
+        for dy in (-1, 1):
+            p.tube((fx, y + dy * 0.035 * s, z - 0.05 * s), (fx, y + dy * 0.035 * s, z + 0.05 * s), 0.012 * s, 'Steel', segments=seg(10, 6))
+        p.box((fx - face * 0.012 * s, y, z), (0.012 * s, 0.22 * s, 0.13 * s), 'Graphite', bevel=0.004 * s)
+    p.box((fx + face * 0.035 * s, y, z - 0.01 * s), (0.04 * s, 0.018 * s, 0.06 * s), 'Magenta', bevel=0.006 * s)
+    p.box((x, y, z - r * 1.25), (r * 2.8, width * 1.05, 0.012 * s), 'Graphite', bevel=0.004 * s)
+
+
 # --- Building one truck --------------------------------------------------------------
 
 class Build:
@@ -2262,11 +2377,11 @@ def build_truck(cls, t, materials, lite=False):
 # frame darkens the engine tucked inside it, say.
 STOCK = {
     'light4x4': ('ladder', 'solidAxleCoil', 'coilLink', 'monotube', 'rubber', 'fixedBars', 'standardAxles',
-                 'steelWheels', 'rallyTires', 'skidPlates', 'petrolSix', 'noSpares'),
+                 'steelWheels', 'rallyTires', 'skidPlates', 'petrolSix', 'noSpares', 'shovelOnly'),
     'heavy': ('ladder', 'beamLeaf', 'rearBeamLeaf', 'monotube', 'rubber', 'fixedBars', 'standardAxles',
-              'steelWheels', 'rallyTires', 'skidPlates', 'dieselSix', 'noSpares'),
+              'steelWheels', 'rallyTires', 'skidPlates', 'dieselSix', 'noSpares', 'shovelOnly'),
     'sxs': ('tubeFrame', 'sxsWishbone', 'sxsTrailing', 'monotube', 'rubber', 'fixedBars', 'standardAxles',
-            'steelWheels', 'rallyTires', 'skidPlates', 'twin', 'noSpares'),
+            'steelWheels', 'rallyTires', 'skidPlates', 'twin', 'noSpares', 'shovelOnly'),
 }
 SHADE = {
     'samples': 192,    # looks per corner: more is smoother and slower
@@ -3137,6 +3252,25 @@ def pickup_bolt_ons(b, sill, w, xb, xf, top, xr, skirt, nose):
         jerry_can(p, (-2.2, -0.5 + k * 0.36, sill + 0.29), s)
     b.add(p)
 
+    # Recovery kit: a winch on a cradle in front of the bumper, under the bull
+    # bar; the boards clamped to the outside of the bed's left side (the side
+    # the cameras see), and the high-lift jack on the right side.
+    half = w / 2
+    bed_x = (xb - 0.035 + xr) / 2
+    for k, rope in (('cableWinch', False), ('ropeWinch', True)):
+        p = b.fit('recovery', [k], 'Winch')
+        winch(p, (nose + 0.25, 0.0, 0.95), 0.52, rope, s)
+        b.add(p)
+    for parts, nylon in ((STEEL_BOARDS, False), (NYLON_BOARDS, True)):
+        p = b.fit('recovery', parts, 'Boards')
+        board_pair(p, (bed_x, half + 0.022, sill + 0.29), 1.2, 0.31, nylon, axes=('X', 'Z', 'Y'), out=1)
+        b.add(p)
+    p = b.fit('recovery', JACKS, 'Jack')
+    high_lift_jack(p, (bed_x, -half - 0.018, sill + 0.3), 1.12, axes=('X', 'Z', 'Y'), out=-1)
+    for x in (bed_x - 0.4, bed_x + 0.4):
+        p.box((x, -half - 0.01, sill + 0.3), (0.04, 0.03, 0.14), 'Graphite', bevel=0.006)
+    b.add(p)
+
     # The engine shows on the outside: the V8 has a bonnet scoop and twin
     # pipes, the diesels a snorkel, the turbo diesel an intercooler too.
     # (The block, gearbox and the rest of the exhaust are the same for all:
@@ -3338,16 +3472,7 @@ def cabover(b):
         for x in (mid - 0.5, mid + 0.5):
             body.box((x, sd * (half - 0.004), 1.67), (0.12, 0.016, 0.035), 'Shadow', bevel=0.006)
         body.box((mid, sd * (half - 0.01), 1.67), (0.012, 0.01, 0.26), 'Shadow')
-        # Sand ladders clamped to the side, above the rear wheel.
-        lx0, lx1, lz = -2.92, -1.68, 2.58
-        for z in (lz - 0.15, lz + 0.15):
-            body.box(((lx0 + lx1) / 2, sd * (half + 0.035), z), (lx1 - lx0, 0.03, 0.04), 'Urethane', bevel=0.008)
-        n = seg(10, 6)
-        for k in range(n):
-            body.box((lx0 + 0.04 + (lx1 - lx0 - 0.08) * k / (n - 1), sd * (half + 0.03), lz), (0.05, 0.022, 0.3),
-                     'Urethane', bevel=0.006)
-        for x in (lx0 + 0.25, lx1 - 0.25):
-            body.box((x, sd * (half + 0.05), lz), (0.05, 0.03, 0.42), 'Graphite', bevel=0.008)
+        # (The sand ladders that used to be clamped here are the recovery kit now: cabover_bolt_ons.)
         body.box((xr + 0.3, sd * (half + 0.004), 2.95), (0.3, 0.012, 0.09), 'TailLamp', bevel=0.004)
     # The back: two doors, a ladder, the lamps and an underrun bar.
     for sd in (-1, 1):
@@ -3460,6 +3585,27 @@ def cabover_bolt_ons(b, sill, w, xb, xf, top, xr):
         p.box((-0.75, sd * 1.165, 1.38), (0.25, 0.01, 0.04), 'Magenta')
     for k in range(3):
         jerry_can(p, (xr + 0.35 + k * 0.25, 0.0, 3.41), 1.0)
+    b.add(p)
+
+    # Recovery kit: a winch on a cradle under the front bumper, between the
+    # tow eyes; boards clamped to both sides of the box above the rear wheel
+    # (where the old always-on sand ladders were); the high-lift jack along the
+    # left side under them.
+    for k, rope in (('cableWinch', False), ('ropeWinch', True)):
+        p = b.fit('recovery', [k], 'Winch')
+        winch(p, (xf + 0.2, 0.0, 1.13), 0.66, rope, 1.6)
+        b.add(p)
+    half = w / 2
+    lx0, lx1, lz = -2.92, -1.68, 2.58
+    for parts, nylon in ((STEEL_BOARDS, False), (NYLON_BOARDS, True)):
+        p = b.fit('recovery', parts, 'Boards')
+        for sd in (-1, 1):
+            traction_board(p, ((lx0 + lx1) / 2, sd * (half + 0.035), lz), lx1 - lx0, 0.34, nylon, axes=('X', 'Z', 'Y'), out=sd)
+            for x in (lx0 + 0.25, lx1 - 0.25):
+                p.box((x, sd * (half + 0.06), lz), (0.05, 0.03, 0.42), 'Graphite', bevel=0.008)
+        b.add(p)
+    p = b.fit('recovery', JACKS, 'Jack')
+    high_lift_jack(p, ((lx0 + lx1) / 2, half + 0.04, lz - 0.34), 1.25, axes=('X', 'Z', 'Y'), out=1)
     b.add(p)
 
     # Engines: the exhaust stacks and air intakes behind the cab.
@@ -3699,6 +3845,21 @@ def buggy_bolt_ons(b, floor, tw):
     for sd in (-1, 1):
         p.box((-1.2, sd * 0.2, floor + 0.73), (0.85, 0.04, 0.012), 'Magenta')
     crate(p, (-1.2, 0, floor + 1.0), (0.4, 0.5, 0.2), 1.0)
+    b.add(p)
+
+    # Recovery kit: a small winch tucked behind the front bumper hoop; the
+    # boards and the high-lift jack strapped flat on the roof.
+    for k, rope in (('cableWinch', False), ('ropeWinch', True)):
+        p = b.fit('recovery', [k], 'Winch')
+        winch(p, (1.64, 0.0, 0.52), 0.36, rope, 0.75)
+        b.add(p)
+    roof_z = 1.72
+    for parts, nylon in ((STEEL_BOARDS, False), (NYLON_BOARDS, True)):
+        p = b.fit('recovery', parts, 'Boards')
+        board_pair(p, (-0.15, 0.17, roof_z + 0.04), 0.86, 0.3, nylon, axes=('X', 'Y', 'Z'), out=1)
+        b.add(p)
+    p = b.fit('recovery', JACKS, 'Jack')
+    high_lift_jack(p, (-0.15, -0.3, roof_z + 0.035), 0.98, axes=('X', 'Y', 'Z'), out=1)
     b.add(p)
 
     # Engines: one pipe for the twin, two for the triple, a turbo, intercooler and air box for the turbo twin.

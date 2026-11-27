@@ -86,12 +86,16 @@ function addStage(load: Loads, season: Season, legs: readonly Leg[], paces: read
   })
 }
 
-/** Stops: snow from a snowbank or slush from the ice, and the dents they leave on the body. */
-function addStops(load: Loads, dents: Map<DentPlace, number>, stops: readonly Stop[], upTo: number): void {
+/** Stops: snow from a snowbank or slush from the ice, mud or snow from digging out of a bog, and the dents they leave on the body. */
+function addStops(load: Loads, dents: Map<DentPlace, number>, stops: readonly Stop[], upTo: number, season: Season): void {
   for (const st of stops) {
     if (st.at > upTo + 1) continue
     if (st.kind === 'slide' || st.kind === 'ice') {
       const extra = GRIME.stops[st.kind]
+      for (const k of KINDS) load[k] += extra[k] ?? 0
+    }
+    if (st.kind === 'bogged') {
+      const extra = GRIME.bogged[season]
       for (const k of KINDS) load[k] += extra[k] ?? 0
     }
     if (st.kind === 'slide') knock(dents, 'nose', GRIME.dents.slide)
@@ -132,7 +136,7 @@ export function raidGrime(state: RaidState, run: StageRun | null = null, at = 0)
     const load = noLoad()
     const weather = rec.weather === undefined ? raidWeather(state, i) : rec.weather
     addStage(load, season, stageLegs(cls, spec), rec.paces, weather, Infinity)
-    addStops(load, dents, rec.stops, Infinity)
+    addStops(load, dents, rec.stops, Infinity, season)
     load.chips += (rec.guardHits ?? 0) * GRIME.guardHitChips
     apply(g, load)
     // The night at the bivouac after it (the rest day after `restAfter` stages).
@@ -144,7 +148,7 @@ export function raidGrime(state: RaidState, run: StageRun | null = null, at = 0)
   if (run) {
     const load = noLoad()
     addStage(load, season, run.legs, run.paces, run.weather, at)
-    addStops(load, dents, run.stops, at)
+    addStops(load, dents, run.stops, at, season)
     // The guards' rocks have no place on the stage: spread them over the distance driven so far.
     if (run.at > 0) load.chips += run.guardHits * Math.min(1, at / run.at) * GRIME.guardHitChips
     apply(g, load)

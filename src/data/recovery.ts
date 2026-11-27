@@ -118,6 +118,15 @@ export const RECOVERY = {
    * with the kit instead (s, before class and driver, like the shovel's).
    */
   snowbank: { boards: 12 * 60, jack: 15 * 60, winch: 8 * 60 } as Readonly<Record<Exclude<RecoveryTool, 'shovel'>, number>>,
+  /**
+   * How much of a winch kit's weight is the winch itself, on the front
+   * bumper (kg, by class); the boards and jack ride on the rear carrier
+   * (weight and balance, `src/sim/load.ts`).
+   */
+  winchMass: {
+    cable: { light4x4: 38, heavy: 125, sxs: 18 },
+    rope: { light4x4: 24, heavy: 90, sxs: 12 },
+  } as Readonly<Record<'cable' | 'rope', Readonly<Partial<Record<ClassId, number>>>>>,
   /** A high-lift jack makes roadside tire, shock and CV swaps (spare or bodge) take this share of the time. */
   jackFix: 0.85,
   /** Towed out by the sweep truck: the crew gets this many hours less at that night's bivouac (never fewer than `minHours`). */

@@ -221,8 +221,15 @@ const FIRM_RAID = 0.15
 export function raidStuckLine(truck: BuiltTruck, raid: Raid): HTMLElement {
   const o = stuckOutlook(truck, raid.stages.flatMap((st) => st.segments), 'steady')
   if (o.stuck < FIRM_RAID) return el('p', 'small cool-text', t('raidUi.stuckFirm'))
-  const vars = { n: num(o.stuck, 1), tows: num(o.tows, 1) }
+  const vars = { n: chanceOf(o.stuck), tows: chanceOf(o.tows) }
   return el('p', `small ${bandOf(o.tows, 0.1, 0.3)}-text`, tf(hasKit(truck) ? 'raidUi.stuckRaidKit' : 'raidUi.stuckRaidBare', vars))
+}
+
+/** An expected count as the chance it happens at least once, in whole per cent (1 − e^(−count), at most 99). */
+function chanceOf(count: number): string {
+  const pct = Math.min(99, Math.round((1 - Math.exp(-count)) * 100))
+  // A real chance never reads as 0%.
+  return num(count > 0.001 ? Math.max(1, pct) : pct)
 }
 
 /** One line about the ice creaking but holding. */
@@ -502,7 +509,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     const softens = wet && (wet.kind === 'thaw' || wet.kind === 'whiteout')
     if (day.stuck >= 0.03 || softens) {
       stuck.className = `small ${bandOf(day.tows, 0.03, 0.1)}-text`
-      stuck.textContent = tf(hasKit(standing) ? 'raidUi.stuckDayKit' : 'raidUi.stuckDayBare', { pct: num(Math.min(99, day.stuck * 100)), tows: num(Math.min(99, day.tows * 100)) })
+      stuck.textContent = tf(hasKit(standing) ? 'raidUi.stuckDayKit' : 'raidUi.stuckDayBare', { pct: chanceOf(day.stuck), tows: chanceOf(day.tows) })
       if (softens) stuck.textContent += ` ${tf('raidUi.stuckWeather', { kind: weatherName(wet!.kind, true) })}`
     } else stuck.hidden = true
 
