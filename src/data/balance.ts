@@ -14,7 +14,7 @@
  * few numbers scaled. Every scale multiplies the stock build's own number.
  */
 import type { ClassId } from './classes'
-import type { RigId } from './rigs'
+import type { LoopRigId, RigId } from './rigs'
 import type { FailureKind } from './wear'
 
 /** Multipliers on the test mule, front and rear alike. Missing = 1. */
@@ -68,7 +68,7 @@ export const BOT_BUILDS: readonly BotBuild[] = [
 ]
 
 /** Lap speeds (km/h) where each class's test mule should first break, per rig. */
-export const MULE_WINDOWS: Readonly<Record<ClassId, Record<RigId, readonly [number, number]>>> = {
+export const MULE_WINDOWS: Readonly<Record<ClassId, Record<LoopRigId, readonly [number, number]>>> = {
   light4x4: { washboardLadder: [50, 110], tortureLoop: [45, 80] },
   heavy: { washboardLadder: [50, 110], tortureLoop: [40, 75] },
   sxs: { washboardLadder: [40, 80], tortureLoop: [40, 80] },

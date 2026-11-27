@@ -6,7 +6,7 @@
  *
  *   Career  the loop, the career (and the backup reminder)
  *   Build   the build screen
- *   Test    the shop's three rigs and the report
+ *   Test    the shop's rigs and the report
  *   Raid    the raids
  *   More    help, saves and backups, settings
  *

@@ -8,6 +8,7 @@
  * rigs say what they mean on a raid. Numbers only: `src/sim/paceCheck.ts`.
  */
 import type { RaidGround } from './raids'
+import type { RigId } from './rigs'
 
 export const PACE_CHECK = {
   /** How long a stretch of each ground it drives (m): a typical raid piece of one ground, and one sample of the long-stage maths, so it stays quick on a phone. */
@@ -20,7 +21,8 @@ export const PACE_CHECK = {
   rigGround: {
     washboardLadder: ['washboard', 'rough'],
     tortureLoop: ['whoops', 'rocks', 'jumps'],
-  } as Readonly<Record<'washboardLadder' | 'tortureLoop', readonly RaidGround[]>>,
+    jumpRig: ['jumps'],
+  } as Readonly<Record<RigId, readonly RaidGround[]>>,
   /** Ground with nothing on it to heat a damper or wear a part is left out: the fast smooth stuff. */
   skip: ['graded', 'ice'] as readonly RaidGround[],
   /**
