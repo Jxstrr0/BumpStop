@@ -17,6 +17,7 @@
  * truck.
  */
 import type { ClassId } from './classes'
+import type { TruckLoad } from './load'
 import type { SlotId } from './parts'
 
 export interface AxleSettings {
@@ -44,6 +45,12 @@ export interface TruckBuild {
   parts: Record<SlotId, string>
   front: AxleSettings
   rear: AxleSettings
+  /**
+   * Where the spares and tools ride, and the fuel (weight and balance,
+   * `src/data/load.ts`). Missing means the stock load, so builds saved
+   * before it read the same.
+   */
+  load?: TruckLoad
 }
 
 /** A setting's range on the build screen. */

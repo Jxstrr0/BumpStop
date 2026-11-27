@@ -38,6 +38,11 @@
  * let the truck stop, and the ruts the beam doesn't show are hit at speed:
  * they go into the ground the ride sim drives (`night.ts`).
  *
+ * Fuel (weight and balance, 27 November 2026): the crew fills the tank to
+ * the build's fuel level each morning. Less fuel is a lighter truck, but a
+ * stage longer than the tank's range has a stop to fill up (`FUEL_STOP`),
+ * where the dampers get a couple of minutes to cool.
+ *
  * Weather (Kelbo, 26 November 2026): some stages have a thaw, a whiteout or
  * a dust storm in the forecast, which comes in partway through or holds off
  * (`weather.ts`). From where it turns, the ground it changes is driven
@@ -63,7 +68,9 @@ import { braking, darkAt, darkFrom, sightSpeed, unseenRuts, unseenShare } from '
 import { CORNERS, ICE_ROAD, type IceSheet } from '../data/winter'
 import { CLASS_MONEY } from '../data/career'
 import { CONDITION, FREE_PLAY_PARTS_MONEY, type CondPart } from '../data/condition'
+import { FUEL_STOP } from '../data/load'
 import { buildTruck, partIn, type BuiltTruck } from './build'
+import { fuelRangeKm } from './load'
 import { axleOf, newCondition, tireCondition, wornTruck, type Condition } from './condition'
 import { detExp, detLog, detPow } from './det'
 import { clipRecorder, type Clip } from './highlight'
@@ -161,6 +168,9 @@ export interface StageRecord {
   leak?: number
   /** A night stage: where it got dark, and the ruts the lamps showed and didn't (missing for daylight and older saves). */
   night?: NightTally
+  /** Stops to fill up with fuel, and the seconds they took (in `time` already; missing in saves from before fuel). */
+  fuelStops?: number
+  fuel?: number
 }
 
 /** Ruts on the dark part of a stage: how many the lamps showed the driver, and how many came up unseen (estimates). */
@@ -255,6 +265,10 @@ export interface StageRun {
   dark: number | null
   /** The ruts so far in the dark, seen and unseen. */
   ruts: { seen: number; unseen: number }
+  /** Fuel stops so far and the seconds they took, and where the next one comes (m from the start; Infinity for none). */
+  fuelStops: number
+  fuel: number
+  nextFuel: number
 }
 
 // ── Speeds and times ──
@@ -264,12 +278,12 @@ const KMH = 1 / 3.6
 /** The stock truck's power-to-weight for a class (W/kg). */
 function stockPowerToWeight(cls: ClassId): number {
   const stock = buildTruck(KITS[cls].stock)
-  return stock.power / stock.mass
+  return stock.power / stock.runMass
 }
 
 /** Speed on fast ground follows power-to-weight. */
 export function powerFactor(truck: BuiltTruck): number {
-  const ratio = truck.power / truck.mass / stockPowerToWeight(truck.build.cls)
+  const ratio = truck.power / truck.runMass / stockPowerToWeight(truck.build.cls)
   const k = detPow(ratio, RAID.powerExponent)
   return Math.min(RAID.powerLimits[1], Math.max(RAID.powerLimits[0], k))
 }
@@ -361,7 +375,7 @@ export function iceSheet(stage: RaidStage): IceSheet | null {
 export function iceAtPace(stage: RaidStage, truck: BuiltTruck, driver: DriverId, pace: PaceId): { use: number; band: IceBand } | null {
   const sheet = iceSheet(stage)
   if (!sheet) return null
-  return iceReading(truck.mass, groundSpeed(truck, driver, 'ice', pace), sheet)
+  return iceReading(truck.runMass, groundSpeed(truck, driver, 'ice', pace), sheet)
 }
 
 /** The weather for a stage of this raid: the morning's forecast, and whether it comes (null for a clear day). */
@@ -502,7 +516,8 @@ export function enterRaid(
 export function raidTruck(state: RaidState, settings?: TruckBuild): BuiltTruck {
   const b = state.entry.build
   const s = settings && settings.cls === b.cls ? settings : b
-  return buildTruck({ cls: b.cls, parts: b.parts, front: s.front, rear: s.rear })
+  // The load (spares, tools, fuel) is a setting too: it can change each morning.
+  return buildTruck({ cls: b.cls, parts: b.parts, front: s.front, rear: s.rear, ...(s.load ? { load: s.load } : {}) })
 }
 
 // ── Driving a stage ──
@@ -563,6 +578,29 @@ export function startStage(state: RaidState, fresh: BuiltTruck, pace: PaceId): S
     leak: 0,
     dark,
     ruts: { seen: 0, unseen: 0 },
+    fuelStops: 0,
+    fuel: 0,
+    nextFuel: firstFuelStop(truck, stageKm(spec) * 1000),
+  }
+}
+
+/** Where the first fuel stop comes on a stage of `metres` (m), or Infinity if the tank lasts. */
+function firstFuelStop(truck: BuiltTruck, metres: number): number {
+  const range = fuelRangeKm(truck.build.cls, truck.load.fuel) * 1000
+  return range > 0 && range < metres ? range : Infinity
+}
+
+/** Fill up wherever the tank has run out by now: a stop at a fuel point, where the dampers cool a little. */
+function refuel(run: StageRun): void {
+  const metres = stageKm(run.spec) * 1000
+  const range = fuelRangeKm(run.truck.build.cls, run.truck.load.fuel) * 1000
+  while (run.at >= run.nextFuel - 1) {
+    coolFor(run, FUEL_STOP)
+    run.time += FUEL_STOP
+    run.fuel += FUEL_STOP
+    run.fuelStops++
+    const next = run.nextFuel + range
+    run.nextFuel = next < metres ? next : Infinity
   }
 }
 
@@ -623,7 +661,7 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     let hazard: 'ice' | 'slide' | null = null
     const sheet = iceSheet(run.spec)
     if (ground === 'ice' && sheet) {
-      const reading = iceReading(run.truck.mass, speed, sheet)
+      const reading = iceReading(run.truck.runMass, speed, sheet)
       const thin = placeOn(state, run, 'ice', ICE_ROAD.thinFrom, ICE_ROAD.thinTo) * seg.length
       if (reading.band === 'cracks' && run.segDone < thin) {
         if (thin - run.segDone <= length) {
@@ -679,6 +717,7 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     }
     run.at += driven
     run.segDone += driven
+    refuel(run)
     const broken = res.wear!.broken
     if (hazard && !broken && driven >= length - 1) {
       if (hazard === 'ice') iceCracks(run)
@@ -750,6 +789,7 @@ function limp(run: StageRun, ground: RaidGround, distance: number): void {
   run.segDone += distance
   run.limped = true
   coolFor(run, time)
+  refuel(run)
   run.trace.distance.push(run.at)
   run.trace.oil.push(Math.max(...run.oil))
   run.trace.wear.push(worstDamage(run.wear))
@@ -931,6 +971,8 @@ export function finishStage(state: RaidState, run: StageRun): StageRecord {
     weather: run.weather ? { ...run.weather } : null,
     guardHits: run.guardHits,
     leak: run.leak,
+    fuelStops: run.fuelStops,
+    fuel: run.fuel,
   }
   if (run.dark !== null) record.night = { dark: run.dark, seen: run.ruts.seen, unseen: run.ruts.unseen }
   state.results.push(record)

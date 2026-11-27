@@ -46,3 +46,10 @@ export const SLOT_INFO: Readonly<Record<SlotId, InfoNote>> = {
   spots: { text: 'info.slot.spots' },
   spares: { text: 'info.slot.spares' },
 }
+
+/** The Load section's notes (weight and balance, 27 November 2026). */
+export const LOAD_INFO: Readonly<Record<'place' | 'fuel' | 'balance', InfoNote>> = {
+  place: { text: 'info.load.place', term: 'balance' },
+  fuel: { text: 'info.load.fuel' },
+  balance: { text: 'info.load.balance', term: 'balance' },
+}

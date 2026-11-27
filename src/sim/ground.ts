@@ -7,6 +7,7 @@
  */
 import { GROUND, type GroundId, type Range } from '../data/ground'
 import { RUT_SHAPE } from '../data/night'
+import { tableMarks, type TableJump } from '../data/rigs'
 import { SIM } from '../data/ride'
 import type { GroundMod } from '../data/weather'
 import { PI, detCos, detExp, detSin } from './det'
@@ -252,4 +253,30 @@ export function buildProfile(ground: GroundId, length: number, rng: Rng, mod?: G
   const out: Profile = { ground, step, length: (n - 1) * step, left, right }
   if (mod && mod.grip !== 1) out.grip = mod.grip
   return out
+}
+
+/**
+ * Lay a built tabletop jump (the jump ramp, `TableJump` in
+ * `src/data/rigs.ts`) on top of a profile, across both tracks: an entry
+ * curve up to the face's slope, a straight face to the lip, a flat top and a
+ * straight landing slope back down. The ground's own roughness stays on top.
+ */
+export function stampTable(profile: Profile, j: TableJump): void {
+  const { lip, topEnd, landEnd } = tableMarks(j)
+  const curveTop = (j.slope * j.entry) / 2
+  const heightAtX = (x: number): number => {
+    const d = x - j.at
+    if (d <= 0 || x >= landEnd) return 0
+    if (d < j.entry) return (j.slope * d * d) / (2 * j.entry)
+    if (x < lip) return curveTop + j.slope * (d - j.entry)
+    if (x < topEnd) return j.height
+    return j.height * (1 - (x - topEnd) / j.landing)
+  }
+  const n = profile.left.length
+  for (let i = 0; i < n; i++) {
+    const h = heightAtX(i * profile.step)
+    if (h === 0) continue
+    profile.left[i] = (profile.left[i] as number) + h
+    profile.right[i] = (profile.right[i] as number) + h
+  }
 }

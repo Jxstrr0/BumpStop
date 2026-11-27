@@ -1,5 +1,5 @@
 /**
- * The shop's three rigs (plan PR 4; the two lap loops started in plan PR 2
+ * The shop's rigs (plan PR 4; the two lap loops started in plan PR 2
  * for the balance bot).
  *
  * - **Shaker rig:** four posts shake the parked truck through a sweep of
@@ -8,6 +8,9 @@
  *   the speed where the dampers fade.
  * - **Torture loop:** whoops, rocks and jumps, faster every lap, to find what
  *   breaks: bottoming, mounts, axles, tires, the frame.
+ * - **Jump ramp** (v1.22, Kelbo picked it, 27 November 2026): one tabletop
+ *   jump a lap, 5 km/h faster each time, with every landing scored: how
+ *   level it came down, the bump stops, bottoming and bounces.
  *
  * Each lap of a loop drives the same road (the loop doesn't change), at the
  * lap's speed times each piece's `pace`: slower through the rocks, flat out
@@ -24,17 +27,51 @@
 import type { ClassId } from './classes'
 import type { GroundId } from './ground'
 
-export type RigId = 'washboardLadder' | 'tortureLoop'
+export type RigId = 'washboardLadder' | 'tortureLoop' | 'jumpRig'
+/** The two lap loops the balance bot checks (the jump ramp scores landings instead). */
+export type LoopRigId = Exclude<RigId, 'jumpRig'>
 
-/** Every rig in the shop, in the order the shop shows them. */
+/**
+ * Every rig in the shop, in the order the shop shows them. New rigs go on
+ * the end: each rig's road seed comes from its place in this list.
+ */
 export type ShopRigId = 'shaker' | RigId
-export const SHOP_RIGS: readonly ShopRigId[] = ['shaker', 'washboardLadder', 'tortureLoop']
+export const SHOP_RIGS: readonly ShopRigId[] = ['shaker', 'washboardLadder', 'tortureLoop', 'jumpRig']
+
+/**
+ * A built tabletop jump, laid on top of a piece's ground (metres along the
+ * piece, heights in metres):
+ *
+ *     run-up | entry curve | straight face | flat top | landing slope | run-out
+ *
+ * The entry curve bends the road up from flat to the face's slope, so the
+ * wheels aren't hit by a sudden edge; the straight face throws front and rear
+ * up alike. Land on the slope and the truck comes down with the ground
+ * falling away under it; too slow and it lands short on the flat top, too
+ * fast and it flies past the slope onto the flat.
+ */
+export interface TableJump {
+  /** Where the entry curve starts (m into the piece). */
+  at: number
+  /** Length of the entry curve (m). */
+  entry: number
+  /** The face's slope (rise over run). */
+  slope: number
+  /** Height of the lip and the flat top (m). */
+  height: number
+  /** Length of the flat top (m). */
+  top: number
+  /** Length of the landing slope, from the top back down to the ground (m). */
+  landing: number
+}
 
 export interface RigPiece {
   ground: GroundId
   length: number
   /** Share of the lap speed driven here. */
   pace: number
+  /** A built jump on this piece (the jump ramp). */
+  table?: TableJump
 }
 
 export interface Rig {
@@ -75,8 +112,57 @@ export const RIGS: Readonly<Record<RigId, Rig>> = {
     speedStep: 5 * KMH,
     maxLaps: 16,
   },
+  // The jump ramp: one tabletop a lap. The stock trucks land it best at
+  // about 50 to 55 km/h; from 60 they fly past the slope and bottom out.
+  jumpRig: {
+    id: 'jumpRig',
+    pieces: [{ ground: 'graded', length: 75, pace: 1, table: { at: 20, entry: 8, slope: 0.18, height: 1, top: 4, landing: 12 } }],
+    startSpeed: 45 * KMH,
+    speedStep: 5 * KMH,
+    maxLaps: 6,
+  },
 }
 
+/** Where a tabletop's lip, the end of its top and the foot of its landing are (m into the piece). */
+export function tableMarks(j: TableJump): { lip: number; topEnd: number; landEnd: number } {
+  const lip = j.at + j.entry + (j.height - (j.slope * j.entry) / 2) / j.slope
+  return { lip, topEnd: lip + j.top, landEnd: lip + j.top + j.landing }
+}
+
+/**
+ * How the jump ramp scores a landing (0 to 100). Each landing starts at 100
+ * and loses points for what went wrong; the word comes from the total. Angles
+ * in degrees, `g` the body's hardest jolt in g (1 g = standing still).
+ */
+export const LANDING = {
+  /** How long after the wheels first touch the landing is watched (s): the bump stops, bottoming and bounces. */
+  settle: 1.2,
+  /** Only flights that start this close to the lip, or past it, count as the jump (m before the lip). */
+  liftFrom: 1,
+  /** Shorter flights (s) are a wheel skipping, not the truck leaving the ground. */
+  minAir: 0.06,
+  /** Coming down within this of the ground's own angle is level (degrees). */
+  levelWithin: 4,
+  /** Points lost per degree past that, nose or tail first. */
+  perDegree: 1.5,
+  /** Points lost for each end (front, rear) that reached its bump stops. */
+  bumpStop: 4,
+  /** Points lost for each corner that bottomed out (metal to metal), up to `bottomCap` corners. */
+  bottom: 8,
+  bottomCap: 3,
+  /** Points lost for each bounce (all four wheels off the ground again). */
+  bounce: 6,
+  /** The body's jolt: points lost per g past `gFrom`, up to `gCap` points. */
+  gFrom: 3,
+  perG: 1.5,
+  gCap: 15,
+  /** Landing short on the flat top, or past the slope on the flat. */
+  short: 8,
+  flat: 8,
+  /** The words: at least this many points. Below `firm` it's Hard. */
+  clean: 80,
+  firm: 50,
+} as const
 /**
  * The shaker rig: all four posts move up and down together (a sine wave),
  * stepping from slow to fast. At each step it waits for the truck to settle
@@ -149,6 +235,10 @@ export const VIEW_3D = {
   slowMotion: 0.3,
   /** The shaker is slowed so no beat looks faster than this many a second (Hz). */
   shakerShownHz: 2.5,
+  /** The jump ramp's landing replay starts this long before take-off (s)... */
+  landingBefore: 0.6,
+  /** ...and its verdict stays on screen this long before the run carries on (real s). */
+  landingHold: 1.4,
 } as const
 
 /** How the ghost truck looks on the 3D test track: a blue copy you can see through, drawn over everything like an X-ray. */

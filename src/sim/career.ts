@@ -561,7 +561,7 @@ export function enterOwn(c: CareerState, driver: DriverId, bench?: TruckBuild): 
   c.money -= paid.entry - paid.sponsor
   c.job = { kind: 'own', driver, paid }
   // The bench's settings (same parts) go on the raid.
-  const b = bench ? { ...own, front: bench.front, rear: bench.rear } : own
+  const b: TruckBuild = bench ? { cls: own.cls, parts: own.parts, front: bench.front, rear: bench.rear, ...(bench.load ? { load: bench.load } : {}) } : own
   // Parts at the bivouacs come out of the garage's own money (none when broke), and are settled after the raid.
   return enterRaid(e.raid, b, driver, {
     seed: eventSeed(c), field: careerField(c.teams, cls, e.tier, c.year), hours: crewHours(c), budget: Math.max(0, c.money),

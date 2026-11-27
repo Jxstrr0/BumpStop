@@ -22,6 +22,7 @@ import { SAVE } from '../data/save'
 import { FAILURE_KINDS, type FailureKind } from '../data/wear'
 import { WEATHER_IDS } from '../data/weather'
 import { findPart, fitsClass, stockBuild, tidyBuild } from '../sim/build'
+import { tidyLoad } from '../sim/load'
 import type { CareerJob, CareerState, Contract, LongOneStory, NewsItem } from '../sim/career'
 import type { CareerHall, DriverTally, RivalTally, SeasonLine } from '../sim/hall'
 import { MOMENT_KINDS, newLog, tidyLogs, type TruckLog, type TruckMoment } from '../sim/logbook'
@@ -136,6 +137,9 @@ export function readBuild(raw: unknown, cls?: ClassId): TruckBuild {
     const axle = isObj(raw[end]) ? raw[end] : fail(`build has no ${end} settings`)
     for (const key of AXLE_KEYS) out[end][key] = finite(axle[key], `${end} ${key}`)
   }
+  // Weight and balance (27 November 2026): a build saved before it has no load, which is the stock load.
+  // Anything odd in it goes back to stock (`tidyLoad`) rather than failing the whole save.
+  if (isObj(raw.load)) out.load = tidyLoad(raw.load)
   return tidyBuild(out)
 }
 

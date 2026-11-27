@@ -1,5 +1,5 @@
 /**
- * The shop (plan PR 4): the three rigs, run live, ending on the report.
+ * The shop (plan PR 4): the rigs, run live, ending on the report.
  *
  * Pick a rig and start it. The sim runs a few hundred steps every frame
  * (`advanceLaps` / `advanceShaker`), so the screen shows the run as it
@@ -34,6 +34,11 @@
  * race a ghost, your best run there or a friend's (`ghostRace.ts`). The
  * ghost's own run is driven again step for step beside yours, shown as a
  * see-through truck in 3D, and the report says who lasted longer.
+ *
+ * The jump ramp (v1.22, Kelbo picked it, 27 November 2026) runs at true
+ * speed, one jump a lap. After each landing the run holds while the 3D view
+ * replays it in slow motion (not on Fast or Skip), and a line over the view
+ * gives its score. Its report is `jumpReport.ts`.
  */
 import { heatShare } from '../audio/cues'
 import { makeSound } from '../audio/sound'
@@ -54,6 +59,8 @@ import { SHOP_EVENT, type ShopEvent } from './events'
 import { jumpTo, type Jump } from './fixes'
 import { readFullPage, writeFullPage } from './fullPage'
 import { distanceText, ghostRace, raceText, type GhostPick } from './ghostRace'
+import { jumpReport } from './jumpReport'
+import { gradeChip, landingSummary } from './landingText'
 import { lapReport, shakerReport, type LapGhost } from './report'
 import { rigView } from './rigView'
 
@@ -98,6 +105,7 @@ function readGhost(raw: unknown): Ghost | null {
   const h = raw.history
   if (!isObj(h) || !(['distance', 'lap', 'oil', 'travel', 'wear'] as const).every((k) => isNums(h[k]))) return null
   if (![raw.brokenLap, raw.laps, raw.lastSpeed].every((x) => typeof x === 'number') || typeof raw.stopped !== 'boolean') return null
+  if (raw.landings !== undefined && !isNums(raw.landings)) return null
   if (raw.broken !== null && !isObj(raw.broken)) return null
   const tr = raw.trace
   if (tr !== null && !(isObj(tr) && isNums(tr.t) && isNums(tr.distance) && isObj(tr.channels))) return null
@@ -114,7 +122,18 @@ interface Race {
 }
 
 type Active =
-  | { kind: 'laps'; rig: RigId; cls: ClassId; truck: BuiltTruck; runner: LapRunner; ghost: LapGhostRun | null; race: Race | null }
+  | {
+      kind: 'laps'
+      rig: RigId
+      cls: ClassId
+      truck: BuiltTruck
+      runner: LapRunner
+      ghost: LapGhostRun | null
+      race: Race | null
+      /** The jump ramp: landings already shown, and whether the run is held while one is replayed. */
+      shown: number
+      held: boolean
+    }
   | { kind: 'shaker'; cls: ClassId; truck: BuiltTruck; runner: ShakerRunner; ghost: ShakerPoint[] | null; total: number; taken: number }
 
 /** Each class and rig drives its own road, the same every run, so a re-run shows exactly what a fix changed. */
@@ -125,6 +144,11 @@ function seedFor(cls: ClassId, rig: ShopRigId): number {
 /** Steps one lap takes at this lap's speed. */
 function lapSteps(r: LapRunner): number {
   return r.rig.pieces.reduce((sum: number, piece: RigPiece) => sum + piece.length / (r.lapSpeed * piece.pace), 0) * STEPS_PER_SECOND
+}
+
+/** The live trace a rig opens on: oil for the ladder, wear for the torture loop, travel for the jump ramp. */
+function defaultChannel(rig: ShopRigId): LiveChannel {
+  return rig === 'tortureLoop' ? 'wear' : rig === 'jumpRig' ? 'travel' : 'oil'
 }
 
 function reducedMotion(): boolean {
@@ -170,7 +194,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
       store.setClass(g.cls)
       if (store.cls() !== g.cls) return
       rig = g.rig
-      channel = g.rig === 'tortureLoop' ? 'wear' : 'oil'
+      channel = defaultChannel(g.rig)
       reset()
     },
   })
@@ -198,7 +222,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     b.addEventListener('click', () => {
       if (active) return
       rig = id
-      channel = id === 'tortureLoop' ? 'wear' : 'oil'
+      channel = defaultChannel(id)
       reset()
     })
     rigRow.append(b)
@@ -284,6 +308,9 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
   const ghostNote = el('p', 'small')
   const raceLine = el('p', 'small race-line')
   raceLine.setAttribute('aria-live', 'polite')
+  // The jump ramp: the last landing's score and what happened.
+  const landingLine = el('p', 'small landing-line')
+  landingLine.setAttribute('aria-live', 'polite')
 
   const controls = el('div', 'btn-row controls')
   const fastBtn = el('button', 'btn', t('shop.fast'))
@@ -328,7 +355,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
   // The numbers laid over the 3D view when it's full page; in the page they sit under it as before.
   const hud = el('div', 'live-hud')
   const headBox = el('div', 'live-headbox')
-  headBox.append(liveTop, progress, frameLine, raceLine)
+  headBox.append(liveTop, progress, frameLine, landingLine, raceLine)
   hud.append(headBox, corners)
   const traces = el('div', 'traces')
   traces.append(channelRow, chartTitle, chartHolder, legendHolder, ghostNote)
@@ -448,7 +475,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
         const ghostRunner = startLaps(ghostTruck.ride, ghostTruck.wear, RIGS[rig], seedFor(cls, rig), { airTemp: AIR, poses: VIEW_3D.poseSeconds, trace: false })
         rival = { pick, truck: ghostTruck, runner: ghostRunner, said: '' }
       }
-      active = { kind: 'laps', rig, cls, truck, runner, ghost: ghost?.kind === 'laps' ? ghost : null, race: rival }
+      active = { kind: 'laps', rig, cls, truck, runner, ghost: ghost?.kind === 'laps' ? ghost : null, race: rival, shown: 0, held: false }
       sound.startLaps(truck.build.parts.engine, cls)
     }
     fast = false
@@ -465,11 +492,13 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     for (const n of [corners, frameLine, channelRow]) n.hidden = !laps
     ghostNote.textContent = active.ghost ? t('shop.ghostNote') : ''
     raceLine.textContent = ''
+    landingLine.replaceChildren()
+    landingLine.hidden = !(active.kind === 'laps' && active.rig === 'jumpRig')
     live.prepend(view3d.element)
     if (active.kind === 'laps') {
       const r = active.race
       const ghostRun = r ? { truck: r.truck, log: r.runner.poses!, broken: () => r.runner.run.w.broken } : null
-      view3d.begin({ truck, road: active.runner.road, log: active.runner.poses!, ghost: ghostRun })
+      view3d.begin({ truck, road: active.runner.road, log: active.runner.poses!, ghost: ghostRun, trueSpeed: active.rig === 'jumpRig' })
     } else {
       const sr = active.runner
       view3d.begin({ truck, road: null, log: sr.poses!, beat: () => sr.freqs[Math.min(sr.index, sr.freqs.length - 1)] as number })
@@ -494,21 +523,45 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     // A long pause (the tab was hidden) shouldn't jump the run ahead.
     const dt = Math.min(0.1, (now - last) / 1000)
     last = now
-    if (skipping) {
+    if (a.kind === 'laps' && a.held) {
+      // A landing replay has the screen: the run waits for it.
+    } else if (skipping) {
       const until = performance.now() + RIG_VIEW.skipBudgetMs
       while (!a.runner.done && performance.now() < until) step(a, 2000)
     } else {
+      // The jump ramp plays at true speed, so the jump in 3D is the jump as it happened.
       const perSecond =
-        a.kind === 'laps' ? lapSteps(a.runner) / RIG_VIEW.secondsPerLap : a.total / RIG_VIEW.shakerSeconds
+        a.kind === 'laps' ? (a.rig === 'jumpRig' ? STEPS_PER_SECOND : lapSteps(a.runner) / RIG_VIEW.secondsPerLap) : a.total / RIG_VIEW.shakerSeconds
       carry += perSecond * dt * (fast ? RIG_VIEW.fastFactor : 1)
       const n = Math.floor(carry)
       carry -= n
       step(a, n)
     }
+    if (a.kind === 'laps') landed(a)
     hear(a, dt)
     drawLive(false)
     if (a.runner.done) finish(false)
     else raf = requestAnimationFrame(tick)
+  }
+
+  /**
+   * The jump ramp: a new landing has been scored. Say so over the view, and
+   * (unless the run is on Fast or Skip, or it just ended) hold the run while
+   * the 3D view replays it in slow motion.
+   */
+  function landed(a: Extract<Active, { kind: 'laps' }>): void {
+    const all = a.runner.landings
+    if (all.length <= a.shown) return
+    a.shown = all.length
+    const score = all[all.length - 1]!
+    landingLine.replaceChildren(gradeChip(score), ' ', tf('jump.liveLast', { n: String(score.lap), speed: num(msToKmh(score.speed)), score: String(score.score), what: landingSummary(score) }))
+    if (skipping || fast || a.runner.done || !view3d.works()) return
+    a.held = true
+    view3d.landing(score, () => {
+      if (active !== a) return
+      a.held = false
+      carry = 0
+    })
   }
 
   /** Tell the sound what the truck did this frame. */
@@ -583,7 +636,9 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
     }
     const r = a.runner
     const piece = r.rig.pieces[r.piece] as RigPiece
-    liveHead.textContent = tf('live.lap', { lap: String(r.lap), speed: num(msToKmh(r.lapSpeed)), ground: t(`ground.${piece.ground}` as StringKey) })
+    liveHead.textContent = a.rig === 'jumpRig'
+      ? tf('jump.live', { n: String(r.lap), total: String(r.rig.maxLaps), speed: num(msToKmh(r.lapSpeed)) })
+      : tf('live.lap', { lap: String(r.lap), speed: num(msToKmh(r.lapSpeed)), ground: t(`ground.${piece.ground}` as StringKey) })
     setProgress((r.run.w.distance - r.lapStart) / lapLength(r.rig), 'live.progress')
 
     const ride = a.truck.ride
@@ -594,9 +649,11 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
       const band = bandOf(oil, axle.damper.warmFrom - C0, axle.damper.redLine - C0)
       c.oil.textContent = `${num(oil)} °C`
       setChip(c.chip, band)
-      const travel = (r.stats.peakCompression[i] as number) / axle.bumpTravel
+      // Each corner's own travel: a load off to one side leaves the low side less (weight and balance).
+      const bump = a.truck.balance.corners[i]?.bumpTravel ?? axle.bumpTravel
+      const travel = (r.stats.peakCompression[i] as number) / bump
       c.travel.textContent = tf('live.cornerTravel', { pct: num(Math.max(0, travel) * 100) })
-      c.travel.className = `corner-line ${bandOf(travel, 1 - axle.bumpStopLength / axle.bumpTravel, 1)}-text`
+      c.travel.className = `corner-line ${bandOf(travel, 1 - axle.bumpStopLength / bump, 1)}-text`
       const wear = cornerWear(r, i)
       c.wear.textContent = tf('live.cornerWear', { pct: num(wear * 100) })
       c.wear.className = `corner-line ${bandOf(wear, WARM_SHARE, 1)}-text`
@@ -697,7 +754,8 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
       if (!stopped && a.runner.points.length > 0) ghosts.set(ghostKey(a.cls, 'shaker'), { kind: 'shaker', points: a.runner.points })
     } else {
       const run = lapResult(a.runner)
-      report = lapReport(run, stopped, a.ghost, ctx)
+      const rival = a.race ? { who: t(a.race.pick.source === 'best' ? 'ghost.whoBest' : 'ghost.whoFriend'), landings: a.race.runner.landings } : null
+      report = a.rig === 'jumpRig' ? jumpReport(run, stopped, a.ghost, ctx, rival) : lapReport(run, stopped, a.ghost, ctx)
       if (!stopped) raceVerdict(report, a, ghostFromRun(a.cls, a.rig, a.truck.build, run))
       const lastLap = run.laps[run.laps.length - 1]
       ghosts.set(ghostKey(a.cls, a.rig), {
@@ -709,6 +767,7 @@ export function shopPanel(store: BuildStore, saves?: ShopSaves): HTMLElement {
         stopped,
         trace: run.trace,
         history: run.history,
+        ...(run.landings.length > 0 ? { landings: run.landings.map((l) => l.score) } : {}),
       })
     }
     ghostsChanged()

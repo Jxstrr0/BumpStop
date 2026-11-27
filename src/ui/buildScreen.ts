@@ -17,6 +17,7 @@ import { shareBuildBlock } from './saves'
 import { truckCardBlock } from './truckCard'
 import { el, num, oneOpenAtATime } from './dom'
 import { infoButton, type ShowTerm } from './info'
+import { loadBlock, type LoadBlock } from './loadBlock'
 import { truckView } from './truckView'
 
 /** One slider: its setting, label, range in screen units, and how to show its value. */
@@ -165,6 +166,7 @@ export function buildPanel(store: BuildStore, showTerm?: ShowTerm): HTMLElement 
   // Pieces that refresh() updates without rebuilding, so a slider being dragged keeps its place.
   let outputs: { end: End; slider: Slider; out: HTMLOutputElement; input: HTMLInputElement }[] = []
   let geometry: { end: End; p: HTMLElement }[] = []
+  let load: LoadBlock | null = null
 
   function refresh(): void {
     const b = store.build()
@@ -236,6 +238,7 @@ export function buildPanel(store: BuildStore, showTerm?: ShowTerm): HTMLElement 
         droop: num(toMm(c.droopTravel)),
       })
     }
+    load?.update()
   }
 
   function slotBlock(slot: SlotId, open: boolean): HTMLElement {
@@ -368,6 +371,9 @@ export function buildPanel(store: BuildStore, showTerm?: ShowTerm): HTMLElement 
 
     const openSlots = new Set([...partsHolder.querySelectorAll<HTMLDetailsElement>('details[open]')].map((d) => d.dataset.slot))
     const openEnds = new Set([...tuneHolder.querySelectorAll<HTMLDetailsElement>('details[open]')].map((d) => d.dataset.end))
+    // The Load section (weight and balance) sits after the axles, one open at a time with them.
+    load = loadBlock(store, openEnds.has('load'), showTerm)
+    oneOpenAtATime(load.element, 'build-tune')
     const firstTime = tuneHolder.childElementCount === 0
     const focused = document.activeElement instanceof HTMLElement && box.contains(document.activeElement) ? document.activeElement.id : ''
 
@@ -380,6 +386,7 @@ export function buildPanel(store: BuildStore, showTerm?: ShowTerm): HTMLElement 
       linkBlock(),
       axleBlock('front', firstTime || openEnds.has('front')),
       axleBlock('rear', openEnds.has('rear')),
+      load.element,
     )
     if (focused) document.getElementById(focused)?.focus()
     refresh()
