@@ -290,6 +290,55 @@ input[type='range'] {
 .slot-part { font-weight: 600; }
 .slot-numbers, .option-meta { font-family: var(--mono); font-size: 13px; color: var(--muted); white-space: nowrap; }
 .axle > summary { font-family: var(--head); font-size: 20px; font-weight: 700; text-transform: uppercase; }
+
+/*
+ * The "i" buttons (src/ui/info.ts): a small round "i" in a 44 px tap area.
+ * The negative margins keep the big tap area from making the rows taller.
+ */
+.setting-head { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.info-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -14px -6px -14px 0;
+  padding: 0;
+  vertical-align: middle;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.info-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font: 700 13px/1 var(--ui);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+}
+.info-btn[aria-expanded='true'] .info-dot { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.info-note {
+  grid-column: 1 / -1;
+  margin: 2px 0 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: var(--panel-2);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+.info-note[hidden] { display: none; }
+.info-note p { margin: 0; }
+.info-note .btn { margin-top: 8px; }
+.slot > .info-note { margin: 0 0 8px; }
 .options { border: 0; margin: 0 0 8px; padding: 0; }
 .option {
   display: grid;
