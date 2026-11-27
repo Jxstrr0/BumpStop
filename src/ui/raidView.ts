@@ -18,6 +18,7 @@ import type { Pose } from '../sim/poses'
 import type { TrackView } from '../render/trackView'
 import { el } from './dom'
 import { photoMode } from './photoMode'
+import { swingCamera } from './swingCamera'
 import { stanceOf } from './truckView'
 
 /** Slow motion for a clip that ends on a break (share of true speed). */
@@ -49,6 +50,9 @@ export function raidView(onFail: () => void = () => {}): RaidView {
   // Photo mode (plan PR 12): freeze the highlight and frame a shot.
   const photo = photoMode(box, canvas, () => view, 'raid')
   caption.after(photo.button)
+  // The swing-around camera (v1.19): drag the picture to look round the truck as it drives.
+  const swing = swingCamera(box, canvas, () => view)
+  caption.after(swing.hint, swing.button)
   let loading: Promise<TrackView | null> | null = null
   let failed = false
   let poses: Pose[][] = []
@@ -110,10 +114,12 @@ export function raidView(onFail: () => void = () => {}): RaidView {
         view.play(p, { rate: 1, loop: false })
       }
       photo.ready(true)
+      swing.ready(true)
     },
     stop() {
       photo.close()
       photo.ready(false)
+      swing.ready(false)
       view?.stop()
     },
     works: () => !failed,

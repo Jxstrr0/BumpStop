@@ -19,6 +19,7 @@ import { PHOTO_LIFT, PHOTO_ZOOM } from '../data/graphics'
 import type { PhotoControls, TrackView } from '../render/trackView'
 import { albumHook, albumPicture, type PhotoPlace } from './album'
 import { el } from './dom'
+import { orbitDrag } from './orbitDrag'
 import { pictureName, pngFile, shareFile, stampMark } from './shareImage'
 
 /** The photo's longer side (pixels). */
@@ -112,39 +113,20 @@ export function photoMode(box: HTMLElement, canvas: HTMLCanvasElement, view: () 
     if (c) set({ ...c, zoom: PHOTO_ZOOM.max - (Number(zoom.input.value) / STEPS) * (PHOTO_ZOOM.max - PHOTO_ZOOM.min) })
   })
 
-  // Drag to turn and lift; pinch to zoom.
-  const pointers = new Map<number, { x: number; y: number }>()
-  let pinch = 0
-  function spread(): number {
-    const [a, b] = [...pointers.values()]
-    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0
-  }
-  function onDown(e: PointerEvent): void {
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    canvas.setPointerCapture(e.pointerId)
-    pinch = spread()
-  }
-  function onMove(e: PointerEvent): void {
-    const last = pointers.get(e.pointerId)
-    if (!last || !c) return
-    const dx = e.clientX - last.x
-    const dy = e.clientY - last.y
-    last.x = e.clientX
-    last.y = e.clientY
-    if (pointers.size >= 2) {
-      const now = spread()
-      if (pinch > 0 && now > 0) set({ ...c, zoom: c.zoom * (pinch / now) })
-      pinch = now
-    } else {
-      const w = Math.max(1, canvas.clientWidth)
-      set({ ...c, turn: c.turn - (dx / w) * Math.PI * 1.5, lift: c.lift + (dy / w) * Math.PI * 0.8 })
-    }
-    toSliders(c)
-  }
-  function onUp(e: PointerEvent): void {
-    pointers.delete(e.pointerId)
-    pinch = spread()
-  }
+  // Drag to turn and lift; pinch to zoom (only while photo mode is open).
+  orbitDrag(canvas, {
+    active: () => c !== null,
+    turn(dTurn, dLift) {
+      if (!c) return
+      set({ ...c, turn: c.turn + dTurn, lift: c.lift + dLift })
+      toSliders(c)
+    },
+    zoom(factor) {
+      if (!c) return
+      set({ ...c, zoom: c.zoom * factor })
+      toSliders(c)
+    },
+  })
   function onKey(e: KeyboardEvent): void {
     if (e.key === 'Escape') close()
   }
@@ -162,22 +144,13 @@ export function photoMode(box: HTMLElement, canvas: HTMLCanvasElement, view: () 
     document.body.classList.add('photo-open')
     bar.hidden = false
     button.hidden = true
-    canvas.addEventListener('pointerdown', onDown)
-    canvas.addEventListener('pointermove', onMove)
-    canvas.addEventListener('pointerup', onUp)
-    canvas.addEventListener('pointercancel', onUp)
     document.addEventListener('keydown', onKey)
     moment.input.focus()
   }
 
   function close(): void {
     if (!box.classList.contains('photo-on')) return
-    canvas.removeEventListener('pointerdown', onDown)
-    canvas.removeEventListener('pointermove', onMove)
-    canvas.removeEventListener('pointerup', onUp)
-    canvas.removeEventListener('pointercancel', onUp)
     document.removeEventListener('keydown', onKey)
-    pointers.clear()
     box.classList.remove('photo-on')
     document.body.classList.remove('photo-open')
     bar.hidden = true

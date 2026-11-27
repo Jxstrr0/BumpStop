@@ -82,3 +82,33 @@ export const TRACK_CAMERA = { fov: 40, designAspect: 16 / 10, maxFov: 72 } as co
 export const PHOTO_LIFT = { min: 0.03, max: 1.35 } as const
 /** Photo mode: how close and how far, as a share of the distance it opened at. */
 export const PHOTO_ZOOM = { min: 0.35, max: 2.5 } as const
+
+/**
+ * The swing-around camera (v1.19): drag the test track or a raid stage to
+ * walk the camera round the truck while it drives; it follows the truck
+ * until "Auto camera" hands it back to the TV-style shots.
+ *
+ * Distances are in truck lengths from the middle of the truck, so a heavy
+ * truck gets the same picture as a side-by-side. The camera never goes
+ * where the scenery would block it: on the right of the road the forest
+ * starts 8.5 m out, so it stops at `rightEdge`; on the left it stays inside
+ * the lane the scenery keeps clear for the cameras (`leftSpare` short of
+ * it). In the shaker's workshop it stays inside the walls and under the roof.
+ */
+export const SWING = {
+  /** Distance at zoom 1, in truck lengths (about where the side-on shot stands). */
+  base: 2.3,
+  zoom: { min: 0.3, max: 1.8 },
+  /** Furthest out on the right of the road (m from its middle). */
+  rightEdge: 7,
+  /** How far inside the cameras' clear lane on the left it stops (m). */
+  leftSpare: 1,
+  /** The workshop's inside, round the truck (m): end walls, back wall, roof. */
+  shop: { xMin: -16.4, xMax: 13.4, zMax: 6, yMax: 5.1 },
+  /** Turn and lift for a drag the width of the picture (radians). */
+  dragTurn: Math.PI * 1.5,
+  dragLift: Math.PI * 0.8,
+  /** One press of an arrow key (radians), and one press of + or − (share of the distance). */
+  keyTurn: 0.12,
+  keyZoom: 0.1,
+} as const
