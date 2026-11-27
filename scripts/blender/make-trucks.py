@@ -1516,11 +1516,10 @@ class Build:
         self.pinions = {}
         self.corner = {}
         self.outputs = {}
-        # The driveline is drawn into the body's own mesh (no extra draw
-        # calls). Set BUMP_SPLIT=1 to give it a node of its own, `Driveline`,
-        # for looking at it without the body while working on the models;
-        # don't commit models built that way.
-        self.drive = Part('Driveline') if os.environ.get('BUMP_SPLIT') else self.shell
+        # The driveline (engine, gearbox, transfer case, exhaust) is a node
+        # of its own, `Driveline`, so the game's X-ray view (v1.27) can hide
+        # the body and keep it: one extra draw call per truck.
+        self.drive = Part('Driveline')
 
     def layouts(self, key):
         """The layouts at one end ('F' or 'R'), stock first."""
@@ -2328,8 +2327,7 @@ def build_truck(cls, t, materials, lite=False):
             if kd in ('wishbone', 'trailingArm'):
                 independent_extras(b, key, kd, b.rig(key, kd))
 
-    if b.drive is not b.shell:
-        b.add(b.drive)
+    b.add(b.drive)
     shell = b.shell.finish(materials)
     place(shell, b.body, (0, 0, 0))
 

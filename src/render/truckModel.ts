@@ -35,6 +35,7 @@
  */
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
+import { SEE_THROUGH, type TruckLook } from '../data/graphics'
 import { DENT_PLACES } from '../data/grime'
 import { KITS } from '../data/kit'
 import type { SlotId } from '../data/parts'
@@ -180,12 +181,25 @@ export class TruckModel {
   private axles: { node: THREE.Object3D; left: number; right: number }[]
   /** Every bolt-on part in the model, and the slot and part ids that show it. */
   private fits: { node: THREE.Object3D; slot: string; parts: string[] }[] = []
+  /** The bolt-on nodes the build has fitted (shown unless X-ray takes the body off). */
+  private fitted = new Set<THREE.Object3D>()
   /** Corners whose wheel has been made to look broken, and how. */
   private broken = new Map<number, 'flat' | 'flop' | 'mount'>()
   /** Materials this copy made for itself (a ghost truck's, or its grimy paint), freed with it. */
   private owned: THREE.Material[] = []
   /** The grimy paint's shader values, once the truck has been given any grime (`setGrime`). */
   private grimeU: GrimeUniforms | null = null
+  /** Truck, X-ray or Both (`setLook`). */
+  private look: TruckLook = 'truck'
+  /** A see-through ghost truck (`ghostly`): its body only ever comes off, it's see-through already. */
+  private ghost = false
+  /** The body's nodes that X-ray takes off: the shell, and the bolt-ons on it (`SEE_THROUGH.bodySlots`). */
+  private shell: THREE.Object3D[] = []
+  /** Every mesh of the body, with the material it's drawn with as solid, while Both has it see-through. */
+  private bodyMeshes: THREE.Mesh[] = []
+  private solid = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>()
+  /** This copy's see-through materials for Both, one per solid one, made the first time. */
+  private clear = new Map<THREE.Material, THREE.Material>()
 
   static async load(cls: ClassId): Promise<TruckModel> {
     return new TruckModel(cls, await loadScene(cls))
@@ -255,6 +269,14 @@ export class TruckModel {
       const m = /^Fit_([A-Za-z]+)_([A-Za-z0-9-]+)/.exec(o.name)
       if (m) this.fits.push({ node: o, slot: m[1]!, parts: m[2]!.split('-') })
     })
+    this.shell.push(find('BodyShell'))
+    const bodySlots: readonly string[] = SEE_THROUGH.bodySlots
+    for (const f of this.fits) if (bodySlots.includes(f.slot)) this.shell.push(f.node)
+    for (const n of this.shell) {
+      n.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) this.bodyMeshes.push(o as THREE.Mesh)
+      })
+    }
     this.fit(KITS[cls].stock.parts)
   }
 
@@ -264,6 +286,8 @@ export class TruckModel {
       const part = parts[f.slot as SlotId]
       f.node.visible = part !== undefined && f.parts.includes(part)
     }
+    this.fitted = new Set(this.fits.filter((f) => f.node.visible).map((f) => f.node))
+    this.showBody()
     this.shocks.forEach((s, i) => {
       const susp = parts[i < 2 ? 'frontSusp' : 'rearSusp']
       const own = susp === undefined ? undefined : s.mounts.find((m) => m.parts?.includes(susp))
@@ -408,6 +432,9 @@ export class TruckModel {
 
   /** Swap the shared paint for this copy's grimy one. */
   private grimeOn(): GrimeUniforms {
+    // The grimy paint goes on the solid body; Both makes its see-through copy afterwards.
+    const look = this.look
+    this.setLook('truck')
     const u = grimeUniforms()
     u.uGrimeShape.value.set(this.radius, this.frontX, this.rearX, this.track / 2)
     const lite = !tierSettings().grimeDetail
@@ -441,7 +468,56 @@ export class TruckModel {
       mesh.material = Array.isArray(before) ? before.map((m) => own(m, spin)) : own(before, spin)
       if (mesh.material !== before) mesh.onBeforeRender = follow
     })
+    this.setLook(look)
     return u
+  }
+
+  /**
+   * Truck, X-ray or Both (Kelbo asked, 27 November 2026). X-ray takes the
+   * body off (the shell and the bolt-ons on it, `SEE_THROUGH.bodySlots`), so
+   * the frame, the engine and gearbox (`Driveline`) and the suspension stand
+   * on their own. Both keeps the body as a faint see-through skin over them:
+   * this copy's own clear materials (the shared ones are left alone), with
+   * no shadow, so the sun still lights what's under it. A ghost truck only
+   * loses its body in X-ray; it's see-through already.
+   */
+  setLook(look: TruckLook): void {
+    if (look === this.look) return
+    this.look = look
+    this.showBody()
+    const seeThrough = look === 'both' && !this.ghost
+    for (const mesh of this.bodyMeshes) {
+      if (seeThrough && !this.solid.has(mesh)) {
+        this.solid.set(mesh, mesh.material)
+        mesh.material = Array.isArray(mesh.material) ? mesh.material.map((m) => this.clearOf(m)) : this.clearOf(mesh.material)
+        mesh.castShadow = false
+      } else if (!seeThrough && this.solid.has(mesh)) {
+        mesh.material = this.solid.get(mesh)!
+        this.solid.delete(mesh)
+        mesh.castShadow = !this.ghost
+      }
+    }
+  }
+
+  /** The body's nodes shown or hidden for the look: X-ray takes them off, a bolt-on shows only if it's fitted. */
+  private showBody(): void {
+    const off = this.look === 'xray'
+    for (const n of this.shell) n.visible = !off && (n.name === 'BodyShell' || this.fitted.has(n))
+  }
+
+  /** A see-through copy of one of the body's materials, for Both. */
+  private clearOf(m: THREE.Material): THREE.Material {
+    let c = this.clear.get(m)
+    if (!c) {
+      c = m.clone()
+      c.name = `${m.name}SeeThrough`
+      c.transparent = true
+      c.opacity = m.name === 'Glass' ? SEE_THROUGH.glassOpacity : SEE_THROUGH.opacity
+      c.depthWrite = false
+      this.clear.set(m, c)
+      this.owned.push(c)
+    }
+    return c
   }
 
   /**
@@ -452,6 +528,8 @@ export class TruckModel {
    * inside it otherwise.
    */
   ghostly(tint: THREE.Color, opacity: number, mix: number): void {
+    this.setLook('truck')
+    this.ghost = true
     const made = new Map<THREE.Material, THREE.Material>()
     const own = (m: THREE.Material): THREE.Material => {
       let c = made.get(m)

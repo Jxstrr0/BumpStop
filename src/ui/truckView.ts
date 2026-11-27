@@ -15,6 +15,7 @@ import { buildTruck, stockBuild, type BuiltTruck } from '../sim/build'
 import type { Garage } from '../render/garage'
 import type { BuildStore } from './buildStore'
 import { el, num } from './dom'
+import { followTruckLook, truckLookToggle } from './truckLook'
 
 const stockCache = new Map<ClassId, BuiltTruck>()
 function stockOf(cls: ClassId): BuiltTruck {
@@ -55,7 +56,7 @@ export function truckView(store: BuildStore): TruckViewHandle {
   canvas.setAttribute('role', 'img')
   const status = el('p', 'small truck-status', t('view.loading'))
   const hint = el('figcaption', 'small', t('view.hint'))
-  box.append(canvas, status, hint)
+  box.append(canvas, status, truckLookToggle(), hint)
 
   let garage: Garage | null = null
   let failed = false
@@ -97,6 +98,8 @@ export function truckView(store: BuildStore): TruckViewHandle {
     try {
       const { createGarage } = await import('../render/garage')
       garage = createGarage(canvas)
+      // Truck, X-ray or Both (v1.27): the same pick as every other 3D view.
+      followTruckLook((look) => garage?.setLook(look))
       const truck = store.truck()
       describe()
       shown = garage.show(truck.build.cls, stanceOf(truck), truck.build.parts).then(

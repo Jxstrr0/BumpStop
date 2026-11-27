@@ -11,6 +11,7 @@
  */
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
+import type { TruckLook } from '../data/graphics'
 import { addLights, applyLook, applyTier, cssColour, makeRenderer, onLookChange } from './look'
 import { frameTime, onTierChange } from './tiers'
 import { REST_POSE, TruckModel, type FittedParts, type Stance } from './truckModel'
@@ -24,6 +25,8 @@ export interface Garage {
    * Null before a truck is in.
    */
   snapshot(width: number, height: number): HTMLCanvasElement | null
+  /** Truck, X-ray or Both: the body as built, taken off, or see-through (v1.27). */
+  setLook(look: TruckLook): void
   dispose(): void
 }
 
@@ -63,6 +66,7 @@ export function createGarage(canvas: HTMLCanvasElement): Garage {
   const stopLook = onLookChange(look)
 
   let truck: TruckModel | null = null
+  let truckLook: TruckLook = 'truck'
   let wanted = 0
   let turn = 0.6
   let lastHand = -Infinity
@@ -163,6 +167,7 @@ export function createGarage(canvas: HTMLCanvasElement): Garage {
         if (ticket !== wanted) return
         truck?.dispose()
         truck = next
+        truck.setLook(truckLook)
         scene.add(truck.root)
         const reach = truck.length * 0.7
         const cam = lights.sun.shadow.camera
@@ -184,6 +189,8 @@ export function createGarage(canvas: HTMLCanvasElement): Garage {
       const ratio = renderer.getPixelRatio()
       const wasTurn = turn
       turn = SNAPSHOT_TURN
+      // The card shows the truck as built, whatever the view is set to.
+      truck.setLook('truck')
       renderer.setPixelRatio(1)
       renderer.setSize(width, height, false)
       camera.aspect = width / height
@@ -194,9 +201,15 @@ export function createGarage(canvas: HTMLCanvasElement): Garage {
       out.height = height
       out.getContext('2d')?.drawImage(canvas, 0, 0, width, height)
       turn = wasTurn
+      truck.setLook(truckLook)
       renderer.setPixelRatio(ratio)
       resize()
       return out
+    },
+    setLook(next) {
+      truckLook = next
+      truck?.setLook(next)
+      draw()
     },
     dispose() {
       cancelAnimationFrame(raf)

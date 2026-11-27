@@ -21,6 +21,7 @@ import { albumHook, albumPicture, type PhotoPlace } from './album'
 import { el } from './dom'
 import { orbitDrag } from './orbitDrag'
 import { pictureName, pngFile, shareFile, stampMark } from './shareImage'
+import { truckLookToggle } from './truckLook'
 
 /** The photo's longer side (pixels). */
 const PHOTO_SIZE = 2048
@@ -84,7 +85,8 @@ export function photoMode(box: HTMLElement, canvas: HTMLCanvasElement, view: () 
   row.append(take, keep, done)
   const note = el('p', 'small photo-note')
   note.setAttribute('aria-live', 'polite')
-  bar.append(hint, moment.wrap, turn.wrap, zoom.wrap, row, note)
+  // Truck, X-ray or Both (v1.27): a photo can show the suspension with the body off, too.
+  bar.append(hint, truckLookToggle(), moment.wrap, turn.wrap, zoom.wrap, row, note)
   box.append(bar)
 
   let c: PhotoControls | null = null
