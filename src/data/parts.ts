@@ -36,6 +36,8 @@ export type SlotId =
   | 'tires'
   | 'protection'
   | 'engine'
+  | 'lightBar'
+  | 'spots'
   | 'spares'
   | 'recovery'
 
@@ -55,6 +57,8 @@ export const SLOTS: readonly SlotId[] = [
   'tires',
   'protection',
   'engine',
+  'lightBar',
+  'spots',
   'spares',
   'recovery',
 ]
@@ -176,6 +180,22 @@ export interface EnginePart extends PartCommon {
   torque: number
 }
 
+/**
+ * Lamps for the night stages (Kelbo, 27 November 2026): a light bar on the
+ * roof and spot lamps on the bull bar, on top of the truck's own headlamps.
+ * See `src/data/night.ts` for how the beam sets the speed in the dark and
+ * how many ruts the driver sees.
+ */
+export interface LightPart extends PartCommon {
+  slot: 'lightBar' | 'spots'
+  /** How far down the road the lamps light well enough to brake for something (m). */
+  reach: number
+  /** How much of the road's width and the corners they light, 0 to 1: the share of ruts that fall in the beam. */
+  spread: number
+  /** Electric power the lamps draw at night (W), which the engine has to make. */
+  draw: number
+}
+
 /** The spares a truck can carry for roadside fixes and the bivouac (plan PR 7). */
 export type SpareId = 'tire' | 'shock' | 'cv'
 export const SPARE_IDS: readonly SpareId[] = ['tire', 'shock', 'cv']
@@ -213,11 +233,15 @@ export type Part =
   | TirePart
   | ProtectionPart
   | EnginePart
+  | LightPart
   | SparesPart
   | RecoveryPart
 
 /** The part type that fits a slot. */
-export type PartIn<S extends SlotId> = Extract<Part, { slot: S }> | (S extends 'rearSusp' | 'frontSusp' ? SuspensionPart : never)
+export type PartIn<S extends SlotId> =
+  | Extract<Part, { slot: S }>
+  | (S extends 'rearSusp' | 'frontSusp' ? SuspensionPart : never)
+  | (S extends 'lightBar' | 'spots' ? LightPart : never)
 
 const kW = 1000
 
@@ -404,6 +428,28 @@ export const PARTS: readonly Part[] = [
     mass: { sxs: 60 }, cost: { sxs: 4000 }, power: 75 * kW, torque: 1.15 },
   { slot: 'engine', id: 'turboTwin', name: 'part.turboTwin', text: 'part.turboTwinText', year: 2008,
     mass: { sxs: 62 }, cost: { sxs: 6000 }, power: 125 * kW, torque: 1.4 },
+
+  // ── Light bar (night stages, after 1.20) ──
+  // A roof bar is wide: it lights the whole road and into the corners, so the driver sees the ruts at the sides.
+  // Halogen first (four or six round lamps, hot and hungry), then LED (2008): further, wider, lighter, a third of the draw.
+  { slot: 'lightBar', id: 'noLightBar', name: 'part.noLightBar', text: 'part.noLightBarText', year: 1985,
+    mass: { light4x4: 0, heavy: 0, sxs: 0 }, cost: { light4x4: 0, heavy: 0, sxs: 0 }, reach: 0, spread: 0, draw: 0 },
+  { slot: 'lightBar', id: 'halogenBar', name: 'part.halogenBar', text: 'part.halogenBarText', year: 1985,
+    mass: { light4x4: 16, heavy: 26, sxs: 9 }, cost: { light4x4: 900, heavy: 1600, sxs: 600 }, reach: 110, spread: 0.75, draw: 520 },
+  { slot: 'lightBar', id: 'ledBar', name: 'part.ledBar', text: 'part.ledBarText', year: 2008,
+    mass: { light4x4: 9, heavy: 15, sxs: 5 }, cost: { light4x4: 2600, heavy: 4200, sxs: 1700 }, reach: 170, spread: 0.92, draw: 240 },
+
+  // ── Spot lamps (night stages, after 1.20) ──
+  // A pair of spots on the bull bar throws a narrow beam a long way: the driver can keep the speed up in the dark,
+  // but they light little of the road's edges. Halogen (1985), then HID (1996) and LED (2012).
+  { slot: 'spots', id: 'noSpots', name: 'part.noSpots', text: 'part.noSpotsText', year: 1985,
+    mass: { light4x4: 0, heavy: 0, sxs: 0 }, cost: { light4x4: 0, heavy: 0, sxs: 0 }, reach: 0, spread: 0, draw: 0 },
+  { slot: 'spots', id: 'halogenSpots', name: 'part.halogenSpots', text: 'part.halogenSpotsText', year: 1985,
+    mass: { light4x4: 7, heavy: 12, sxs: 4 }, cost: { light4x4: 500, heavy: 900, sxs: 350 }, reach: 190, spread: 0.3, draw: 260 },
+  { slot: 'spots', id: 'hidSpots', name: 'part.hidSpots', text: 'part.hidSpotsText', year: 1996,
+    mass: { light4x4: 6, heavy: 10, sxs: 3 }, cost: { light4x4: 1800, heavy: 3000, sxs: 1200 }, reach: 280, spread: 0.32, draw: 110 },
+  { slot: 'spots', id: 'ledSpots', name: 'part.ledSpots', text: 'part.ledSpotsText', year: 2012,
+    mass: { light4x4: 4, heavy: 7, sxs: 2 }, cost: { light4x4: 2400, heavy: 3800, sxs: 1500 }, reach: 360, spread: 0.38, draw: 90 },
 
   // ── Spares carried ──
   { slot: 'spares', id: 'noSpares', name: 'part.noSpares', text: 'part.noSparesText', year: 1985,

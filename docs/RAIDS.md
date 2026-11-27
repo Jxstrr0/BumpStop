@@ -245,6 +245,13 @@ roll: `src/sim/weather.ts`; driving it: `advanceStage` in `src/sim/raid.ts`.
 - **Saves:** each stage result keeps the day's weather (`StageRecord.weather`);
   saves from before have none and load as they are.
 
+## Night stages (v1.24)
+
+Some winter stages run into the dark, and the Polar Night Raid gets darker
+every day. The stage splits where it gets dark; after that the driver only
+goes as fast as the lamps let them stop, and ruts outside the beam are hit
+blind. All of it: `docs/NIGHT.md`.
+
 ## The pace check and what Push costs
 
 Playtest, 26 November 2026: "Push is always right, and the rigs don't
@@ -288,6 +295,11 @@ pose log runs while each sample is driven, then the busiest five seconds
 them, plus room for the camera. If something broke in the sample, the clip
 is the last 3.5 seconds before the break. Recording never changes a result;
 a test checks it.
+
+Since the radio co-driver (v1.23.0.0) a clip starts up to two seconds
+before its busiest stretch (`CLIP.lead`), still five seconds long, so the
+truck is seen coming up to the jump and the co-driver has time to call it
+(`docs/SOUND.md`, "The radio co-driver").
 
 ## The raid balance bot
 

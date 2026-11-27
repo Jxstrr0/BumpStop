@@ -243,6 +243,12 @@ export interface RaidStage {
    * under it (km/h). See `src/data/winter.ts`.
    */
   ice?: { cm: number; waveKmh: number }
+  /**
+   * Night stages (Kelbo, 27 November 2026): where it gets dark, as a share
+   * of the stage (0 is dark from the start). Missing means it finishes in
+   * daylight. See `src/data/night.ts`.
+   */
+  dark?: number
 }
 
 export interface Raid {
@@ -366,12 +372,13 @@ export const RAIDS: Readonly<Record<RaidId, Raid>> = {
     text: 'raid.autumnRaid.text',
     season: 'summer',
     seed: 7501,
+    // As the nights draw in: each day gets dark earlier, and the last runs all night (night stages, after 1.20).
     stages: [
-      { ...LONG_STAGES.logging, airC: 14 },
-      { ...LONG_STAGES.burn, airC: 15 },
-      { ...LONG_STAGES.mines, airC: 13 },
-      { ...LONG_STAGES.eskers, airC: 14 },
-      { ...LONG_STAGES.rock, airC: 12 },
+      { ...LONG_STAGES.logging, airC: 14, dark: 0.75 },
+      { ...LONG_STAGES.burn, airC: 15, dark: 0.6 },
+      { ...LONG_STAGES.mines, airC: 13, dark: 0.45 },
+      { ...LONG_STAGES.eskers, airC: 14, dark: 0.3 },
+      { ...LONG_STAGES.rock, airC: 12, dark: 0 },
     ],
   },
   longOne: {
@@ -403,7 +410,8 @@ export const RAIDS: Readonly<Record<RaidId, Raid>> = {
       { tag: 'stage.frostHeaves', airC: -18, segments: route(
         ['snow', 14], ['iceHeaves', 6], ['snow', 10], ['rocks', 3], ['iceHeaves', 5], ['snow', 14],
         ['iceHeaves', 6], ['rocks', 2], ['snow', 14], ['iceHeaves', 4], ['snow', 10]) },
-      { tag: 'stage.bigLake', airC: -28, ice: { cm: 46, waveKmh: 45 }, segments: route(
+      // The short winter day runs out halfway across the big lake.
+      { tag: 'stage.bigLake', airC: -28, ice: { cm: 46, waveKmh: 45 }, dark: 0.5, segments: route(
         ['snow', 8], ['ice', 30], ['iceHeaves', 4], ['ice', 26], ['snow', 10], ['ice', 12], ['snow', 6]) },
     ],
   },
@@ -421,7 +429,7 @@ export const RAIDS: Readonly<Record<RaidId, Raid>> = {
         ['rough', 6], ['snow', 20], ['iceHeaves', 6], ['snow', 17]) },
       { tag: 'stage.bigLake', airC: -30, ice: { cm: 45, waveKmh: 55 }, segments: route(
         ['snow', 10], ['ice', 45], ['iceHeaves', 5], ['ice', 40], ['snow', 12], ['ice', 30], ['snow', 13]) },
-      { tag: 'stage.tundra', airC: -22, ice: { cm: 65, waveKmh: 50 }, segments: route(
+      { tag: 'stage.tundra', airC: -22, ice: { cm: 65, waveKmh: 50 }, dark: 0.4, segments: route(
         ['snow', 25], ['rough', 8], ['snow', 20], ['iceHeaves', 10], ['rocks', 4], ['snow', 25], ['iceHeaves', 8],
         ['snow', 22], ['ice', 20], ['snow', 18]) },
     ],

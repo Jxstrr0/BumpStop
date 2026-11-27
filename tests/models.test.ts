@@ -57,7 +57,7 @@ function gltfJson(path: string): Gltf {
 const CORNERS = ['FL', 'FR', 'RL', 'RR']
 
 /** Parts with nothing to bolt on, so nothing to draw. */
-const NOTHING_TO_SEE = new Set(['noGuards', 'noSpares', 'noBars', 'shovelOnly'])
+const NOTHING_TO_SEE = new Set(['noGuards', 'noSpares', 'noBars', 'noLightBar', 'noSpots', 'shovelOnly'])
 /** Slots drawn once per corner. */
 const PER_CORNER: readonly SlotId[] = ['dampers', 'wheels', 'tires']
 

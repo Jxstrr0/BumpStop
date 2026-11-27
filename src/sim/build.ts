@@ -28,6 +28,7 @@ import { PARTS, SLOTS, type Part, type PartIn, type SlotId } from '../data/parts
 import { SIM, TEST_MULES, type AxleSetup, type DamperSetup, type RideSetup } from '../data/ride'
 import { MULE_WEAR, type AxleWear, type FatigueSpec, type WearSetup } from '../data/wear'
 import { powInt } from './det'
+import { beamOf, type Beam } from './night'
 import { loadShift, tidyLoad, type KitWeights } from './load'
 import { RECOVERY } from '../data/recovery'
 
@@ -86,6 +87,8 @@ export interface BuiltTruck {
   cost: number
   /** Engine peak power (W). */
   power: number
+  /** The lamps for night stages: headlamps plus any light bar and spots (`src/sim/night.ts`). */
+  beam: Beam
   front: CornerGeometry
   rear: CornerGeometry
 }
@@ -363,6 +366,7 @@ export function buildTruck(input: TruckBuild): BuiltTruck {
     balance: balanceOf(ride, corners, stockSag, stockLoad, runMass, sprungMass + 2 * (unsprung[0] as number) + 2 * (unsprung[1] as number)),
     cost,
     power: engine.power,
+    beam: beamOf(partIn(b, 'lightBar'), partIn(b, 'spots')),
     front: corners[0] as CornerGeometry,
     rear: corners[1] as CornerGeometry,
   }

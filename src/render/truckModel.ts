@@ -271,6 +271,18 @@ export class TruckModel {
     })
   }
 
+  /** Hang something on the body so it moves with it (the night lamps' lights, `lamps.ts`). */
+  attach(o: THREE.Object3D): void {
+    this.body.add(o)
+  }
+
+  /** The body's bounds in its own space, as it sits at rest: nose, tail, floor and roof (m). */
+  bodyBounds(): THREE.Box3 {
+    this.root.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(this.body)
+    return box.applyMatrix4(this.body.matrixWorld.clone().invert())
+  }
+
   /** Overall length (m), for framing the camera. */
   get length(): number {
     return this.frontX - this.rearX + this.radius * 4

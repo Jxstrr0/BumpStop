@@ -118,3 +118,37 @@ export const SWING = {
   keyTurn: 0.12,
   keyZoom: 0.1,
 } as const
+
+/**
+ * Night stages (after 1.20): how the 3D looks in the dark. The sky goes to
+ * night whatever the phone's theme, the moon gives a faint blue light, and
+ * the truck's lamps are real spotlights (`src/render/lamps.ts`).
+ */
+export const NIGHT_LOOK = {
+  /** Moonlight: the sky light and the "sun" (now the moon), as shares of their night-mode brightness. */
+  moon: 0.16,
+  /** Fog colour in the dark, and how near it closes in (m): the dark swallows everything past the lamps. */
+  fog: 0x05070d,
+  fogNear: 25,
+  fogFar: 140,
+  /** Warm halogen white. */
+  colour: 0xfff1d8,
+  /** Brightness of a headlamp-reach light (three.js candela-ish); a longer reach is brighter in step. */
+  intensity: 60,
+  /** The wide light's share of that when there are two. */
+  wideShare: 0.8,
+  /** A light reaches this many times the lamp's reach before it's gone. */
+  distance: 1.6,
+  /** Soft edge of the beam (0 hard, 1 all soft). */
+  penumbra: 0.55,
+  /** How fast it fades with distance (2 is real; less carries further on screen). */
+  decay: 1,
+  /** Half-angle of the beam for spread 0 and spread 1 (radians). */
+  angle: [0.12, 0.85] as const,
+  /** Each lamp aims at the road this share of its reach ahead. */
+  aim: 0.35,
+  /** The road sits this far below the body's lowest point (m), near enough. */
+  groundBelow: 0.25,
+  /** Headlamps sit this share of the way up the body. */
+  headlampHeight: 0.4,
+} as const

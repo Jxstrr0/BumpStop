@@ -4,10 +4,12 @@ How a player's build turns into a truck the sim can drive (plan PR 3). The
 parts are in `src/data/parts.ts`, each class's settings, ranges and stock
 build in `src/data/kit.ts`, and the builder in `src/sim/build.ts`.
 
-## Twelve slots
+## Fourteen slots
 
 Frame, front suspension, rear suspension, dampers, bump stops, anti-roll
-bars, axles and CVs, wheels, tires, protection, engine and spares. Every
+bars, axles and CVs, wheels, tires, protection, engine, light bar, spot
+lamps and spares (the two lamp slots came with night stages, v1.24:
+`docs/NIGHT.md`). Every
 part lists its mass (kg, whole truck) and cost (cr., the game's money) for each class it
 comes in, and the year it can first be bought. A part with no number for a
 class doesn't come in that size: heavy trucks have no spaceframe, and

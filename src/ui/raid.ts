@@ -16,6 +16,11 @@
  *    and the skip button along the bottom, and the checkpoint as a card that
  *    comes up from the bottom. "Traces" drops back to the page with the trace
  *    (the same remembered pick as the test track, `fullPage.ts`).
+ *    The radio co-driver (Kelbo picked it, 27 November 2026) calls what's
+ *    ahead as each clip starts, read from that clip's real road ("Caution.
+ *    Big jump. 50."), plus the start, the checkpoints, the finish, stops,
+ *    the ice creaking, the weather turning and the shocks warming up. His
+ *    words show over the picture too (`src/audio/pacenotes.ts`, `radio.ts`).
  * 4. **Results:** the day's times and the overall standings.
  * 5. **The bivouac:** pick jobs for the night within the hours and spares.
  * 6. **Final results** after the last stage.
@@ -24,7 +29,11 @@
  * stage and at the end, so a reload comes back to that screen. A reload in
  * the middle of a stage starts that stage again from its morning.
  */
+import { clipCall } from '../audio/pacenotes'
+import { getRadio } from '../audio/radio'
 import { CLASSES } from '../data/classes'
+import type { RadioLine } from '../data/radio'
+import type { GroundId } from '../data/ground'
 import { SPARE_IDS, type SpareId } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, FREE_RAID_IDS, JOBS, PACES, RAID, RAIDS, RIVALS, type DriverId, type PaceId, type RaidId, type Rival } from '../data/raids'
 import { t, tf, type StringKey } from '../data/strings'
@@ -48,10 +57,11 @@ import { raidGrime } from '../sim/grime'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
   advanceStage, bivouacHours, bivouacJobs, sweptIn, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isCondPart, isRestDay, isUnderPart, leaveCheckpoint,
-  partsBudget, partsMoney, parTime, raidOf, raidTruck, raidWeather, stageKm, standings, startStage,
+  nightOutlook, partsBudget, partsMoney, parTime, raidOf, raidTruck, raidWeather, stageKm, standings, startStage,
   type IceNote, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
 } from '../sim/raid'
 import { forecastAt, forecastWord, weatherOn, type StageWeather } from '../sim/weather'
+import { darkAt, darkFrom } from '../sim/night'
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, bandOf, lineChart, type Band, type LineChart } from './charts'
 import { el, num, showTabFor } from './dom'
@@ -324,6 +334,9 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
   /** What to do if the 3D can't start: the stage on screen sets this, to go back to the page. */
   let onViewFail: () => void = () => {}
   const view3d = raidView(() => onViewFail())
+  const radio = getRadio()
+  /** Stops the last stage's captions listener. */
+  let unCaption: () => void = () => {}
   /** Hand the garage a copy, so a stage driven after this can't change what's saved. */
   const saveRaid = () => saves?.onRaid(state ? structuredClone(state) : null)
 
@@ -535,13 +548,20 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
         kind: weatherName(forecast!.kind, true), word: t(`forecast.${forecastWord(forecast!.chance)}` as StringKey), to: num(forecast!.to / 1000),
       }), 'warm-text')
     }
-    /** The checkpoints and the forecast note that come before km `k`, in order. */
+    // Where it gets dark, if it does: a pencil note too.
+    const darkKm = (() => { const d = darkFrom(spec); return d === null ? null : d / 1000 })()
+    let darkNoted = darkKm === null
+    /** The checkpoints, the forecast note and nightfall that come before km `k`, in order. */
     const marksBefore = (k: number) => {
       for (;;) {
         const cpAt = cp < cps.length && (cps[cp] as number) <= k ? (cps[cp] as number) : Infinity
         const noteAt = !noted && forecast!.from / 1000 < k ? forecast!.from / 1000 : Infinity
-        if (cpAt === Infinity && noteAt === Infinity) return
-        if (noteAt < cpAt) note()
+        const darkAt = !darkNoted && (darkKm as number) < k ? (darkKm as number) : Infinity
+        if (cpAt === Infinity && noteAt === Infinity && darkAt === Infinity) return
+        if (darkAt <= noteAt && darkAt <= cpAt) {
+          darkNoted = true
+          row(Math.round(darkAt), t('raidUi.bookDark'), 'warm-text')
+        } else if (noteAt < cpAt) note()
         else {
           row(cpAt, tf('raidUi.checkpoint', { n: String(cp + 1) }), 'rb-cp')
           cp++
@@ -549,7 +569,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       }
     }
     for (const seg of spec.segments) {
-      marksBefore(km)
+      // Nightfall right at the start of a piece goes before it.
+      marksBefore(km + (darkKm === km ? 1e-6 : 0))
       row(km, tf('raidUi.segment', { ground: t(`ground.${seg.ground}` as StringKey), km: num(seg.km) }))
       km += seg.km
     }
@@ -585,6 +606,37 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       )
     }
 
+    // After dark: how far the lamps reach, what that does to the speed, and how many ruts they should show.
+    const nightBox = el('div')
+    const outlook = nightOutlook(spec, wornTruck(truck, s.cond), s.entry.driver, 'steady')
+    if (outlook) {
+      const beam = truck.beam
+      const darkKmNow = num(outlook.length / 1000)
+      const unseen = outlook.ruts > 0 ? 1 - outlook.seen / outlook.ruts : 0
+      const band: Band = unseen <= 0.3 ? 'cool' : unseen <= 0.55 ? 'warm' : 'hot'
+      const slowed = outlook.slowed.map((x) => tf('raidUi.nightSlowItem', {
+        ground: t(`ground.${x.ground}` as StringKey), night: num(x.night * 3.6), day: num(x.day * 3.6),
+      }))
+      const ruts = el('p', 'readout-line')
+      ruts.append(
+        tf('raidUi.nightRuts', { ruts: num(outlook.ruts), seen: num(outlook.seen) }), ' ',
+        el('span', `chip ${band}`, BAND_WORD[band]),
+      )
+      const lampsJump = button(t('raidUi.toLights'), 'btn small-btn')
+      lampsJump.addEventListener('click', () => jumpTo({ kind: 'slot', slot: 'lightBar' }))
+      nightBox.append(
+        el('h4', 'raid-sub', t('raidUi.nightHead')),
+        el('p', 'readout-line', outlook.dark <= 0 ? tf('raidUi.nightAll', { dark: darkKmNow }) : tf('raidUi.nightFrom', { km: num(outlook.dark / 1000), dark: darkKmNow })),
+        el('p', 'readout-line', tf('raidUi.nightLamps', { reach: num(beam.reach), spread: num(beam.spread * 100) })),
+        el('p', 'small', slowed.length
+          ? tf('raidUi.nightSlowed', { list: slowed.join(', '), pace: t('pace.steady').toLowerCase(), lost: gap(outlook.lost).slice(1) })
+          : tf('raidUi.nightFast', { pace: t('pace.steady').toLowerCase() })),
+        ruts,
+        el('p', 'small', t('raidUi.nightNote')),
+        lampsJump,
+      )
+    }
+
     // The pace check (playtest, 26 November 2026): what each pace call does to this truck on today's rough ground.
     const checkBox = paceCheckBlock(wornTruck(truck, s.cond), s.entry.driver, groundsToCheck(spec.segments.map((x) => x.ground)), spec.airC, 'paceCheck.leadRaid')
 
@@ -597,6 +649,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       syncPace()
     })
     syncPace()
+    // Get the co-driver's voice ready while the player reads the roadbook.
+    radio.prepare()
     const start = button(t('raidUi.start'), 'btn start-btn')
     start.addEventListener('click', () => {
       run = startStage(s, raidTruck(s, store.build()), pace)
@@ -604,7 +658,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     })
     show(
       head, facts, fuelLine, rocks, stuck,
-      el('h4', 'raid-sub', t('raidUi.roadbook')), book, weatherBox, iceBox,
+      el('h4', 'raid-sub', t('raidUi.roadbook')), book, weatherBox, nightBox, iceBox,
       el('h4', 'raid-sub', t('raidUi.condition')), conditionList(s),
       el('p', 'small', tf('raidUi.sparesLine', { list: sparesList(s.spares) })), settings,
       checkBox, el('h4', 'raid-sub', t('raidUi.paceCall')), paceRow, paceText, start, retireButton(),
@@ -618,6 +672,9 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     stopTimers()
     const s = state!
     const r = run!
+    // Every way in here is a tap, which is when browsers let sound start.
+    radio.hush()
+    radio.wake()
     const raid = raidOf(s)
     const totalM = stageKm(r.spec) * 1000
     const head = el('h3', 'raid-day', `${tf('raidUi.day', { n: String(r.stage + 1), total: String(raid.stages.length) })} · ${t(r.spec.tag)}`)
@@ -666,6 +723,27 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     })
     const log = el('ul', 'raid-log')
     log.setAttribute('aria-live', 'polite')
+    // The co-driver's words, over the picture while he talks.
+    const caption = el('p', 'radio-caption')
+    const captionText = el('span')
+    caption.append(el('span', 'radio-who', t('radio.who')), ' ', captionText)
+    caption.hidden = true
+    unCaption()
+    unCaption = radio.onCaption((text) => {
+      caption.hidden = text === null
+      captionText.textContent = text ?? ''
+    })
+    const lower = el('div', 'raid-lower')
+    lower.append(caption, log)
+    /** The ground the co-driver last called, so a long stretch of it isn't called every clip. */
+    let calledGround: GroundId | null = null
+    /** Warned about warm shocks yet this stage. */
+    let calledHot = false
+    /** True while the page catches up after a skip: no calls for what flew past. */
+    let quiet = false
+    const call = (lines: RadioLine[], urgent = false) => {
+      if (!quiet) radio.say(lines, urgent)
+    }
     const skip = button(t('raidUi.skip'))
     const card = el('div', 'raid-card')
     const ride = r.truck.ride
@@ -678,6 +756,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     let logged = 0
     let creaks = 0
     let turned = false
+    let nightfall = false
 
     /** Draw the trace up to `upTo` metres (rebuilt when the sim adds to it). */
     function draw(upTo: number): void {
@@ -721,22 +800,36 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
         g.cell.dataset.band = band
       }
       set(oilGauge, `${num(oilNow)} °C`, bandOf(oilNow, warm, red))
+      if (!calledHot && bandOf(oilNow, warm, red) !== 'cool') {
+        calledHot = true
+        call(['hot'])
+      }
       set(wearGauge, `${num(wearNow)}%`, bandOf(wearNow, 50, 100))
       // Stops come into the log as the highlight passes them.
       while (logged < r.stops.length && (r.stops[logged] as Stop).at <= upTo + 1) addStop(r.stops[logged++] as Stop)
       while (creaks < r.iceNotes.length && (r.iceNotes[creaks] as IceNote).at <= upTo + 1) {
         log.append(el('li', 'warm-text', iceNoteText(r.iceNotes[creaks++] as IceNote)))
+        call(['creak'])
+      }
+      // Nightfall, as the highlight passes the place.
+      if (!nightfall && r.dark !== null && r.dark <= upTo + 1 && r.dark > 0) {
+        nightfall = true
+        log.append(el('li', 'warm-text', tf('raidUi.darkFalls', { km: num(r.dark / 1000, 1) })))
       }
       // The weather turning, as the highlight passes the place.
       const w = r.weather
       if (!turned && w && weatherOn(w, r.at) && w.at <= upTo + 1) {
         turned = true
         log.append(el('li', 'warm-text', tf('raidUi.weatherTurn', { km: num(w.at / 1000, 1), kind: weatherName(w.kind), what: weatherTurn(w.kind) })))
+        call([w.kind])
       }
     }
 
     function addStop(st: Stop): void {
       log.append(el('li', 'hot-text', stopText(st)))
+      // Trouble cuts in over whatever he was saying.
+      const line: RadioLine = st.fix === 'cool' ? 'cool' : st.kind === 'ice' ? 'crack' : st.kind === 'slide' ? 'slide' : st.fix === 'patch' ? 'under' : 'stop'
+      call([line], true)
     }
 
     function headline(km: number, ground: string, pace: PaceId): void {
@@ -752,6 +845,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       skip.hidden = true
       const legStart = r.at
       liveHead.textContent = tf('raidUi.driving', { n: String(r.leg + 1) })
+      call([legStart === 0 ? 'go' : 'goOn'])
       const step = () => {
         advanceStage(s, r)
         if (r.status === 'driving') {
@@ -771,6 +865,8 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       skip.textContent = t(r.status === 'finished' ? 'raidUi.skipFinish' : 'raidUi.skip')
       skip.hidden = false
       await view3d.setLeg(r.truck, clips)
+      // The truck moves off as the co-driver finishes "Three, two, one… go!" (or "Right. Off we go.").
+      await radio.quiet(3500)
       if (run !== r) return
       let i = 0
       let clipStart = 0
@@ -783,10 +879,16 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
           return
         }
         // The truck as muddy, snowy and dented as the raid has made it by this moment.
-        view3d.show(i, r.weather && weatherOn(r.weather, c.at) ? r.weather.kind : null, raidGrime(s, r, c.at))
+        view3d.show(i, r.weather && weatherOn(r.weather, c.at) ? r.weather.kind : null, raidGrime(s, r, c.at), darkAt(r.dark, c.at))
         const span = c.poses[c.poses.length - 1]!.t - c.poses[0]!.t
         duration = c.broken ? span / BREAK_RATE + BREAK_HOLD : span
         clipStart = performance.now()
+        // The co-driver reads this clip's road ahead of the truck.
+        const said = clipCall({ ground: c.ground, road: c.road, from: c.poses[0]!.x, to: c.poses[c.poses.length - 1]!.x }, calledGround)
+        if (said) {
+          calledGround = said.ground
+          call(said.lines)
+        }
         const eased = r.stops.filter((st) => st.leg === leg && st.at <= c.at).length
         headline(c.at, t(`ground.${c.ground}` as StringKey), PACES[Math.max(0, PACES.indexOf(pace) - Math.min(RAID.easeSteps, eased))] as PaceId)
       }
@@ -805,13 +907,19 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       }
       const endLeg = () => {
         cancelAnimationFrame(raf)
+        // Catching up to the end of the leg: what flew past goes in the log without a call.
+        quiet = true
         draw(legEnd)
+        quiet = false
+        if (r.status === 'checkpoint') call(['checkpoint'])
+        else if (!r.late) call(['finish'])
         const lastSeg = r.legs[leg]?.segments.at(-1)
         headline(legEnd, lastSeg ? t(`ground.${lastSeg.ground}` as StringKey) : '', currentPace(r))
         if (r.status === 'checkpoint') checkpointCard()
         else finishCard()
       }
       skip.onclick = () => {
+        radio.hush()
         cancelAnimationFrame(raf)
         clips.length = i
         endLeg()
@@ -844,6 +952,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       syncPace()
       const go = button(t('raidUi.goOn'), 'btn start-btn')
       go.addEventListener('click', () => {
+        radio.wake()
         leaveCheckpoint(r, pace)
         driveLeg()
       })
@@ -896,7 +1005,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     traces.append(channelRow, chTitle, chartHolder, readout)
     const foot = el('div', 'raid-foot')
     foot.append(skip, card)
-    stage.append(view3d.element, hud, traces, log, foot)
+    stage.append(view3d.element, hud, traces, lower, foot)
     layout()
     show(head, stage)
     draw(0)
@@ -932,6 +1041,17 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     if (w?.comes) lines.append(el('p', 'small warm-text', tf('raidUi.resWeather', { kind: weatherName(w.kind), km: num(w.at / 1000) })))
     else if (w) lines.append(el('p', 'small', tf('raidUi.cpWeatherHeld', { kind: weatherName(w.kind, true) })))
     if (rec.limped) lines.append(el('p', 'small hot-text', t('raidUi.limped')))
+    // Night: what the lamps showed, and the way to the lamps if ruts came up unseen.
+    const nt = rec.night
+    if (nt) {
+      const unseen = Math.round(nt.unseen)
+      if (unseen >= 1) {
+        lines.append(el('p', 'small warm-text', tf('raidUi.resNight', { seen: num(nt.seen), unseen: num(unseen) })))
+        const jump = button(t('raidUi.toLights'), 'btn small-btn')
+        jump.addEventListener('click', () => jumpTo({ kind: 'slot', slot: 'lightBar' }))
+        lines.append(jump)
+      } else lines.append(el('p', 'small cool-text', tf('raidUi.resNightClean', { seen: num(nt.seen) })))
+    }
     // Underside hits: what the guards took, what the leaks cost, and where to fix it for next time.
     const guards = guardWords(raidTruck(s))
     const took = rec.guardHits ?? 0

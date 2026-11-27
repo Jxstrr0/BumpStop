@@ -6,6 +6,7 @@
  * always give exactly the same heights.
  */
 import { GROUND, type GroundId, type Range } from '../data/ground'
+import { RUT_SHAPE } from '../data/night'
 import { tableMarks, type TableJump } from '../data/rigs'
 import { SIM } from '../data/ride'
 import type { GroundMod } from '../data/weather'
@@ -211,6 +212,28 @@ export function buildProfile(ground: GroundId, length: number, rng: Rng, mod?: G
       } else {
         stamp(left, step, x, len, shape)
         stamp(right, step, x, len, shape)
+      }
+    }
+  }
+
+  // Night stages: the ruts the driver didn't see in the beam (`src/data/night.ts`). Their own stream, and only
+  // drawn when there are some, so every daytime road stays exactly as it was.
+  if (mod?.ruts && mod.ruts > 0) {
+    const r = rng.fork('night-ruts')
+    const expected = (mod.ruts * length) / 1000
+    // A whole number of ruts, with the part left over as a chance of one more: right on average on short samples.
+    const count = Math.floor(expected) + (r.chance(expected - Math.floor(expected)) ? 1 : 0)
+    for (let j = 0; j < count; j++) {
+      const x = r.range(0, length)
+      const len = pick(r, RUT_SHAPE.length)
+      const d = pick(r, RUT_SHAPE.depth)
+      // Steep sides and a flat bottom: down into the road, and a hard edge to climb out over.
+      const shape = (u: number) => -d * Math.min(1, RUT_SHAPE.edge * detSin(PI * u))
+      if (r.chance(RUT_SHAPE.bothTracks)) {
+        stamp(left, step, x, len, shape)
+        stamp(right, step, x, len, shape)
+      } else {
+        stamp(r.chance(0.5) ? left : right, step, x, len, shape)
       }
     }
   }

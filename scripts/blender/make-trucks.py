@@ -2377,11 +2377,11 @@ def build_truck(cls, t, materials, lite=False):
 # frame darkens the engine tucked inside it, say.
 STOCK = {
     'light4x4': ('ladder', 'solidAxleCoil', 'coilLink', 'monotube', 'rubber', 'fixedBars', 'standardAxles',
-                 'steelWheels', 'rallyTires', 'skidPlates', 'petrolSix', 'noSpares', 'shovelOnly'),
+                 'steelWheels', 'rallyTires', 'skidPlates', 'petrolSix', 'noLightBar', 'noSpots', 'noSpares', 'shovelOnly'),
     'heavy': ('ladder', 'beamLeaf', 'rearBeamLeaf', 'monotube', 'rubber', 'fixedBars', 'standardAxles',
-              'steelWheels', 'rallyTires', 'skidPlates', 'dieselSix', 'noSpares', 'shovelOnly'),
+              'steelWheels', 'rallyTires', 'skidPlates', 'dieselSix', 'noLightBar', 'noSpots', 'noSpares', 'shovelOnly'),
     'sxs': ('tubeFrame', 'sxsWishbone', 'sxsTrailing', 'monotube', 'rubber', 'fixedBars', 'standardAxles',
-            'steelWheels', 'rallyTires', 'skidPlates', 'twin', 'noSpares', 'shovelOnly'),
+            'steelWheels', 'rallyTires', 'skidPlates', 'twin', 'noLightBar', 'noSpots', 'noSpares', 'shovelOnly'),
 }
 SHADE = {
     'samples': 192,    # looks per corner: more is smoother and slower
@@ -2838,6 +2838,47 @@ def lamp_bar(p, x, z, width, n, scale=1.0, face=1):
                smooth=False)
 
 
+def led_bar(p, x, z, width, scale=1.0):
+    """A slim LED light bar (2008 on): a black extrusion with one long lit strip and cooling fins on top."""
+    p.box((x, 0, z), (0.07 * scale, width, 0.075 * scale), 'Graphite', bevel=0.012 * scale)
+    p.box((x + 0.036 * scale, 0, z), (0.008 * scale, width - 0.05, 0.042 * scale), 'Lamp', bevel=0.003 * scale)
+    for k in range(seg(9, 5)):
+        y = -width / 2 + width * (k + 0.5) / seg(9, 5)
+        p.box((x - 0.01 * scale, y, z + 0.042 * scale), (0.05 * scale, 0.012, 0.012 * scale), 'Graphite')
+
+
+def light_bars(b, x, z, width, n, scale, stand_y, stand_h, stand_r):
+    """The two light bars a truck can have on its roof (night stages): the
+    halogen bar of round lamps, or the slim LED bar. Each brings its own
+    brackets down to the roof. Only the build's own is shown."""
+    for kind in ('halogenBar', 'ledBar'):
+        p = b.fit('lightBar', [kind])
+        if kind == 'halogenBar':
+            lamp_bar(p, x, z, width, n, scale)
+        else:
+            led_bar(p, x, z - 0.015 * scale, width, scale)
+        for sd in (-1, 1):
+            p.tube((x, sd * stand_y, z - stand_h + 0.05), (x, sd * stand_y, z - stand_h), stand_r, 'Graphite', segments=6)
+            p.tube((x, sd * stand_y, z - 0.05 * scale), (x, sd * stand_y, z - stand_h + 0.05), stand_r, 'Graphite', segments=6)
+        b.add(p)
+
+
+def spot_lamps(b, x, ys, z, rad, mount=None):
+    """A pair of spot lamps (night stages): round halogen or HID pots, or
+    square LED pods. `mount` draws whatever holds them, once per lamp."""
+    for kinds in (('halogenSpots', 'hidSpots'), ('ledSpots',)):
+        p = b.fit('spots', list(kinds))
+        for y in ys:
+            if kinds[0] == 'ledSpots':
+                p.box((x - 0.02, y, z), (0.07, rad * 2.2, rad * 2.2), 'Graphite', bevel=0.012)
+                p.box((x + 0.017, y, z), (0.008, rad * 1.8, rad * 1.8), 'Lamp', bevel=0.006)
+            else:
+                headlamp(p, x, y, z, rad)
+            if mount:
+                mount(p, y)
+        b.add(p)
+
+
 def arch_cut(skin, x, r, radius, half, mat='Graphite'):
     """Cut a wheel arch up into a body shell: a round bite of `radius`
     centred on the wheel at (x, r), right across the body."""
@@ -2997,9 +3038,9 @@ def pickup(b):
            (nose + 0.15, 0.4, 1.5), (nose + 0.2, 0.55, 1.4), (nose + 0.2, 0.55, 1.03), (2.18, 0.5, 0.7)]
     body.sweep(bar, 0.033, 'Graphite', sides=seg(12, 6), bend=0.1)
     body.tube((nose + 0.2, -0.55, 1.27), (nose + 0.2, 0.55, 1.27), 0.024, 'Graphite', segments=seg(10, 6))
-    for sd in (-1, 1):
-        headlamp(body, nose + 0.24, sd * 0.3, 1.36, 0.068)
-        body.box((nose + 0.2, sd * 0.3, 1.3), (0.03, 0.04, 0.06), 'Graphite')
+    # Spot lamps on the bull bar's cross tube, if the build has them (night stages).
+    spot_lamps(b, nose + 0.24, (-0.3, 0.3), 1.36, 0.068,
+               lambda p, y: p.box((nose + 0.2, y, 1.3), (0.03, 0.04, 0.06), 'Graphite'))
 
     # --- Handles, mirrors, number boards, aerial ---------------------------
     for sd in (-1, 1):
@@ -3081,10 +3122,8 @@ def pickup(b):
         arch_flare(body, x, r, arch_r, half - 0.1, half + 0.065, skirt + 0.01, 0.055, 'Trim')
     for sd in (-1, 1):
         body.box((-t['cg_rear'] - 0.6, sd * (t['track'] / 2), 0.66), (0.018, 0.34, 0.44), 'Rubber', bevel=0.004)
-    # Roof lamp bar and its brackets.
-    lamp_bar(body, xf - 0.66, top + 0.11, 1.4, 5)
-    for sd in (-1, 1):
-        body.tube((xf - 0.66, sd * 0.6, top + 0.06), (xf - 0.66, sd * 0.6, top), 0.012, 'Graphite', segments=6)
+    # The light bar on the roof, if the build has one (night stages).
+    light_bars(b, xf - 0.66, top + 0.11, 1.4, 5, 1.0, 0.6, 0.11, 0.012)
 
     pickup_driveline(b)
     pickup_frames(b, sill)
@@ -3384,14 +3423,12 @@ def cabover(b):
                  (xb + 0.05, half - 0.2, top), (xb + 0.05, half - 0.22, top + 0.42),
                  (xb + 0.05, -half + 0.22, top + 0.42), (xb + 0.35, half - 0.25, top + 0.4),
                  (xb + 0.35, -half + 0.25, top + 0.4)], 'Paint', bevel=0.05)
-    # A sun visor over the screen, and the lamp bar on the roof's front edge.
+    # A sun visor over the screen, and the light bar on the roof's front edge (if the build has one).
     vz = top - 0.14
     body.convex([(xf - rake + 0.36, sd * (half - 0.12), vz - 0.1 + dz) for sd in (-1, 1) for dz in (0, 0.03)] +
                 [(xf - rake + 0.02, sd * (half - 0.12), vz + 0.06 + dz) for sd in (-1, 1) for dz in (0, 0.03)], 'Trim',
                 bevel=0.012)
-    lamp_bar(body, xf - rake + 0.1, top + 0.1, 1.9, 6, 1.4)
-    for sd in (-1, 1):
-        body.tube((xf - rake + 0.1, sd * 0.8, top + 0.03), (xf - rake + 0.1, sd * 0.8, top), 0.018, 'Graphite', segments=6)
+    light_bars(b, xf - rake + 0.1, top + 0.1, 1.9, 6, 1.4, 0.8, 0.1, 0.018)
     # Wipers, hung from above the screen as on a real cab-over.
     for sd in (-1, 1):
         body.tube((xf - 0.03, sd * 0.3, belt + 0.12), (xf - 0.16, sd * 0.75, belt + 0.55), 0.01, 'Shadow', segments=5)
@@ -3416,6 +3453,10 @@ def cabover(b):
                      for sz in (-1, 1)], 'Trim', bevel=0.035)
         headlamp(body, xf + 0.27, sd * 0.7, bz + 0.02, 0.085)
         headlamp(body, xf + 0.27, sd * 0.47, bz + 0.02, 0.065)
+    # Spot lamps stood on top of the bumper, if the build has them (night stages).
+    spot_lamps(b, xf + 0.22, (-0.55, 0.55), bz + 0.3, 0.085,
+               lambda p, y: p.tube((xf + 0.16, y, bz + 0.16), (xf + 0.16, y, bz + 0.22), 0.025, 'Graphite', segments=8))
+    for sd in (-1, 1):
         eye = [(xf + 0.24, sd * 0.22, bz - 0.06), (xf + 0.38, sd * 0.22, bz - 0.06), (xf + 0.42, sd * 0.22, bz - 0.01),
                (xf + 0.38, sd * 0.22, bz + 0.04), (xf + 0.24, sd * 0.22, bz + 0.04)]
         body.sweep(eye, 0.022, 'Magenta', sides=seg(8, 5), curve=2 if HD else 0)
@@ -3691,7 +3732,10 @@ def buggy(b):
                  ((roof_front + 0.04, tw * 0.9, 0.028), (roof_back - 0.04, tw * 0.9, 0.028), (roof_front + 0.04, tw * 0.9, 0.05),
                   (roof_back - 0.04, tw * 0.9, 0.05), (roof_front, tw * 0.5, 0.068), (roof_back, tw * 0.5, 0.068))
                  for sd in (-1, 1)], 'Paint', bevel=0.012)
-    lamp_bar(body, roof_front - 0.03, roof_z + 0.11, 0.9, 4, 0.8)
+    light_bars(b, roof_front - 0.03, roof_z + 0.11, 0.9, 4, 0.8, 0.3, 0.08, 0.01)
+    # Spot lamps on the roof's front tube, outboard of the bar, if the build has them (night stages).
+    spot_lamps(b, roof_front + 0.03, (-tw * 0.8, tw * 0.8), roof_z + 0.08, 0.045,
+               lambda p, y: p.box((roof_front, y, roof_z + 0.035), (0.03, 0.03, 0.05), 'Graphite'))
     # A safety whip with a magenta flag.
     body.tube((-1.3, 0.45, floor + 0.35), (-1.32, 0.45, roof_z + 0.95), 0.006, 'Graphite', segments=4)
     body.convex([(-1.32, 0.45, roof_z + 0.95), (-1.32, 0.45, roof_z + 0.75), (-1.6, 0.45, roof_z + 0.85),

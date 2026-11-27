@@ -44,6 +44,11 @@ export interface GroundMod {
   features: number
   /** Tire grip. */
   grip: number
+  /**
+   * Night stages only (`src/data/night.ts`): ruts per km the driver doesn't
+   * see in the beam, so they're hit at speed. Missing means none.
+   */
+  ruts?: number
 }
 
 export interface WeatherSpec {
