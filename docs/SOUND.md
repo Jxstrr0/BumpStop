@@ -154,6 +154,58 @@ big, isn't credited, or if a file sits in `public/sounds/` without a line.
 | `groan` | Steel groaning or creaking under load, then a snap |
 | `hissLoop` | A steady hiss with no start or end: steam, a leaking air line |
 
+## The radio co-driver
+
+Kelbo picked it on 27 November 2026. On a raid stage a co-driver talks over
+the helmet intercom, rally style: short calls warning of what's ahead.
+
+**What he says.** As each highlight clip starts, he reads that clip's real
+road ahead of the truck (`src/audio/pacenotes.ts`). Whoops, rocks, jumps
+and frost heaves are spotted by looking down both wheel tracks for a
+stretch whose highest and lowest points are far enough apart
+(`RADIO_SPOT` in `src/data/radio.ts`): 10 cm for whoops, 8 cm for rocks,
+35 cm for jumps, 10 cm for heaves. The first one ahead gets its name, with
+"Caution" when the biggest one there is big (whoops 24 cm, rocks 13 cm,
+jumps 85 cm), and its distance rounded to 30, 50, 80, 100 or 200 m if
+it's at least 16 m off ("Caution. Big jump. 30."). A heave with a crack
+edge facing the truck is "Caution. Heave, step up." The thaw and the dust
+storm make the same bumps bigger, so he says "Caution" more often in them.
+Plain ground (graded, washboard, rough gravel, ice, snow) gets its name when
+the road turns into it, and not again until it changes. To give him time,
+clips now start up to two seconds before their busiest stretch
+(`CLIP.lead` in `src/sim/highlight.ts`).
+
+He also calls the start ("Three, two, one… go!"), off again after a
+checkpoint, into the checkpoint, the finish (unless the truck was towed in
+late), each stop as the highlight reaches it (a breakdown, cooked shocks, a
+rock underneath, a snowbank, the ice cracking), the ice creaking, the
+weather turning, and the first time the hottest oil goes past the warm
+line. Nothing he says changes a result: he only reads what the sim did.
+
+**How it sounds** (`src/audio/radio.ts`). One call at a time. A call that
+comes while he's talking waits, but only the newest waits, and it's dropped
+if it waits more than 2.5 s, since an old warning is worse than none.
+Trouble cuts in. Skipping hushes him, and what flew past goes in the log
+without a call. The recordings are clean; the intercom is made live: a
+band from 320 to 3,600 Hz, a touch of grit, and a click of hiss as the mic
+keys up and lets go. Numbers in `RADIO`.
+
+**The voice.** 32 lines, one take each, made for Bump Stop with ElevenLabs'
+text to speech in the "Joe English" voice from its voice library (a
+Northern English voice, for Birchland's English-flavoured north), then
+trimmed, made mono 22 kHz and shrunk to 48 kbps: about 300 KB in all, in
+`public/radio/`, which the offline copy keeps like everything else. They
+cost about 600 ElevenLabs credits. "One fifty" was skipped, so 150 m
+rounds to 100 or 200.
+
+**Captions and settings.** His words show over the picture on a
+highlighter slip while he talks ("CO-DRIVER Caution. Big jump. 30."), so
+the calls work on a phone on silent too. Settings has **On** (voice and
+words), **Words only** and **Off**, and a volume slider for his voice. The
+pick is kept in `bumpstop.radio` and `bumpstop.radioVolume`. A browser with
+no sound offers words only. He has his own switch, apart from the test
+track's Sound switch.
+
 ## Tests
 
 `tests/sound.test.ts`: every engine part has a sound; the straight-six only
@@ -170,3 +222,12 @@ listed file is there, under 300 KB, CC0 or CC BY and credited in
 `CREDITS.md`; every file in `public/sounds/` is listed; the tidy-up mixes
 to one channel, evens out the loudness, cuts and fades long recordings,
 blends a loop's ends and leaves silence silent.
+
+`tests/radio.test.ts`: every co-driver line has a file under 40 KB in
+`public/radio/`, its words and a credit, and every file there is a line;
+captions read like a roadbook; distances round to the nearest call and none
+is said for something right under the truck; a jump is called with its
+distance, a big one gets a Caution, a set of whoops is called by its
+tallest, a step-up crack is told from a plain heave; plain ground is called
+once when it changes; and on real seeded roads the rough grounds get calls
+and the smooth ones none.

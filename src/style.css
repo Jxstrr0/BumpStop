@@ -622,6 +622,30 @@ input[type='range'] {
 /* Bivouac breakdowns: what tired oil, cracked bushings or sagged springs do, under the line. */
 .raid-list .cond-effect { display: block; margin: 0 0 4px; color: var(--muted); }
 .raid-log { margin: 8px 0; padding-left: 20px; font-size: 14px; }
+/* The radio co-driver's words while he talks (v1.23.0.0): a highlighter slip, like a pencil note in the roadbook. */
+.radio-caption {
+  margin: 8px 0 4px;
+  padding: 4px 10px;
+  max-width: 34em;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.radio-caption[hidden] { display: none; }
+.radio-who {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.radio-volume { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; font-size: 14px; }
+.radio-volume[hidden] { display: none; }
+.radio-volume input { flex: 1 1 160px; min-height: 44px; accent-color: var(--accent-text); }
+.radio-volume-value { font-family: var(--mono); min-width: 4ch; text-align: right; }
 .raid-log li { margin: 4px 0; }
 .raid-card:not(:empty) { margin-top: 12px; padding: 12px; border: 2px solid var(--ink); border-radius: 6px; background: var(--panel-2); }
 .raid-card .raid-sub { margin-top: 0; }
@@ -1348,10 +1372,17 @@ body:has(.tab-page:not([hidden]) .live.full) { overflow: hidden; }
 }
 .raid-live.full .rig-view:not(.photo-on) { margin: 0; }
 /* The last two lines of the log (a stop, the ice creaking, the weather turning), each on its own slip. */
-.raid-live.full .raid-log {
+/* The co-driver's words and the log share the space above the foot (v1.23.0.0). */
+.raid-live.full .raid-lower {
   grid-area: log;
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.raid-live.full .raid-log {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
