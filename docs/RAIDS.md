@@ -48,7 +48,10 @@ a reload in the middle of a stage drives it again from its morning.
    thirds of the way, to the nearest kilometre). Each leg has its own pace
    call: **Conserve**, **Steady** or **Push**.
 3. **Breakdowns stop the truck.** The crew fixes it at the roadside, then
-   the driver eases off one pace call for the rest of the leg.
+   the driver eases off one pace call for the rest of the leg. On rough
+   ground rocks can get past the guards and dent the oil pan, diff or fuel
+   tank, which stops the truck the same way and leaks until it's fixed:
+   `docs/UNDERSIDE.md`.
 4. **The bivouac.** Eight mechanic hours, the spares left on the truck and
    the money for parts. Pick jobs; what's left worn carries into tomorrow.
    Shock oil, springs and bushings also tire over the raid and make the

@@ -25,13 +25,17 @@ import { t, tf, type StringKey } from '../data/strings'
 import { COND_PARTS, type CondPart } from '../data/condition'
 import type { WeatherId } from '../data/weather'
 import type { WearState } from '../sim/wear'
+import { UNDER_PARTS } from '../data/underside'
+import { guardShare, leakPerKm, stageOutlook } from '../sim/underside'
+import type { BuiltTruck } from '../sim/build'
+import type { Raid } from '../data/raids'
 import { checkBuild, partIn } from '../sim/build'
 import { conditionEffect, wornTruck } from '../sim/condition'
 import { groundsToCheck } from '../sim/paceCheck'
 import { driverName } from '../sim/career'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
-  advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isCondPart, isRestDay, leaveCheckpoint,
+  advanceStage, bivouacHours, bivouacJobs, checkJobs, currentPace, doJobs, enterRaid, finishStage, iceAtPace, isCondPart, isRestDay, isUnderPart, leaveCheckpoint,
   partsBudget, partsMoney, parTime, raidOf, raidTruck, raidWeather, stageKm, standings, startStage,
   type IceNote, type Job, type RaidState, type StageRecord, type StageRun, type Stop,
 } from '../sim/raid'
@@ -39,6 +43,7 @@ import { forecastAt, forecastWord, weatherOn, type StageWeather } from '../sim/w
 import type { BuildStore } from './buildStore'
 import { BAND_WORD, bandOf, lineChart, type LineChart } from './charts'
 import { el, num, showTabFor } from './dom'
+import { jumpTo } from './fixes'
 import { paceCheckBlock } from './paceCheck'
 import { BREAK_RATE, raidView } from './raidView'
 
@@ -100,6 +105,7 @@ export function raidTable(rows: { who: string; time: number }[], rec: StageRecor
 const money = (n: number) => tf('career.money', { n: num(Math.round(n)) })
 
 function partName(part: Job['part'], index: number): string {
+  if (isUnderPart(part)) return t(`raidUi.part.${part}` as StringKey)
   if (isCondPart(part)) return tf(`raidUi.part.${part}` as StringKey, { axle: t(`axleName.${index}` as StringKey) })
   if (part === 'frame') return tf('raidUi.part.frame', { zone: t(`zone.${['front', 'centre', 'rear'][index] ?? 'centre'}` as StringKey) })
   return tf(`raidUi.part.${part}` as StringKey, { corner: t(`cornerName.${index}` as StringKey) })
@@ -130,6 +136,9 @@ export function sparesList(spares: Record<SpareId, number>): string {
 
 /** One line about a roadside stop: where, what, what the crew did and the time it cost. */
 function stopText(st: Stop): string {
+  if (st.kind === 'sump' || st.kind === 'diff' || st.kind === 'tank') {
+    return tf('raidUi.underStop', { km: num(st.at / 1000, 1), part: t(`raidUi.under.${st.kind}` as StringKey), lost: gap(st.lost).slice(1) })
+  }
   if (st.kind === 'ice') return tf('raidUi.iceStop', { km: num(st.at / 1000, 1), lost: gap(st.lost).slice(1) })
   if (st.kind === 'slide') return tf('raidUi.slideStop', { km: num(st.at / 1000, 1), lost: gap(st.lost).slice(1) })
   const where = st.kind === 'frame' ? `, ${t(`zone.${st.zone ?? 'centre'}` as StringKey)}` : `, ${t(`corner.${st.corner}` as StringKey)}`
@@ -141,6 +150,36 @@ function stopText(st: Stop): string {
     lost: gap(st.lost).slice(1),
   })
   return text + (st.estimated ? t('raidUi.stopLater') : '')
+}
+
+/** Upper case first letter, for a name that starts a sentence. */
+const upFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+/** The truck's guards as words in a sentence ("the skid plates"), or null with none. */
+function guardWords(truck: BuiltTruck): string | null {
+  const id = partIn(truck.build, 'protection').id
+  return guardShare(truck) > 0 ? t(`raidUi.guards.${id}` as StringKey) : null
+}
+
+/** Below this many rocks reaching the underside (before the guards) over a raid, it counts as smooth. */
+const SMOOTH_RAID = 0.8
+
+/**
+ * What the rocks will do to this truck over a raid at Steady, for the entry
+ * cards (underside hits): how many get past its guards, or that the raid is
+ * smooth enough to leave them off. Colours follow the trace rule.
+ */
+export function raidRockLine(truck: BuiltTruck, raid: Raid): HTMLElement {
+  const all = raid.stages.flatMap((st) => st.segments)
+  const pass = 1 - guardShare(truck)
+  const through = stageOutlook(truck, all, 'steady')
+  // Rocks reaching the underside before the guards (armour still lets some through, so this never divides by 0).
+  const raw = through / pass
+  if (raw < SMOOTH_RAID) return el('p', 'small cool-text', t('raidUi.underSmooth'))
+  const guards = guardWords(truck)
+  const n = num(through, through < 10 ? 1 : 0)
+  const text = guards ? tf('raidUi.underRaid', { n, guards }) : tf('raidUi.underRaidBare', { n })
+  return el('p', `small ${bandOf(through, 1, 3)}-text`, text)
 }
 
 /** One line about the ice creaking but holding. */
@@ -270,12 +309,14 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       return
     }
     const raidText = el('p', 'small')
+    const rockBox = el('div')
     const studsText = el('p', 'small warm-text', t('raidUi.winterNoStuds'))
     const driverText = el('p', 'small')
     const syncText = () => {
       const raid = RAIDS[raidId]
       raidText.textContent = `${t(raid.text)} ${tf('raidUi.stagesLine', { n: String(raid.stages.length), km: num(raid.stages.reduce((s, st) => s + stageKm(st), 0)) })}`
       studsText.hidden = raid.season !== 'winter' || partIn(store.truck().build, 'tires').studded
+      rockBox.replaceChildren(raidRockLine(store.truck(), raid))
       driverText.textContent = tf('driver.about', { trade: t(DRIVERS[driver].name), text: t(DRIVERS[driver].text) })
     }
     const raidRow = picker(FREE_RAID_IDS, (id) => t(RAIDS[id].name), () => raidId, (id) => {
@@ -310,7 +351,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       morningScreen()
     })
     show(
-      el('h3', 'raid-sub', t('raidUi.pickRaid')), raidRow, raidText, studsText,
+      el('h3', 'raid-sub', t('raidUi.pickRaid')), raidRow, raidText, rockBox, studsText,
       el('h3', 'raid-sub', t('raidUi.pickDriver')), driverRow, driverText,
       truckLines, enter,
     )
@@ -349,7 +390,9 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     const tired: { part: CondPart; index: number; value: number }[] = []
     for (const part of COND_PARTS) s.cond[part].forEach((value, index) => tired.push({ part, index, value }))
     const tiredShown = tired.filter((c) => c.value >= RAID.jobFrom).sort((a, b) => b.value - a.value)
-    if (!shown.length && !tiredShown.length) list.append(el('li', 'small', t('raidUi.allGood')))
+    // Underside hits: dents in the oil pan, diff and fuel tank, and what their leaks cost.
+    const dents = UNDER_PARTS.filter((part) => s.under[part] >= RAID.jobFrom)
+    if (!shown.length && !tiredShown.length && !dents.length) list.append(el('li', 'small', t('raidUi.allGood')))
     for (const w of shown) {
       const li = el('li', `${bandOf(w.damage, 0.5, 0.85)}-text`, tf('raidUi.wornLine', { part: partName(w.part, w.index), pct: num(w.damage * 100) }))
       list.append(li)
@@ -359,6 +402,13 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
         part: partName(c.part, c.index), pct: num(c.value * 100), state: t(`raidUi.state.${c.part}` as StringKey),
       }))
       li.append(el('span', 'small cond-effect', effectText(c.part, c.value)))
+      list.append(li)
+    }
+    for (const part of dents) {
+      const v = s.under[part]
+      const li = el('li', `${bandOf(v, 0.5, 0.85)}-text`, tf('raidUi.dentLine', { part: partName(part, 0), pct: num(v * 100) }))
+      const one = { sump: 0, diff: 0, tank: 0, [part]: v }
+      li.append(el('span', 'small cond-effect', tf('raidUi.dentEffect', { lost: gap(leakPerKm(one) * 100).slice(1) })))
       list.append(li)
     }
     return list
@@ -375,6 +425,16 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     const head = el('h3', 'raid-day', `${tf('raidUi.day', { n: String(s.stage + 1), total: String(raid.stages.length) })} · ${t(spec.tag)}`)
     const par = parTime(cls, spec.segments.map((x) => ({ ground: x.ground, length: x.km * 1000 })))
     const facts = el('p', 'readout-line', tf('raidUi.stageFacts', { km: num(stageKm(spec)), air: num(spec.airC), par: clock(par) }))
+    // Underside hits: how many rocks today's stage should get past the guards, on the truck as it stands (sagged springs sit lower).
+    const rocks = el('p', 'small')
+    const standing = wornTruck(truck, s.cond)
+    const through = stageOutlook(standing, spec.segments, 'steady')
+    const guards = guardWords(standing)
+    if (through >= 0.05) {
+      rocks.className = `small ${bandOf(through, 0.5, 1.5)}-text`
+      const n = num(through, 1)
+      rocks.textContent = guards ? tf('raidUi.underOutlook', { n, guards }) : tf('raidUi.underOutlookBare', { n })
+    } else rocks.hidden = true
 
     // The roadbook: each piece of ground with its distance, and the checkpoints.
     const total = stageKm(spec)
@@ -466,7 +526,7 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       stageScreen()
     })
     show(
-      head, facts,
+      head, facts, rocks,
       el('h4', 'raid-sub', t('raidUi.roadbook')), book, weatherBox, iceBox,
       el('h4', 'raid-sub', t('raidUi.condition')), conditionList(s),
       el('p', 'small', tf('raidUi.sparesLine', { list: sparesList(s.spares) })), settings,
@@ -736,6 +796,18 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     if (w?.comes) lines.append(el('p', 'small warm-text', tf('raidUi.resWeather', { kind: weatherName(w.kind), km: num(w.at / 1000) })))
     else if (w) lines.append(el('p', 'small', tf('raidUi.cpWeatherHeld', { kind: weatherName(w.kind, true) })))
     if (rec.limped) lines.append(el('p', 'small hot-text', t('raidUi.limped')))
+    // Underside hits: what the guards took, what the leaks cost, and where to fix it for next time.
+    const guards = guardWords(raidTruck(s))
+    const took = rec.guardHits ?? 0
+    if (guards && took > 0) {
+      lines.append(el('p', 'small cool-text', upFirst(took === 1 ? tf('raidUi.guardHit', { guards }) : tf('raidUi.guardHits', { guards, n: String(took) }))))
+    }
+    if ((rec.leak ?? 0) >= 1) lines.append(el('p', 'small warm-text', tf('raidUi.leakLine', { lost: gap(rec.leak ?? 0).slice(1) })))
+    if (rec.stops.some((st) => isUnderPart(st.kind as Job['part']))) {
+      const jump = button(t('raidUi.toProtection'), 'btn small-btn')
+      jump.addEventListener('click', () => jumpTo({ kind: 'slot', slot: 'protection' }))
+      lines.append(el('p', 'small', t('raidUi.underHint')), jump)
+    }
     const next = button(t(s.phase === 'done' ? 'raidUi.toFinal' : 'raidUi.toBivouac'), 'btn start-btn')
     next.addEventListener('click', () => (s.phase === 'done' ? finalScreen() : bivouacScreen()))
     show(
@@ -810,7 +882,9 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
         const problem = on ? null : checkJobs(s, [...others, job])
         b.disabled = problem !== null
         const hours = num(job.hours, 2).replace(/\.?0+$/, '')
-        let text = isCondPart(job.part)
+        let text = isUnderPart(job.part)
+          ? tf('raidUi.underJobLine', { hours, pct: num(job.damage * 100) })
+          : isCondPart(job.part)
           ? tf('raidUi.condJobLine', { hours, pct: num(job.damage * 100), after: num(job.after * 100), state: t(`raidUi.state.${job.part}` as StringKey) })
           : tf('raidUi.jobLine', { hours, pct: num(job.damage * 100), after: num(job.after * 100) })
         if (job.spare) text += tf('raidUi.jobSpare', { spare: t(`raidUi.spare.${job.spare}` as StringKey) })

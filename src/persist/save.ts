@@ -28,6 +28,8 @@ import { MOMENT_KINDS, newLog, tidyLogs, type TruckLog, type TruckMoment } from 
 import type { RaidState } from '../sim/raid'
 import { newCondition } from '../sim/condition'
 import { COND_PARTS } from '../data/condition'
+import { UNDER_PARTS, type UnderPart } from '../data/underside'
+import { newUnderside } from '../sim/underside'
 import { teamsForYear, type TeamGarage } from '../sim/teams'
 
 export interface GarageSave {
@@ -234,7 +236,17 @@ function readRaid(raw: unknown): RaidState {
   }
   const spent = raw.spent === undefined ? 0 : finite(raw.spent, 'raid parts money spent')
   if (spent < 0) fail('raid parts money spent is below zero')
-  return { ...(raw as unknown as RaidState), entry, cond, spent }
+  // Underside hits (after 1.13): a raid saved before them has no dents under the truck.
+  const under = newUnderside()
+  if (raw.under !== undefined) {
+    if (!isObj(raw.under)) fail('raid underside is not a list')
+    for (const part of UNDER_PARTS) {
+      const v = finite(raw.under[part], `${part} underside`)
+      if (v < 0 || v > 1) fail(`${part} underside is out of range`)
+      under[part] = v
+    }
+  }
+  return { ...(raw as unknown as RaidState), entry, cond, spent, under }
 }
 
 const TROUBLES = ['fade', 'bottoming', 'mount', 'axle', 'tire', 'stuck', 'lost']
@@ -407,6 +419,7 @@ function count(v: unknown): number {
 function isMoment(m: unknown): m is TruckMoment {
   if (!isObj(m) || !MOMENT_KINDS.includes(m.kind as TruckMoment['kind'])) return false
   if (typeof m.raid !== 'string' || !Object.hasOwn(RAIDS, m.raid) || typeof m.year !== 'number') return false
+  if (m.kind === 'hit') return UNDER_PARTS.includes(m.part as UnderPart)
   if (m.kind !== 'broke') return true
   return FAILURE_KINDS.includes(m.part as FailureKind) && Number.isInteger(m.corner) && (m.corner as number) >= -1 && (m.corner as number) <= 3
 }
