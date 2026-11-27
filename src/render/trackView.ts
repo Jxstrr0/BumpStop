@@ -54,6 +54,18 @@ export interface BreakFocus {
   kind: FailureKind
 }
 
+/**
+ * A moment in a jump ramp landing (`src/sim/landing.ts`), shown as the
+ * replay passes it: a puff at the corner (amber on the bump stop, red for a
+ * bottom-out, dust where the wheels touch) and `onMark` for the caption.
+ * `t` is seconds into the run; `corner` 0 to 3, or -1 for the whole truck.
+ */
+export interface ClipMark {
+  t: number
+  kind: 'takeoff' | 'touch' | 'bumpStop' | 'bottom' | 'bounce'
+  corner: number
+}
+
 export interface ClipOptions {
   /** Clip seconds per real second: 1 is true speed, 0.3 slow motion. */
   rate: number
@@ -67,6 +79,11 @@ export interface ClipOptions {
   ghost?: readonly Pose[] | null
   /** What broke on the ghost, shown once it has stopped. */
   ghostBroken?: BreakFocus | null
+  /** Hold the side-on shot (the jump ramp's landing replays). */
+  side?: boolean
+  /** Moments to mark as the clip passes them, and who to tell. */
+  marks?: readonly ClipMark[]
+  onMark?: (mark: ClipMark) => void
 }
 
 export interface RunSetup {
@@ -246,7 +263,10 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
 
   const dust = new Puffs(160, 0xc8b89a)
   const smoke = new Puffs(70, 0xe8e8e8)
-  scene.add(dust.points, smoke.points)
+  // The jump ramp's landing marks: amber on the bump stops, red for a bottom-out.
+  const amber = new Puffs(40, 0xf0ae45)
+  const red = new Puffs(40, 0xff5050)
+  scene.add(dust.points, smoke.points, amber.points, red.points)
 
   let truck: TruckModel | null = null
   // The ghost truck, and its clip of the same moments.
@@ -562,6 +582,29 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     }
   }
 
+  /** The landing marks between two moments of the clip (run seconds): a puff at the corner, and tell the caption. */
+  function passMarks(from: number, to: number): void {
+    if (!truck) return
+    for (const m of opts.marks ?? []) {
+      if (m.t <= from || m.t > to) continue
+      opts.onMark?.(m)
+      const puffs = m.kind === 'bumpStop' ? amber : m.kind === 'bottom' ? red : m.kind === 'touch' ? dust : null
+      if (!puffs) continue
+      if (m.kind === 'bottom' && !reduced.matches) shake = Math.max(shake, 0.5)
+      const corners = m.corner >= 0 ? [m.corner] : [0, 1, 2, 3]
+      for (const corner of corners) {
+        const c = truck.cornerPosition(corner, focusPos)
+        for (let i = 0; i < 8; i++) {
+          puffs.emit({
+            x: c.x + (Math.random() - 0.5) * 0.3, y: Math.max(0.05, c.y - truck.radius * 0.3), z: c.z,
+            vx: (Math.random() - 0.5) * 1.6, vy: 0.4 + Math.random() * 0.9, vz: (Math.random() - 0.5) * 1.6,
+            life: 0.9 + Math.random() * 0.5, size: truck.radius * 0.6, grow: truck.radius * 1.2, alpha: m.kind === 'touch' ? 0.5 : 0.8,
+          })
+        }
+      }
+    }
+  }
+
   function emitDust(p: Pose, dt: number): void {
     if (!truck || !run?.road || p.speed < 2) return
     // More dust the faster it goes (and the higher the graphics tier); it trails behind each wheel.
@@ -646,6 +689,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     }
     const length = clipLength()
     const dt = dtReal * opts.rate
+    const before = clipTime
     if (!ended) {
       clipTime += dt
       if (clipTime >= length) {
@@ -663,6 +707,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const progress = length > 0 ? clipTime / length : 1
     const tx = applyPose(p)
     placeGhost(clipTime)
+    if (opts.marks && clipTime > before) passMarks(clip[0]!.t + before, clip[0]!.t + clipTime)
     if (!ended) {
       emitDust(p, dt)
       if (opts.focus) emitSmoke(opts.focus, dt, progress)
@@ -671,6 +716,8 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const puffDt = ended ? dtReal * 0.6 : dt
     dust.update(puffDt)
     smoke.update(puffDt)
+    amber.update(puffDt)
+    red.update(puffDt)
     shake = Math.max(0, shake - dtReal * 2.2)
     placeCamera(run?.road ? tx : 0, progress)
     renderer.render(scene, camera)
@@ -796,13 +843,15 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       ghostCursor = 0
       if (ghost && ghostClip.length === 0) ghost.root.visible = false
       restart()
-      if (!o.focus) {
+      if (!o.focus && !o.side) {
         shot = SHOTS[shotIndex++ % SHOTS.length]!
       } else {
         shot = 'side'
       }
       if (!sameRoad) buildStrip()
       dust.clear()
+      amber.clear()
+      red.clear()
       loop()
     },
     stop() {

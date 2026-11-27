@@ -40,6 +40,8 @@ export interface LapGhost {
   lastSpeed: number
   stopped: boolean
   trace: BreakTrace | null
+  /** The jump ramp: each landing's score, jump by jump. */
+  landings?: number[]
 }
 
 export interface ReportContext {
@@ -168,7 +170,7 @@ function smoothMotion(): boolean {
 }
 
 /** "Goes to the rear axle's spring rate slider" or "Goes to the dampers part". */
-function jumpText(jump: Jump): string {
+export function jumpText(jump: Jump): string {
   if (jump.kind === 'slot') return tf('report.goesTo', { where: tf('report.whereSlot', { slot: t(`slot.${jump.slot}` as StringKey).toLowerCase() }) })
   return tf('report.goesTo', {
     where: tf('report.whereAxle', { end: t(`end.${jump.end}` as StringKey), setting: t(`build.${jump.key}` as StringKey).toLowerCase() }),
@@ -181,9 +183,14 @@ function jumpText(jump: Jump): string {
  * truck) give way to the next one on the list, up to three.
  */
 function fixList(fixes: readonly { target: FixTarget; text: StringKey }[], end: End, ctx: ReportContext): HTMLElement {
+  return fixButtons(fixes.map((f) => ({ ...f, end })), ctx)
+}
+
+/** Up to three fix buttons, each for its own end of the truck; ones that can't be done on this truck this year are skipped. */
+export function fixButtons(fixes: readonly { target: FixTarget; text: StringKey; end: End }[], ctx: ReportContext): HTMLElement {
   const list = el('ul', 'fix-buttons')
-  for (const fix of fixes.filter((f) => fixUseful(f.target, end, ctx.truck.build, ctx.year)).slice(0, 3)) {
-    const jump = fixJump(fix.target, end, ctx.truck.build)
+  for (const fix of fixes.filter((f) => fixUseful(f.target, f.end, ctx.truck.build, ctx.year)).slice(0, 3)) {
+    const jump = fixJump(fix.target, fix.end, ctx.truck.build)
     const li = el('li')
     if (!jump) {
       li.append(el('p', 'small fix-later', fix.target === 'pace' ? t('report.pace') : t(fix.text)))
@@ -199,18 +206,18 @@ function fixList(fixes: readonly { target: FixTarget; text: StringKey }[], end: 
   return list
 }
 
-function kicker(ctx: ReportContext): HTMLElement {
+export function kicker(ctx: ReportContext): HTMLElement {
   const cls = CLASSES.find((c) => c.id === ctx.cls)!
   return el('p', 'kicker', tf('report.kicker', { rig: t(`rig.${ctx.rig}` as StringKey), cls: t(cls.name) }))
 }
 
-function crewNote(text: string): HTMLElement {
+export function crewNote(text: string): HTMLElement {
   const q = el('blockquote', 'crew')
   q.append(el('p', '', `“${text}”`), el('cite', '', `— ${t('report.crewWho')}`))
   return q
 }
 
-function runAgainButton(ctx: ReportContext): HTMLButtonElement {
+export function runAgainButton(ctx: ReportContext): HTMLButtonElement {
   const again = el('button', 'btn run-again', t('report.runAgain'))
   again.type = 'button'
   again.addEventListener('click', ctx.onRunAgain)
@@ -255,7 +262,7 @@ function compareLine(run: LapRun, stopped: boolean, ghost: LapGhost | null): HTM
 }
 
 /** The big trace, with its channel chips and slow-motion playback. */
-function traceBlock(ev: BreakEvent, trace: BreakTrace, ghost: LapGhost | null, truck: BuiltTruck): HTMLElement {
+export function traceBlock(ev: BreakEvent, trace: BreakTrace, ghost: LapGhost | null, truck: BuiltTruck): HTMLElement {
   const info = FAILURES[ev.kind]
   const channels: Channel[] = ev.corner >= 0 ? [...info.corner] : [...info.frame]
   const first = mainChannel(ev)

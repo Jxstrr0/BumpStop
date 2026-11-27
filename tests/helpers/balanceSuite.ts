@@ -1,10 +1,10 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { BOT_BUILDS, BOT_SEEDS, MULE_WINDOWS } from '../../src/data/balance'
 import type { ClassId } from '../../src/data/classes'
-import type { RigId } from '../../src/data/rigs'
+import type { LoopRigId } from '../../src/data/rigs'
 import { botRun, breakKmh, describe as say, fixTweak, noteRow, weakTweak, writeSummary } from './bot'
 
-const RIG_IDS: readonly RigId[] = ['washboardLadder', 'tortureLoop']
+const RIG_IDS: readonly LoopRigId[] = ['washboardLadder', 'tortureLoop']
 
 /** Each check drives a few full-detail lap runs: a couple of seconds here, slower on a shared CI runner. */
 const BOT_TIMEOUT = 60_000

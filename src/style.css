@@ -1131,6 +1131,9 @@ body.photo-open .tabs { display: none; }
 .live-headbox .frame-line { margin: -6px 0 10px; }
 .live-headbox .race-line { margin: -4px 0 10px; }
 .live-headbox .race-line:empty { display: none; }
+/* The jump ramp's last landing: its score chip and what happened. */
+.landing-line { margin: -4px 0 10px; }
+.landing-line:empty { display: none; }
 .end-head { margin: 0 0 8px; font-weight: 600; }
 .end-report { background: var(--accent); color: var(--on-accent); }
 
@@ -1248,7 +1251,8 @@ body:has(.tab-page:not([hidden]) .live.full) { overflow: hidden; }
 .live.full .size-btn { margin: 0; }
 .live.full .live-progress { margin-top: 6px; margin-bottom: 0; }
 .live.full .frame-line,
-.live.full .race-line { margin-top: 4px; margin-bottom: 0; font-size: 12px; color: var(--ink); }
+.live.full .race-line,
+.live.full .landing-line { margin-top: 4px; margin-bottom: 0; font-size: 12px; color: var(--ink); }
 
 /* The four corners: front pair under the lap, rear pair over the buttons. */
 .live.full .corner {
@@ -1406,3 +1410,13 @@ body:has(.tab-page:not([hidden]) .live.full) { overflow: hidden; }
   /* "Pace call for leg 2" starts the right-hand column (the fourth child from the end). */
   .raid-live.full .raid-card > .small:nth-last-child(4) { break-before: column; margin-top: 0; }
 }
+
+/* The jump ramp's report (v1.20): every landing, with the last run and the ghost beside it. */
+.jump-sum { font-weight: 600; }
+.jump-list { list-style: none; margin: 0 0 12px; padding: 0; }
+.jump-row { padding: 8px 0; border-top: 1px solid var(--line); }
+.jump-row:last-child { border-bottom: 1px solid var(--line); }
+.jump-row p { margin: 0; }
+.jump-row-what { margin-top: 4px !important; }
+.jump-row-vs { margin-top: 4px !important; color: var(--muted); }
+.jump-compare { font-weight: 600; }

@@ -1,7 +1,7 @@
 /**
  * Bump Stop's entry point. It opens the garage slot from last time (plan
  * PR 8), then shows one screen: the "roadbook" look (plan PR 0) with the
- * career (plan PR 9), the build screen (plan PR 3), the shop's three rigs
+ * career (plan PR 9), the build screen (plan PR 3), the shop's rigs
  * and the report (plan PR 4), which test the truck, the raids (plan PR 7),
  * which race it, the saves and backups, the help (plan PR 11), and the
  * settings (graphics and offline play, plan PR 12), split over the bottom
