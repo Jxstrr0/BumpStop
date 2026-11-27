@@ -325,6 +325,7 @@ const STRINGS = {
   'view3d.replay': 'Slow motion: {what}, {where}.',
   'view3d.replayFrame': 'Slow motion: {what} at the {zone}.',
   'view3d.lasted': 'It lasted. The last clip of the run.',
+  'view3d.finished': 'It lasted every lap. Through the finish and pulled up.',
   'view3d.loading': 'Loading the 3D track…',
   'view3d.liveGhost': 'Live from the track. The see-through truck is the ghost.',
 
