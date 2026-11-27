@@ -55,10 +55,10 @@ export function raidView(): RaidView {
   let ready = false
 
   function load(): Promise<TrackView | null> {
-    loading ??= import('../render/trackView').then(
-      ({ createTrackView }) => (view = createTrackView(canvas)),
-      (err) => fail(err),
-    )
+    // The catch covers both ways it can go wrong: the 3D code not arriving, and the phone refusing WebGL when the view is made.
+    loading ??= import('../render/trackView')
+      .then(({ createTrackView }) => (view = createTrackView(canvas)))
+      .catch((err: unknown) => fail(err))
     return loading
   }
 

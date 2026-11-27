@@ -20,6 +20,11 @@ export const TIER_IDS: readonly TierId[] = ['lite', 'full', 'ultra']
 export interface TierSettings {
   /** Most pixels drawn per CSS pixel (phones are 2 to 3). */
   pixelRatioCap: number
+  /**
+   * Most pixels the test track draws in all. It only bites on a big canvas
+   * (the test track full page on a computer); a phone screen fits under it.
+   */
+  maxPixels: number
   /** Smooth edges. Fixed when a 3D view is made, so a change shows after a reload. */
   antialias: boolean
   /** The sun casts the truck's shadow. */
@@ -43,9 +48,9 @@ export interface TierSettings {
 }
 
 export const TIERS: Record<TierId, TierSettings> = {
-  lite: { pixelRatioCap: 1, antialias: false, shadows: false, shadowMap: 512, shadowBlur: 1, cover: 0.3, dust: 0.4, roadStep: 0.15, liteModels: true },
-  full: { pixelRatioCap: 2, antialias: true, shadows: true, shadowMap: 1024, shadowBlur: 1, cover: 0.85, dust: 1, roadStep: 0.1, liteModels: false },
-  ultra: { pixelRatioCap: 3, antialias: true, shadows: true, shadowMap: 2048, shadowBlur: 3, cover: 1.3, dust: 1.4, roadStep: 0.07, liteModels: false },
+  lite: { pixelRatioCap: 1, maxPixels: 1_500_000, antialias: false, shadows: false, shadowMap: 512, shadowBlur: 1, cover: 0.3, dust: 0.4, roadStep: 0.15, liteModels: true },
+  full: { pixelRatioCap: 2, maxPixels: 2_500_000, antialias: true, shadows: true, shadowMap: 1024, shadowBlur: 1, cover: 0.85, dust: 1, roadStep: 0.1, liteModels: false },
+  ultra: { pixelRatioCap: 3, maxPixels: 4_500_000, antialias: true, shadows: true, shadowMap: 2048, shadowBlur: 3, cover: 1.3, dust: 1.4, roadStep: 0.07, liteModels: false },
 }
 
 /** Auto's frame-rate watcher (see TierGovernor in src/render/tiers.ts). */
@@ -63,6 +68,15 @@ export const AUTO_TIER = {
   /** A frame longer than this is a tab switch or a stall, not the frame rate (s). */
   stallS: 0.5,
 } as const
+
+/**
+ * The test track's lens (see `src/render/framing.ts`). The shots were framed
+ * for a 16:10 picture at 40 degrees top to bottom. On a taller canvas (the
+ * test track full page on a phone held upright) the lens opens up to keep
+ * the picture as wide, but never past `maxFov`, where the sky and the near
+ * ground would start to look stretched.
+ */
+export const TRACK_CAMERA = { fov: 40, designAspect: 16 / 10, maxFov: 72 } as const
 
 /** Photo mode (plan PR 12): how high the camera may go (radians above the ground). */
 export const PHOTO_LIFT = { min: 0.03, max: 1.35 } as const

@@ -26,13 +26,14 @@
  */
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
-import { PHOTO_LIFT } from '../data/graphics'
+import { PHOTO_LIFT, TRACK_CAMERA } from '../data/graphics'
 import { LAND, LAND_COLOUR, SHAKER_FLOOR, SKY } from '../data/scenery'
 import type { FailureKind } from '../data/wear'
 import { WEATHER_LOOK, type WeatherId } from '../data/weather'
 import type { Profile } from '../sim/ground'
 import type { Pose } from '../sim/poses'
 import { GHOST_LOOK } from '../data/rigs'
+import { pixelRatioFor, trackFov } from './framing'
 import { addLights, applyLook, applyTier, cssColour, isDark, makeRenderer, onLookChange } from './look'
 import { Puffs } from './particles'
 import { loadKit, plant, Props, Wires, type Kit } from './scenery'
@@ -154,7 +155,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   const renderer = makeRenderer(canvas)
   const scene = new THREE.Scene()
   // The far limit is past the sky's bowl.
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, SKY_RADIUS * 1.2)
+  const camera = new THREE.PerspectiveCamera(TRACK_CAMERA.fov, 1, 0.1, SKY_RADIUS * 1.2)
   const lights = addLights(scene, 8)
   scene.fog = new THREE.Fog(0xffffff, 40, 140)
 
@@ -284,13 +285,23 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   }
   const stopLook = onLookChange(look)
 
+  /** Fit the lens to a picture this shape: a tall one (full page on a phone) opens it up. */
+  function frame(aspect: number): void {
+    camera.aspect = aspect
+    camera.fov = trackFov(aspect)
+    camera.updateProjectionMatrix()
+  }
+
   function resize(): void {
     const w = canvas.clientWidth
     const h = canvas.clientHeight
     if (w === 0 || h === 0) return
+    // A very big canvas (full page on a computer) is drawn a little softer to stay smooth.
+    const tier = tierSettings()
+    const ratio = pixelRatioFor(w, h, window.devicePixelRatio, tier.pixelRatioCap, tier.maxPixels)
+    if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio)
     renderer.setSize(w, h, false)
-    camera.aspect = w / h
-    camera.updateProjectionMatrix()
+    frame(w / h)
   }
 
   /** Lay the road under this clip, with room behind and ahead for the camera. */
@@ -768,8 +779,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       const ratio = renderer.getPixelRatio()
       renderer.setPixelRatio(1)
       renderer.setSize(width, height, false)
-      camera.aspect = width / height
-      camera.updateProjectionMatrix()
+      frame(width / height)
       draw(0)
       const out = document.createElement('canvas')
       out.width = width
