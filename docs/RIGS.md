@@ -94,9 +94,9 @@ at 100 and loses:
 | Landing short on the top, or on the flat past the slope | 8 |
 
 80 and up is **Clean** (cool blue), 50 and up **Firm** (amber), below that
-**Hard** (red), always with the word. A stock light 4x4 scores about 96,
-87, 79, 69, 29 and 16 from 45 to 70 km/h. Longer bump stops are the biggest
-fix (69 to 78 at 60 km/h, 29 to 57 at 65), then softer springs (the lip
+**Hard** (red), always with the word. A stock light 4x4 scores about 92,
+86, 78, 64, 30 and 16 from 45 to 70 km/h. Longer bump stops are the biggest
+fix (64 to 78 at 60 km/h, 30 to 56 at 65), then softer springs (the lip
 throws the truck less high) and more rebound. The harness
 `scripts/harness/jumps.harness.ts` prints every landing for any tune.
 
