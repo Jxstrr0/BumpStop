@@ -536,6 +536,21 @@ export function buyUpgrade(c: CareerState, id: UpgradeId): void {
 
 // ── Entering your own truck ──
 
+/**
+ * A tier's prize money by place, first place down, for a field of `of`
+ * trucks in your class (yours counted): a big field pays more places
+ * (`TierRules.bigField`). Light 4x4 money: times `CLASS_MONEY` to pay.
+ */
+export function tierPrizes(tier: Tier, of: number): readonly number[] {
+  const r = TIERS[tier]
+  return r.bigField && of >= r.bigField.from ? [...r.prizes, ...r.bigField.more] : r.prizes
+}
+
+/** How many trucks will be in your class at the next raid, yours counted. */
+export function fieldSize(c: CareerState, cls: ClassId): number {
+  return careerRivals(c, cls, nextEvent(c).tier).length + 1
+}
+
 export function entryFee(c: CareerState, cls: ClassId): number {
   return TIERS[nextEvent(c).tier].entryFee * CLASS_MONEY[cls]
 }
@@ -767,7 +782,7 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
     const pos = out.pos
     const earned = pos === 1 ? 'win' : pos !== null && pos <= 3 ? 'podium' : out.finished ? 'finish' : null
     if (job.kind === 'own') {
-      out.prize = pos !== null ? (tier.prizes[pos - 1] ?? 0) * CLASS_MONEY[cls] : 0
+      out.prize = pos !== null ? (tierPrizes(e.tier, out.of)[pos - 1] ?? 0) * CLASS_MONEY[cls] : 0
       const bill = repairBill(c, state)
       out.repairs = bill.repairs
       out.spares = bill.spares

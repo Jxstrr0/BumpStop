@@ -15,7 +15,7 @@ import { changeCost, checkBuild, massAndCost, partIn, partsFor, stockBuild } fro
 import {
   buyTruck, buyUpgrade, cheapestBuild, contractProblems, contractRaid, crewHours, driveAuto, enterOwn, entryProblems, eventSeed,
   fitOwn, garageCare, garageSpares, isBroke, newCareer, nextEvent, offers, repairBill, repairShare, sellTruck, setContractBuild, settle,
-  takeContract, truckPrice, truckValue, upgradeProblem, type CareerState,
+  takeContract, fieldSize, tierPrizes, truckPrice, truckValue, upgradeProblem, type CareerState,
 } from '../src/sim/career'
 import { enterRaid, type RaidState, type StageRecord } from '../src/sim/raid'
 import { Rng } from '../src/sim/rng'
@@ -307,6 +307,29 @@ describe('your own truck', () => {
       expect(r.prizes[2]!, tier).toBeGreaterThan(fees * 1.25)
       expect(r.prizes[0]!, tier).toBeGreaterThan(fees * 3)
     }
+  })
+
+  it('a big field pays every place down to eighth at the national raids and the finale, not at a regional one', () => {
+    expect(tierPrizes('regional', 8)).toEqual(TIERS.regional.prizes)
+    for (const tier of ['national', 'long'] as const) {
+      const r = TIERS[tier]
+      expect(tierPrizes(tier, 7), tier).toEqual(r.prizes)
+      const big = tierPrizes(tier, 8)
+      expect(big.length, tier).toBe(8)
+      // Each place still pays less than the one before it.
+      for (let k = 1; k < big.length; k++) expect(big[k]!, `${tier} ${k}`).toBeLessThan(big[k - 1]!)
+    }
+  })
+
+  it('the classes\' fields: the light 4x4 is the big one, so only it gets the deeper prizes', () => {
+    const c = newCareer(3)
+    c.season = 20
+    c.year = 2005
+    c.teams = teamsForYear(2005)
+    while (nextEvent(c).tier !== 'national') c.next++
+    expect(fieldSize(c, 'light4x4')).toBeGreaterThanOrEqual(8)
+    expect(fieldSize(c, 'heavy')).toBeLessThan(8)
+    expect(fieldSize(c, 'sxs')).toBeLessThan(8)
   })
 
   it('retiring earns nothing and the rivals take the places', () => {

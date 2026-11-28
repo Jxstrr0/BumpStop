@@ -86,6 +86,12 @@ export interface TierRules {
   driverFee: number
   /** Reputation for finishing, a podium and a win (own entry); contracts get half. */
   repFor: { finish: number; podium: number; win: number }
+  /**
+   * A big field pays deeper: with `from` trucks or more in your class
+   * (counting yours), the places after `prizes` pay these too (light 4x4
+   * money, times `CLASS_MONEY`).
+   */
+  bigField?: { from: number; more: readonly number[] }
 }
 
 /**
@@ -97,14 +103,22 @@ export interface TierRules {
  * 3,500 / 2,000, drivers ×1; national 4,000, 15,000 / 9,000 / 5,000 /
  * 2,500, ×1.6; the finale 9,000, 40,000 / 22,000 / 12,000 / 6,000 / 3,000,
  * ×3. How it was checked: `docs/BALANCE.md`.
+ *
+ * Big fields (Kelbo picked it, 28 November 2026): late in a career the light
+ * 4x4 earned about a third of the other classes for what its parts cost,
+ * because its fields have eight trucks against five to seven, so mid-field
+ * paid nothing at the national raids and the finale. Like a real rally,
+ * whose purse grows with the entries, a field of eight or more now pays
+ * every place down to eighth there (`bigField`). It touches only the light
+ * 4x4, and only from about 2000, when its field reaches eight.
  */
 export const TIERS: Readonly<Record<Tier, TierRules>> = {
   regional: { entryFee: 1000, prizes: [10000, 7000, 5000], rep: 0, driverFee: 0.6,
     repFor: { finish: 1, podium: 3, win: 5 } },
   national: { entryFee: 3000, prizes: [20000, 13000, 8500, 4500], rep: 15, driverFee: 1,
-    repFor: { finish: 2, podium: 4, win: 7 } },
+    repFor: { finish: 2, podium: 4, win: 7 }, bigField: { from: 8, more: [4000, 3000, 2500, 2000] } },
   long: { entryFee: 7000, prizes: [50000, 30000, 18000, 9000, 4500], rep: 60, driverFee: 2,
-    repFor: { finish: 3, podium: 8, win: 15 } },
+    repFor: { finish: 3, podium: 8, win: 15 }, bigField: { from: 8, more: [4000, 3500, 3000] } },
 }
 
 /** Each hired driver's fee for a regional raid in a light 4x4, and the reputation they want before they'll drive for you. */
