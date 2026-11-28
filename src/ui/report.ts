@@ -187,7 +187,7 @@ function fixList(fixes: readonly { target: FixTarget; text: StringKey }[], end: 
 }
 
 /** Up to three fix buttons, each for its own end of the truck; ones that can't be done on this truck this year are skipped. */
-export function fixButtons(fixes: readonly { target: FixTarget; text: StringKey; end: End }[], ctx: ReportContext): HTMLElement {
+export function fixButtons(fixes: readonly { target: FixTarget; text: StringKey; end: End }[], ctx: Pick<ReportContext, 'truck' | 'year' | 'onFix'>): HTMLElement {
   const list = el('ul', 'fix-buttons')
   for (const fix of fixes.filter((f) => fixUseful(f.target, f.end, ctx.truck.build, ctx.year)).slice(0, 3)) {
     const jump = fixJump(fix.target, fix.end, ctx.truck.build)

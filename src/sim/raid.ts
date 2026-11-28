@@ -298,10 +298,14 @@ function stockPowerToWeight(cls: ClassId): number {
   return stock.power / stock.runMass
 }
 
+/** The truck's power-to-weight against its class's stock truck (1 is the same). */
+export function powerRatio(truck: BuiltTruck): number {
+  return truck.power / truck.runMass / stockPowerToWeight(truck.build.cls)
+}
+
 /** Speed on fast ground follows power-to-weight. */
 export function powerFactor(truck: BuiltTruck): number {
-  const ratio = truck.power / truck.runMass / stockPowerToWeight(truck.build.cls)
-  const k = detPow(ratio, RAID.powerExponent)
+  const k = detPow(powerRatio(truck), RAID.powerExponent)
   return Math.min(RAID.powerLimits[1], Math.max(RAID.powerLimits[0], k))
 }
 
@@ -332,7 +336,7 @@ export function groundSpeed(truck: BuiltTruck, driver: DriverId, ground: RaidGro
 }
 
 /** Better lines save time on the driver's good ground without changing the hits. */
-function lineFactor(driver: DriverId, ground: RaidGround): number {
+export function lineFactor(driver: DriverId, ground: RaidGround): number {
   const d = DRIVERS[driver]
   return d.skill.includes(ground) ? d.skillTime : 1
 }

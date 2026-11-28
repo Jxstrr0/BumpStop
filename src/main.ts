@@ -17,6 +17,7 @@ import './style.css'
 import { t } from './data/strings'
 import { buildPanel } from './ui/buildScreen'
 import { careerPanel } from './ui/career'
+import { contestPanel } from './ui/contest'
 import { applyDev, devPanel } from './ui/devMode'
 import { el, reveal } from './ui/dom'
 import { openGarage, type Garage } from './ui/garage'
@@ -80,7 +81,7 @@ function gameScreen(app: HTMLElement, garage: Garage): void {
     career: [head, ...(reminder ? [reminder] : []), loopPanel(help.element), career.element],
     build: [buildPanel(store, help.showTerm)],
     test: [shopPanel(store, garage.shop)],
-    raid: [raidPanel(store, garage.raid, career.raid)],
+    raid: [raidPanel(store, garage.raid, career.raid), contestPanel(store, career.raid)],
     more: [help.element, savesPanel(garage), settingsPanel(), devPanel(), roadbookStrip(), el('p', 'note', t('preview.note'))],
   })
   app.append(footer(), tabs.bar)

@@ -82,6 +82,22 @@ Muskeg Marathon, Esker Dash, Firebreak Raid, Aurora Raid, Coast to Coast.
 Turned down earlier: the Frostbite 300, the Esker Run, the Long Night Raid,
 the Muskeg 800, the Birchland Traverse.
 
+## One-day events
+
+**Picked by Kelbo on 28 November 2026.** Short contests beside the raids
+(`src/data/contests.ts`), each with its own kind of course. Names in
+`contest.*.name` in `src/data/strings.ts`.
+
+| Kind | Id | Name | Where |
+| --- | --- | --- | --- |
+| Hill climb | `hillClimb` | **Tailings Hill Climb** | Up the old mine tailings at Gritstone |
+| Speed trial | (coming) | **The Rattle Mile** | A measured mile of washboard |
+| Jump contest | (coming) | **Sawbuck Fall Fair Jump-Off** | The fall fair at Sawbuck |
+| Short course | (coming) | **Gravel Pit Derby** | Laps of a gravel pit (the name Kelbo picked for a raid that left the career) |
+
+Offered and not picked: Sawdust Hill Climb, Gritstone Grade, Chatterbox Mile,
+Loose Fillings Mile, Mill Days Big Air.
+
 ## Rival teams
 
 **Picked by Kelbo on 26 November 2026.** Four teams with their own trucks
