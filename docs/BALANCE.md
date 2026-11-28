@@ -30,6 +30,14 @@ npx vitest run --config vitest.harness.config.ts career-light4x4
   par for a stock truck and for an upgraded one, by driver and pace call.
   Rivals' `pace` is the same ratio, so this is what their numbers are set
   against. `teams.harness.ts` prints each team's pace and trouble by year.
+- **Money by class** (`career-money.harness.ts`): the career bot in one
+  class from a garage opened in `BOT_START` (2005 by default, the first year
+  side-by-sides race), entering the one-day events between raids too, with
+  where the money came from (raids, contracts, events, series) and went
+  (truck, parts, crew and tools). `BOT_ESTABLISHED=300,200000` starts it as
+  a garage twenty years in (that reputation and money, every crew and tool
+  bought) changing class. `BOT_CLASS=sxs BOT_SEEDS=1,2 npx vitest run
+  --config vitest.harness.config.ts career-money`.
 - **Underside hits** (`underside.harness.ts`): rocks through the guards and the time they cost, per class, raid, guards and pace (`docs/UNDERSIDE.md`).
 - **Part traps** (`culprit.harness.ts`): every part, one at a time, on the
   stock truck with factory settings: no part should break far more than
@@ -216,3 +224,52 @@ change the bot's results on Steady: they make a long raid kinder to a
 truck rather than faster. The heavy truck's money is about 3.5 times a
 light 4x4's and the upgrades cost the same for every class, so a heavy
 garage still buys them all early.
+
+## Side-by-side money (28 November 2026)
+
+An older run of the bot (when side-by-sides raced from 1985) had the
+side-by-side banking about 60,000 by 2003, against 150,000 to 240,000 for
+the light 4x4 and over a million for the heavy truck. Kelbo asked for a
+look now that side-by-sides race only from 2005 (1.35) and the one-day
+events pay (1.34). The bot learnt to enter the events, to open its garage
+in 2005, and to keep a money book (`career-money.harness.ts`). Two seeds a
+class, Steady all the way, nothing in the game changed.
+
+"Earned" is the bank at the end, plus the truck's resale, plus what went on
+crew, tools and parts, less any starting money. "In light 4x4 money"
+divides it by the class's money scale (`CLASS_MONEY`: heavy 3.5,
+side-by-side 0.6), because that's what it buys.
+
+**A new garage in 2005, eight seasons:**
+
+| Class | Wins | Finale open | Earned | In light 4x4 money |
+| --- | --- | --- | --- | --- |
+| Light 4x4 | 0 in 21 and 0 in 25 | never | 112,000 / 133,000 | 112,000 / 133,000 |
+| Heavy truck | 0 in 11 and 0 in 6 | never | 100,000 / 99,000 | 29,000 / 28,000 |
+| Side-by-side | 1 in 38 and 1 in 41 | third season | 127,000 / 171,000 | 212,000 / 285,000 |
+
+A new garage in 2005 meets light and heavy fields that have had twenty
+years to grow, and a side-by-side field that's only just started (one to
+three teams). The side-by-side is the easiest start of that era.
+
+**A garage twenty years in (reputation 300, 200,000 in the bank, every crew
+and tool) changing class in 2005, six seasons:**
+
+| Class | Wins | Earned | A season | In light 4x4 money, a season |
+| --- | --- | --- | --- | --- |
+| Light 4x4 | 0 in 36 (both) | 111,000 / 93,000 | about 17,000 | about 17,000 |
+| Heavy truck | 0 and 1 in 36 | 1,029,000 / 975,000 | about 167,000 | about 48,000 |
+| Side-by-side | 3 in 36 (both) | 205,000 / 215,000 | about 35,000 | about 58,000 |
+
+**The side-by-side isn't the poorest any more**: since 2005 it earns the
+most for what its parts cost, and even more than the light 4x4 in plain
+money. Its fields are five to seven trucks, so most finishes are in the
+paid places, and the top sponsor's money (times 0.6) more than covers a
+regional entry. Nothing was changed for it.
+
+**The light 4x4 is the one behind** late in a career. Its fields are eight
+trucks against five to seven, so a mid-field finish (5th to 8th) is outside
+the paid places at the national raids and the finale; with the works
+sponsor a regional raid pays about 4,400 whatever the place, but the
+national raids and the finale lose money unless it reaches the podium.
+Left for Kelbo to decide.

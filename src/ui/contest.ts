@@ -25,7 +25,7 @@
 import { makeSound } from '../audio/sound'
 import { heatShare } from '../audio/cues'
 import { CLASSES, type ClassId } from '../data/classes'
-import { CONTEST_IDS, CONTESTS, EVENT_CAREER, ROUNDS, type Contest, type ContestId, type ContestKind } from '../data/contests'
+import { CONTEST_IDS, CONTESTS, EVENT_CAREER, HILL_CLIMB, ROUNDS, type Contest, type ContestId, type ContestKind } from '../data/contests'
 import { CLASS_MONEY } from '../data/career'
 import { FAILURES } from '../data/failures'
 import { DRIVER_IDS, DRIVERS, PACES, RAIDS, type DriverId, type PaceId, type Rival } from '../data/raids'
@@ -635,7 +635,7 @@ export function contestPanel(store: BuildStore, career?: EventCareer): HTMLEleme
     skipBtn.disabled = false
     fastBtn.setAttribute('aria-pressed', 'false')
     show(liveBox)
-    view3d.begin({ truck, road: runner.road, log: runner.poses!, trueSpeed: live.trueSpeed, finishText: t(c.kind === 'judged' ? 'contestUi.finishedJump' : isRace(c.id) ? 'contestUi.finishedFlag' : 'contestUi.finished') })
+    view3d.begin({ truck, road: runner.road, log: runner.poses!, trueSpeed: live.trueSpeed, grade: c.timed?.climb ? HILL_CLIMB.grade : 0, finishText: t(c.kind === 'judged' ? 'contestUi.finishedJump' : isRace(c.id) ? 'contestUi.finishedFlag' : 'contestUi.finished') })
     layout()
     drawLive()
     reveal(liveBox, { behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
