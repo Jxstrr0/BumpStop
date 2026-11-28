@@ -15,7 +15,7 @@ services them.
 | Wear | Comes from | What it does to the truck |
 | --- | --- | --- |
 | **Shock oil** gets tired | Every bit of heat the dampers make; oil run hot (warm line up to the red line) tires up to twice as fast | Damps up to 30% less, and foams and fades up to 18 °C sooner |
-| **Springs** sag | Rough kilometres (rough gravel, whoops, rocks, jumps, frost heaves) and bottom-outs | Sits lower: up to 30% less travel before the bump stop (it moves to droop), and 8% softer |
+| **Springs** sag | Rough kilometres (rough gravel, whoops, rocks, jumps, frost heaves) and bottom-outs | Sits lower: up to 30% less travel before the bump stop (it moves to droop); the same stiffness, since a tired spring gets shorter, not softer |
 | **Bushings** crack | Rough kilometres and bottom-outs | The mounts get up to 15% weaker, so they crack sooner |
 
 The ride sim drives the worn truck (`wornTruck`), so a fade still comes out
