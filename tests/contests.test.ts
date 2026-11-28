@@ -6,11 +6,11 @@
  */
 import { describe, expect, it } from 'vitest'
 import { CLASSES } from '../src/data/classes'
-import { CONTEST_IDS, CONTESTS, HILL_CLIMB, SPEED_TRIAL } from '../src/data/contests'
+import { CONTEST_IDS, CONTESTS, HILL_CLIMB, JUMP_OFF, SPEED_TRIAL } from '../src/data/contests'
 import { t } from '../src/data/strings'
 import { buildTruck, stockBuild } from '../src/sim/build'
 import {
-  bestOf, climbFactor, contestStandings, courseLength, courseRig, courseSeed, courseSpeeds, passKmh, passRig, rivalRuns, scorePasses, scoreRun, type ContestRun,
+  bestOf, climbFactor, contestStandings, courseLength, courseRig, courseSeed, courseSpeeds, jumpRig, passKmh, passRig, rivalRuns, scoreJump, scorePasses, scoreRun, type ContestRun,
 } from '../src/sim/contest'
 import { runLaps, type LapRun } from '../src/sim/laps'
 import { rivalsIn } from '../src/sim/rivals'
@@ -28,13 +28,13 @@ function climb(cls: (typeof CLASSES)[number]['id'], driver: 'veteran' | 'charger
 }
 
 describe('the events table', () => {
-  it('has a name and a line for every event, and a course of real length', () => {
+  it('has a name and a line for every event, and a course of real length (a jump contest just one jump)', () => {
     for (const id of CONTEST_IDS) {
       const c = CONTESTS[id]
       expect(c.id).toBe(id)
       expect(t(c.name)).toBeTruthy()
       expect(t(c.text)).toBeTruthy()
-      expect(courseLength(c)).toBeGreaterThan(1000)
+      expect(courseLength(c)).toBeGreaterThanOrEqual(c.kind === 'judged' ? 150 : 1000)
       expect(c.runs).toBeGreaterThan(0)
     }
   })
@@ -134,6 +134,50 @@ describe('the speed trial', () => {
     const rivals = [{ id: 'a', runs: [95] }, { id: 'b', runs: [null] }, { id: 'c', runs: [85] }]
     expect(contestStandings('topSpeed', mine, rivals, 1).map((r) => r.who)).toEqual(['a', 'you', 'c', 'b'])
     expect(bestOf([80, null, 95], 'topSpeed')).toBe(95)
+  })
+})
+
+const FAIR = CONTESTS.jumpOff
+
+function jump(cls: (typeof CLASSES)[number]['id'], kmh: number): ContestRun {
+  const truck = buildTruck(stockBuild(cls))
+  return scoreJump(runLaps(truck.ride, truck.wear, jumpRig(FAIR, kmh), courseSeed(FAIR, cls), { airTemp: fromCelsius(FAIR.airC), trace: false }), kmh)
+}
+
+describe('the jump contest', () => {
+  it('jumps the tabletop once an attempt, at the speed called', () => {
+    const rig = jumpRig(FAIR, 58)
+    expect(rig.maxLaps).toBe(1)
+    expect(rig.startSpeed * 3.6).toBeCloseTo(58, 9)
+    expect(rig.pieces[0]!.table).toEqual(FAIR.course[0]!.table)
+  })
+
+  it('pays the landing plus the crowd\'s points for distance', () => {
+    const r = jump('heavy', 54)
+    expect(r.landing).toBeTruthy()
+    expect(r.air).toBe(Math.round(r.landing!.flown * JUMP_OFF.perMetre))
+    expect(r.score).toBe(r.landing!.score + r.air!)
+  })
+
+  it('flies further when faster, and lands worse past the slope', () => {
+    const slow = jump('light4x4', 50)
+    const fast = jump('light4x4', 66)
+    expect(fast.landing!.flown).toBeGreaterThan(slow.landing!.flown)
+    expect(fast.landing!.score).toBeLessThan(slow.landing!.score)
+  })
+
+  it('gives every stock truck the best jump the rivals are measured from', () => {
+    for (const c of CLASSES) {
+      const best = Math.max(...FAIR.speeds!.map((k) => jump(c.id, k).score ?? 0))
+      expect(best, c.id).toBe(JUMP_OFF.stockBest[c.id])
+    }
+  }, SLOW)
+
+  it('ranks the most points first, the same rivals every time', () => {
+    const mine: ContestRun[] = [{ pace: 'steady', score: 110, broken: null, bottomOuts: 0, lost: 0 }]
+    const rivals = [{ id: 'a', runs: [120] }, { id: 'b', runs: [null] }, { id: 'c', runs: [100] }]
+    expect(contestStandings('judged', mine, rivals, 1).map((r) => r.who)).toEqual(['a', 'you', 'c', 'b'])
+    expect(rivalRuns(FAIR, 'sxs', rivalsIn('sxs'))).toEqual(rivalRuns(FAIR, 'sxs', rivalsIn('sxs')))
   })
 })
 
