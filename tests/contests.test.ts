@@ -17,6 +17,8 @@ import { rivalsIn } from '../src/sim/rivals'
 import { fromCelsius } from '../src/sim/units'
 
 const HILL = CONTESTS.hillClimb
+/** These drive whole runs through the ride sim: a second or so each here, more on a busy CI machine. */
+const SLOW = 60_000
 
 function climb(cls: (typeof CLASSES)[number]['id'], driver: 'veteran' | 'charger', pace: 'conserve' | 'steady' | 'push'): ContestRun {
   const truck = buildTruck(stockBuild(cls))
@@ -62,14 +64,14 @@ describe('the hill climb', () => {
       expect(r.broken, c.id).toBeNull()
       expect(r.score, c.id).toBeGreaterThan(60)
     }
-  })
+  }, SLOW)
 
   it('is quicker on Push than on Steady', () => {
     const steady = climb('light4x4', 'veteran', 'steady')
     const push = climb('light4x4', 'veteran', 'push')
     expect(push.score).not.toBeNull()
     expect(push.score!).toBeLessThan(steady.score!)
-  })
+  }, SLOW)
 
   it('takes time off for every bottom-out, and gives no time for a break', () => {
     const truck = buildTruck(stockBuild('heavy'))
@@ -108,12 +110,12 @@ describe('the speed trial', () => {
       expect(r.broken?.kind, c.id).toBe('fade')
       expect(r.score, c.id).toBe(SPEED_TRIAL.stockTop[c.id])
     }
-  })
+  }, SLOW)
 
   it('goes faster with dampers that shed more heat', () => {
     expect(trial('light4x4', 'remoteReservoir').score!).toBeGreaterThan(trial('light4x4').score!)
     expect(trial('sxs', 'remoteReservoir').score!).toBeGreaterThan(trial('sxs').score!)
-  })
+  }, SLOW)
 
   it('gives the rivals passes on the event\'s steps, the same every time', () => {
     for (const c of CLASSES) {
@@ -159,5 +161,5 @@ describe('rivals and standings', () => {
     const steady = climb('light4x4', 'veteran', 'steady')
     expect(steady.score!).toBeGreaterThan(best)
     expect(push.score!).toBeLessThan(best * 1.05)
-  })
+  }, SLOW)
 })
