@@ -91,7 +91,7 @@ the Muskeg 800, the Birchland Traverse.
 | Kind | Id | Name | Where |
 | --- | --- | --- | --- |
 | Hill climb | `hillClimb` | **Tailings Hill Climb** | Up the old mine tailings at Gritstone |
-| Speed trial | (coming) | **The Rattle Mile** | A measured mile of washboard |
+| Speed trial | `speedTrial` | **The Rattle Mile** | A measured mile of washboard |
 | Jump contest | (coming) | **Sawbuck Fall Fair Jump-Off** | The fall fair at Sawbuck |
 | Short course | (coming) | **Gravel Pit Derby** | Laps of a gravel pit (the name Kelbo picked for a raid that left the career) |
 

@@ -6,17 +6,19 @@
  */
 import { describe, expect, it } from 'vitest'
 import { CLASSES } from '../src/data/classes'
-import { CONTEST_IDS, CONTESTS, HILL_CLIMB } from '../src/data/contests'
+import { CONTEST_IDS, CONTESTS, HILL_CLIMB, SPEED_TRIAL } from '../src/data/contests'
 import { t } from '../src/data/strings'
 import { buildTruck, stockBuild } from '../src/sim/build'
 import {
-  bestOf, climbFactor, contestStandings, courseLength, courseRig, courseSeed, courseSpeeds, rivalRuns, scoreRun, type ContestRun,
+  bestOf, climbFactor, contestStandings, courseLength, courseRig, courseSeed, courseSpeeds, passKmh, passRig, rivalRuns, scorePasses, scoreRun, type ContestRun,
 } from '../src/sim/contest'
 import { runLaps, type LapRun } from '../src/sim/laps'
 import { rivalsIn } from '../src/sim/rivals'
 import { fromCelsius } from '../src/sim/units'
 
 const HILL = CONTESTS.hillClimb
+/** These drive whole runs through the ride sim: a second or so each here, more on a busy CI machine. */
+const SLOW = 60_000
 
 function climb(cls: (typeof CLASSES)[number]['id'], driver: 'veteran' | 'charger', pace: 'conserve' | 'steady' | 'push'): ContestRun {
   const truck = buildTruck(stockBuild(cls))
@@ -60,16 +62,16 @@ describe('the hill climb', () => {
     for (const c of CLASSES) {
       const r = climb(c.id, 'veteran', 'steady')
       expect(r.broken, c.id).toBeNull()
-      expect(r.time, c.id).toBeGreaterThan(60)
+      expect(r.score, c.id).toBeGreaterThan(60)
     }
-  })
+  }, SLOW)
 
   it('is quicker on Push than on Steady', () => {
     const steady = climb('light4x4', 'veteran', 'steady')
     const push = climb('light4x4', 'veteran', 'push')
-    expect(push.time).not.toBeNull()
-    expect(push.time!).toBeLessThan(steady.time!)
-  })
+    expect(push.score).not.toBeNull()
+    expect(push.score!).toBeLessThan(steady.score!)
+  }, SLOW)
 
   it('takes time off for every bottom-out, and gives no time for a break', () => {
     const truck = buildTruck(stockBuild('heavy'))
@@ -79,9 +81,59 @@ describe('the hill climb', () => {
       ({ laps: [{ ...lap, bottomOuts }], broken, brokenLap: broken ? 1 : 0, trace: null, wear: {} as never, history: {} as never, landings: [] })
     const clean = scoreRun(HILL, fake(0, null), speeds, 'veteran', 'steady')
     const bumpy = scoreRun(HILL, fake(4, null), speeds, 'veteran', 'steady')
-    expect(bumpy.time! - clean.time!).toBeCloseTo(4 * HILL_CLIMB.bottomOutCost, 9)
+    expect(bumpy.score! - clean.score!).toBeCloseTo(4 * HILL_CLIMB.bottomOutCost, 9)
     const ev = { kind: 'tire', corner: 0, zone: null, t: 10, distance: 300, speed: 10 } as unknown as NonNullable<LapRun['broken']>
-    expect(scoreRun(HILL, fake(0, ev), speeds, 'veteran', 'steady').time).toBeNull()
+    expect(scoreRun(HILL, fake(0, ev), speeds, 'veteran', 'steady').score).toBeNull()
+  })
+})
+
+const MILE = CONTESTS.speedTrial
+
+function trial(cls: (typeof CLASSES)[number]['id'], dampers?: string): ContestRun {
+  const b = stockBuild(cls)
+  if (dampers) b.parts.dampers = dampers
+  const truck = buildTruck(b)
+  return scorePasses(MILE, runLaps(truck.ride, truck.wear, passRig(MILE), courseSeed(MILE, cls), { airTemp: fromCelsius(MILE.airC), trace: false }))
+}
+
+describe('the speed trial', () => {
+  it('runs the mile faster every pass, from the first pass speed', () => {
+    const rig = passRig(MILE)
+    expect(rig.startSpeed * 3.6).toBeCloseTo(MILE.passes!.startKmh, 9)
+    expect(rig.speedStep * 3.6).toBeCloseTo(MILE.passes!.stepKmh, 9)
+    expect(passKmh(MILE, 3)).toBe(MILE.passes!.startKmh + 2 * MILE.passes!.stepKmh)
+  })
+
+  it('ends every stock truck on a fade, at the top pass the rivals are measured from', () => {
+    for (const c of CLASSES) {
+      const r = trial(c.id)
+      expect(r.broken?.kind, c.id).toBe('fade')
+      expect(r.score, c.id).toBe(SPEED_TRIAL.stockTop[c.id])
+    }
+  }, SLOW)
+
+  it('goes faster with dampers that shed more heat', () => {
+    expect(trial('light4x4', 'remoteReservoir').score!).toBeGreaterThan(trial('light4x4').score!)
+    expect(trial('sxs', 'remoteReservoir').score!).toBeGreaterThan(trial('sxs').score!)
+  }, SLOW)
+
+  it('gives the rivals passes on the event\'s steps, the same every time', () => {
+    for (const c of CLASSES) {
+      const runs = rivalRuns(MILE, c.id, rivalsIn(c.id))
+      expect(rivalRuns(MILE, c.id, rivalsIn(c.id))).toEqual(runs)
+      for (const r of runs.flatMap((x) => x.runs)) {
+        if (r === null) continue
+        expect((r - MILE.passes!.startKmh) % MILE.passes!.stepKmh).toBe(0)
+        expect(r).toBeLessThanOrEqual(passKmh(MILE, MILE.passes!.most))
+      }
+    }
+  })
+
+  it('ranks the fastest pass first', () => {
+    const mine: ContestRun[] = [{ pace: 'steady', score: 90, broken: null, bottomOuts: 0, lost: 0 }]
+    const rivals = [{ id: 'a', runs: [95] }, { id: 'b', runs: [null] }, { id: 'c', runs: [85] }]
+    expect(contestStandings('topSpeed', mine, rivals, 1).map((r) => r.who)).toEqual(['a', 'you', 'c', 'b'])
+    expect(bestOf([80, null, 95], 'topSpeed')).toBe(95)
   })
 })
 
@@ -97,17 +149,17 @@ describe('rivals and standings', () => {
   it('keeps the best run each, quickest first, with no-times last', () => {
     expect(bestOf([null, 120, 118.5])).toBe(118.5)
     expect(bestOf([null, null])).toBeNull()
-    const mine: ContestRun[] = [{ pace: 'push', time: null, broken: null, bottomOuts: 0, lost: 0 }, { pace: 'steady', time: 130, broken: null, bottomOuts: 0, lost: 0 }]
+    const mine: ContestRun[] = [{ pace: 'push', score: null, broken: null, bottomOuts: 0, lost: 0 }, { pace: 'steady', score: 130, broken: null, bottomOuts: 0, lost: 0 }]
     const rivals = [{ id: 'a', runs: [125, null] }, { id: 'b', runs: [null, null] }, { id: 'c', runs: [140, 135] }]
-    expect(contestStandings(mine, rivals, 1).map((r) => r.who)).toEqual(['a', 'c', 'you', 'b'])
-    expect(contestStandings(mine, rivals, 2).map((r) => r.who)).toEqual(['a', 'you', 'c', 'b'])
+    expect(contestStandings('timed', mine, rivals, 1).map((r) => r.who)).toEqual(['a', 'c', 'you', 'b'])
+    expect(contestStandings('timed', mine, rivals, 2).map((r) => r.who)).toEqual(['a', 'you', 'c', 'b'])
   })
 
   it('leaves the best rival within reach of a stock truck on Push with a quick driver', () => {
     const best = Math.min(...rivalRuns(HILL, 'light4x4', rivalsIn('light4x4')).map((r) => bestOf(r.runs) ?? Infinity))
     const push = climb('light4x4', 'charger', 'push')
     const steady = climb('light4x4', 'veteran', 'steady')
-    expect(steady.time!).toBeGreaterThan(best)
-    expect(push.time!).toBeLessThan(best * 1.05)
-  })
+    expect(steady.score!).toBeGreaterThan(best)
+    expect(push.score!).toBeLessThan(best * 1.05)
+  }, SLOW)
 })

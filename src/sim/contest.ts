@@ -2,16 +2,17 @@
  * One-day events (`src/data/contests.ts`): the sums behind them.
  *
  * Your truck runs the event's course through the full ride sim, exactly like
- * a rig on the test track (`laps.ts`): the course is turned into a one-lap
- * rig whose pieces carry the speed the driver takes each one at. So a break
- * on the hill climb is the same break the torture loop would show, with the
- * same trace and the same fix.
+ * a rig on the test track (`laps.ts`). The hill climb's course becomes a
+ * one-lap rig whose pieces carry the speed the driver takes each one at; the
+ * speed trial's is a loop driven faster every pass, like the washboard
+ * ladder. So a break here is the same break the test track would show, with
+ * the same trace and the same fix.
  *
  * The rivals are quick seeded estimates, like a raid's (`rivals.ts`): the
  * same event always gives them the same runs, so a second go is fair.
  */
 import { CLASSES, type ClassId } from '../data/classes'
-import { HILL_CLIMB, type Contest } from '../data/contests'
+import { HILL_CLIMB, SPEED_TRIAL, type Contest, type ContestKind } from '../data/contests'
 import { STEADY_KMH, type DriverId, type PaceId, type Rival } from '../data/raids'
 import type { Rig } from '../data/rigs'
 import type { BuiltTruck } from './build'
@@ -64,9 +65,13 @@ export function courseRig(contest: Contest, speeds: readonly number[]): Rig {
 /** One of your runs, scored. */
 export interface ContestRun {
   pace: PaceId
-  /** Seconds to the top, or null if something broke on the way. */
-  time: number | null
-  /** What broke (the run stops there), or null. */
+  /**
+   * The run's score, or null for none: seconds to the top on a hill climb
+   * (null if something broke on the way), the fastest clean pass on a speed
+   * trial (km/h; null if the first pass didn't come clean).
+   */
+  score: number | null
+  /** What broke (the run stops there), or null. On a speed trial this is usually the fade that ended it. */
   broken: BreakEvent | null
   /** Bottom-outs on the way (each corner counts). */
   bottomOuts: number
@@ -78,9 +83,55 @@ export interface ContestRun {
 export function scoreRun(contest: Contest, run: LapRun, speeds: readonly number[], driver: DriverId, pace: PaceId): ContestRun {
   const bottomOuts = run.laps.reduce((sum, lap) => sum + lap.bottomOuts, 0)
   const lost = bottomOuts * HILL_CLIMB.bottomOutCost
-  if (run.broken) return { pace, time: null, broken: run.broken, bottomOuts, lost }
+  if (run.broken) return { pace, score: null, broken: run.broken, bottomOuts, lost }
   const clean = contest.course.reduce((sum, p, i) => sum + (p.length / (speeds[i] as number)) * lineFactor(driver, p.ground), 0)
-  return { pace, time: clean + lost, broken: null, bottomOuts, lost }
+  return { pace, score: clean + lost, broken: null, bottomOuts, lost }
+}
+
+// ── The speed trial ──
+
+/** The speed of pass `n` (1 for the first), in km/h. */
+export function passKmh(contest: Contest, n: number): number {
+  const p = contest.passes!
+  return p.startKmh + (n - 1) * p.stepKmh
+}
+
+/** The mile as a loop for `laps.ts`: each pass is a lap, faster each time. */
+export function passRig(contest: Contest): Rig {
+  const p = contest.passes!
+  return {
+    id: `course:${contest.id}`,
+    pieces: contest.course.map((c) => ({ ground: c.ground, length: c.length, pace: 1 })),
+    startSpeed: p.startKmh * KMH,
+    speedStep: p.stepKmh * KMH,
+    maxLaps: p.most,
+  }
+}
+
+/** Score a speed trial run: the fastest pass that came clean (the one something broke on doesn't count). */
+export function scorePasses(contest: Contest, run: LapRun): ContestRun {
+  const clean = run.broken ? run.laps.length - 1 : run.laps.length
+  const bottomOuts = run.laps.reduce((sum, lap) => sum + lap.bottomOuts, 0)
+  return { pace: 'steady', score: clean > 0 ? passKmh(contest, clean) : null, broken: run.broken, bottomOuts, lost: 0 }
+}
+
+// ── Either kind ──
+
+/** The course as the rig the ride sim drives, for this kind of event. */
+export function eventRig(contest: Contest, truck: BuiltTruck, driver: DriverId, pace: PaceId): { rig: Rig; speeds: number[] } {
+  if (contest.kind === 'topSpeed') return { rig: passRig(contest), speeds: [] }
+  const speeds = courseSpeeds(contest, truck, driver, pace)
+  return { rig: courseRig(contest, speeds), speeds }
+}
+
+/** Score a finished run, for this kind of event. */
+export function scoreEvent(contest: Contest, run: LapRun, speeds: readonly number[], driver: DriverId, pace: PaceId): ContestRun {
+  return contest.kind === 'topSpeed' ? scorePasses(contest, run) : scoreRun(contest, run, speeds, driver, pace)
+}
+
+/** True if score `a` beats score `b` in this kind of event: quicker on a hill climb, faster on a speed trial. */
+export function beats(kind: ContestKind, a: number, b: number): boolean {
+  return kind === 'topSpeed' ? a > b : a < b
 }
 
 /** The course's par time: the stock truck at Steady with an average driver, sprinting uphill, no bottom-outs (s). */
@@ -96,6 +147,7 @@ export interface RivalRuns {
 
 /** Every rival's runs at the event, the same every time for the same event and class. */
 export function rivalRuns(contest: Contest, cls: ClassId, field: readonly Rival[]): RivalRuns[] {
+  if (contest.kind === 'topSpeed') return rivalPasses(contest, cls, field)
   const par = coursePar(contest, cls)
   const seed = courseSeed(contest, cls)
   return field.map((rival) => {
@@ -110,28 +162,54 @@ export function rivalRuns(contest: Contest, cls: ClassId, field: readonly Rival[
   })
 }
 
-/** The best of some runs, or null if none of them made it. */
-export function bestOf(runs: readonly (number | null)[]): number | null {
+/**
+ * A speed trial's rivals: the stock truck's top pass, better for the quicker
+ * teams, wandering a little, and now and then a pass short with a break.
+ */
+function rivalPasses(contest: Contest, cls: ClassId, field: readonly Rival[]): RivalRuns[] {
+  const p = contest.passes!
+  const seed = courseSeed(contest, cls)
+  const top = passKmh(contest, p.most)
+  return field.map((rival) => {
+    const runs: (number | null)[] = []
+    for (let k = 0; k < contest.runs; k++) {
+      const rng = new Rng(hashString(`${seed}:${rival.id}:${k}`))
+      const aim = SPEED_TRIAL.stockTop[cls] + SPEED_TRIAL.kmhPerPace * (1 - rival.pace) * 100 + SPEED_TRIAL.wander * rival.spread * rng.range(-1, 1)
+      let kmh = Math.min(top, p.startKmh + Math.floor((aim - p.startKmh) / p.stepKmh) * p.stepKmh)
+      if (rng.chance(rival.risk * SPEED_TRIAL.rivalRisk)) kmh -= p.stepKmh
+      runs.push(kmh >= p.startKmh ? kmh : null)
+    }
+    return { id: rival.id, runs }
+  })
+}
+
+/** The best of some runs in this kind of event, or null if none of them scored. */
+export function bestOf(runs: readonly (number | null)[], kind: ContestKind = 'timed'): number | null {
   let best: number | null = null
-  for (const r of runs) if (r !== null && (best === null || r < best)) best = r
+  for (const r of runs) if (r !== null && (best === null || beats(kind, r, best))) best = r
   return best
 }
 
 export interface ContestStanding {
   /** 'you' or the rival's id. */
   who: string
-  /** Best time so far, or null if no run has made it yet. */
+  /** Best score so far, or null if no run has scored yet. */
   best: number | null
 }
 
 /**
- * The standings after the first `runs` runs: the quickest best time first,
- * and anyone without a finished run at the bottom (you above rivals there).
+ * The standings after the first `runs` runs: the best score first, and
+ * anyone without a score at the bottom (you above rivals there). Ties keep
+ * you first.
  */
-export function contestStandings(mine: readonly ContestRun[], rivals: readonly RivalRuns[], runs: number): ContestStanding[] {
+export function contestStandings(kind: ContestKind, mine: readonly ContestRun[], rivals: readonly RivalRuns[], runs: number): ContestStanding[] {
   const rows: ContestStanding[] = [
-    { who: 'you', best: bestOf(mine.slice(0, runs).map((r) => r.time)) },
-    ...rivals.map((r) => ({ who: r.id, best: bestOf(r.runs.slice(0, runs)) })),
+    { who: 'you', best: bestOf(mine.slice(0, runs).map((r) => r.score), kind) },
+    ...rivals.map((r) => ({ who: r.id, best: bestOf(r.runs.slice(0, runs), kind) })),
   ]
-  return rows.sort((a, b) => (a.best === null ? (b.best === null ? 0 : 1) : b.best === null ? -1 : a.best - b.best))
+  const order = (a: ContestStanding, b: ContestStanding): number => {
+    if (a.best === null || b.best === null) return a.best === null ? (b.best === null ? 0 : 1) : -1
+    return beats(kind, a.best, b.best) ? -1 : beats(kind, b.best, a.best) ? 1 : 0
+  }
+  return rows.sort(order)
 }
