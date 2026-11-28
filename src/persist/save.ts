@@ -13,6 +13,7 @@
  * older version of Bump Stop still loads. Pure: no DOM, no storage.
  */
 import { CALENDAR, QUIRK_IDS, TEAM_IDS, UPGRADES, type QuirkId, type UpgradeId } from '../data/career'
+import { GRUDGE } from '../data/grudges'
 import { CLASSES, type ClassId } from '../data/classes'
 import { KITS, type AxleSettings, type TruckBuild } from '../data/kit'
 import { LOGBOOK } from '../data/logbook'
@@ -274,7 +275,11 @@ function readRival(raw: unknown, i: number, cls: ClassId): Rival {
   const delay = arrayOf(raw.delay, `${what} delay`, 2).map((x) => finite(x, `${what} delay`))
   const trouble = arrayOf(raw.trouble, `${what} trouble`)
   if (!trouble.length || trouble.some((x) => !TROUBLES.includes(x as string))) fail(`${what} has unknown trouble`)
-  return { ...(raw as unknown as Rival), delay: delay as [number, number] }
+  const out = { ...(raw as unknown as Rival), delay: delay as [number, number] }
+  // Grudges (after 1.35): a driver's name and heat. Older raids have neither; anything odd is dropped, never failing the save.
+  if (out.driver !== undefined && !(typeof out.driver === 'string' && (out.driver as string).startsWith('driverName.'))) delete out.driver
+  if (out.grudge !== undefined && !(typeof out.grudge === 'number' && Number.isFinite(out.grudge) && out.grudge > 0)) delete out.grudge
+  return out
 }
 
 // ── The career (format 2) ──
@@ -331,7 +336,16 @@ function readTeams(raw: unknown, year: number): TeamGarage {
   return fresh
 }
 
-const NEWS_KINDS: readonly NewsItem['kind'][] = ['result', 'winner', 'copied', 'newParts', 'sponsor', 'broke', 'longOne', 'skipped', 'event', 'series']
+const NEWS_KINDS: readonly NewsItem['kind'][] = ['result', 'winner', 'copied', 'newParts', 'sponsor', 'broke', 'longOne', 'skipped', 'event', 'series', 'grudge']
+
+const GRUDGE_WHYS = ['bump', 'tookWin', 'beat', 'settled']
+
+/** A grudge news line that names a real driver and says why. */
+function grudgeNewsOk(n: Record<string, unknown>): boolean {
+  const level = (x: unknown) => typeof x === 'number' && Number.isInteger(x) && x >= 0 && x <= 3
+  return typeof n.who === 'string' && typeof n.driver === 'string' && n.driver.startsWith('driverName.')
+    && GRUDGE_WHYS.includes(n.why as string) && level(n.from) && level(n.to)
+}
 
 /**
  * The first Long One win (plan PR 13), for the finale card and the record.
@@ -475,7 +489,8 @@ function readCareer(raw: unknown): CareerState {
   // News is only for reading: anything that doesn't look like news is dropped rather than failing the save.
   const news = Array.isArray(raw.news)
     ? raw.news.filter((n): n is NewsItem => isObj(n) && NEWS_KINDS.includes(n.kind as NewsItem['kind'])
-      && (n.kind !== 'event' && n.kind !== 'series' || (CONTEST_IDS.includes(n.contest as ContestId) && CLASS_IDS.includes(n.cls as ClassId))))
+      && (n.kind !== 'event' && n.kind !== 'series' || (CONTEST_IDS.includes(n.contest as ContestId) && CLASS_IDS.includes(n.cls as ClassId)))
+      && (n.kind !== 'grudge' || grudgeNewsOk(n)))
     : []
   const career: CareerState = {
     seed: finite(raw.seed, 'career seed') >>> 0,
@@ -496,10 +511,26 @@ function readCareer(raw: unknown): CareerState {
     stats: { raids: stats.raids as number, wins: stats.wins as number, podiums: stats.podiums as number, contracts: stats.contracts as number },
     trucks: readTrucks(raw.trucks),
     ...readEvents(raw.events, season),
+    ...readGrudges(raw.grudges),
   }
   // The garage's truck always has a logbook (a save from before logbooks gets a fresh one).
   tidyLogs(career)
   return career
+}
+
+/**
+ * Rival drivers' grudges (added after 1.35, with no new save format: a save
+ * without them starts with nobody holding one). Only team entries' ids with
+ * heat above zero are kept; anything else is dropped, never failing the save.
+ */
+function readGrudges(raw: unknown): { grudges?: Record<string, number> } {
+  if (!isObj(raw)) return {}
+  const out: Record<string, number> = {}
+  for (const [id, h] of Object.entries(raw)) {
+    if (!TEAM_IDS.some((t) => id.startsWith(t)) || typeof h !== 'number' || !Number.isFinite(h) || h <= 0) continue
+    out[id] = Math.min(GRUDGE.max, h)
+  }
+  return Object.keys(out).length ? { grudges: out } : {}
 }
 
 /**

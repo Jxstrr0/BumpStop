@@ -82,6 +82,7 @@ import { axleOf, newCondition, tireCondition, wornTruck, type Condition } from '
 import { detExp, detLog, detPow } from './det'
 import { clipRecorder, type Clip } from './highlight'
 import { iceReading, type IceBand } from './ice'
+import { raidGrudges } from './grudges'
 import { rivalsIn, rivalStages, type RivalStage } from './rivals'
 import { hashString, Rng } from './rng'
 import { runStage } from './stage'
@@ -503,9 +504,12 @@ export function partsMoney(state: RaidState): number {
   return Math.max(0, partsBudget(state) - state.spent)
 }
 
-/** Who else is entered in the player's class. */
+/**
+ * Who else is entered in the player's class. In a career raid, a driver you
+ * rubbed doors with on an earlier stage is hotter for the rest of it (`grudges.ts`).
+ */
 export function raidField(state: RaidState): readonly Rival[] {
-  return state.entry.field ?? rivalsIn(state.entry.build.cls)
+  return state.entry.field ? raidGrudges(state, state.entry.field) : rivalsIn(state.entry.build.cls)
 }
 
 /** Career raids pass `extra`: the year's seed, the field, the crew's hours and the money for parts (see `RaidEntry`). */

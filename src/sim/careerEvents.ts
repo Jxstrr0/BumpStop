@@ -26,9 +26,9 @@ import type { TruckBuild } from '../data/kit'
 import { SLOTS } from '../data/parts'
 import type { DriverId } from '../data/raids'
 import { checkBuild, type BuildProblem } from './build'
-import { addNews, isBroke, nextEvent, repairShare, type CareerState } from './career'
+import { addNews, careerRivals, isBroke, nextEvent, repairShare, type CareerState } from './career'
 import { contestStandings, rivalRuns, type ContestStanding, type RivalRuns } from './contest'
-import { careerField } from './teams'
+import { meetRivals, type GrudgeNote } from './grudges'
 
 /** Your entry in a round, while its runs are being driven. */
 export interface EventEntry {
@@ -72,9 +72,9 @@ export function roundsOf(id: ContestId): number {
   return ROUNDS.filter((r) => r.contest === id).length
 }
 
-/** The rivals at a round in a class: the regional raids' field. */
+/** The rivals at a round in a class: the regional raids' field, drivers' grudges and all. */
 export function eventField(c: CareerState, cls: ClassId) {
-  return careerField(c.teams, cls, 'regional', c.year)
+  return careerRivals(c, cls, 'regional')
 }
 
 /** The rivals' runs at a round: the same every time for the same career, year and round. */
@@ -182,6 +182,8 @@ export interface EventSettlement {
   points: number
   table: ContestStanding[]
   rivals: RivalRuns[]
+  /** Rival drivers whose grudge against you moved to a new level. */
+  grudges: GrudgeNote[]
 }
 
 /**
@@ -216,6 +218,7 @@ export function settleEvent(c: CareerState): EventSettlement {
   const i = live.round
   const id = ROUNDS[i]!.contest
   const contest = CONTESTS[id]
+  const field = eventField(c, live.cls)
   const rivals = roundRivals(c, i, live.cls)
   const table = contestStandings(contest.kind, live.scores.map((score) => ({ score })), rivals, contest.runs)
   const k = table.findIndex((r) => r.who === 'you')
@@ -236,7 +239,11 @@ export function settleEvent(c: CareerState): EventSettlement {
   const out: EventSettlement = {
     contest: id, round: roundNo(i), rounds: roundsOf(id), cls: live.cls, pos, of: table.length,
     prize, paid: live.paid, repairs, money: prize - live.paid - repairs, rep, points, table, rivals,
+    // Grudges: the drivers there remember who finished ahead (no door rubs: one truck on the course at a time).
+    grudges: meetRivals(c, table.filter((r) => r.best !== null), field),
   }
+  // Grudge news first, so the result reads above it (newest first).
+  for (const n of out.grudges) addNews(c, { kind: 'grudge', year: c.year, ...n })
   addNews(c, { kind: 'event', year: c.year, contest: id, round: out.round, cls: live.cls, pos, of: out.of, money: out.money, rep })
   return out
 }

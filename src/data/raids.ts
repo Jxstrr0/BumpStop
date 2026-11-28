@@ -461,6 +461,10 @@ export interface Rival {
   /** What usually goes wrong for them. */
   trouble: readonly RivalTrouble[]
   habit: StringKey
+  /** Career only: the team's driver in this class, from the driver pool (`src/sim/grudges.ts`). */
+  driver?: StringKey
+  /** Career only: the driver's heat against you (grudges, `src/data/grudges.ts`); missing for none. */
+  grudge?: number
 }
 
 /** A stage with this share of harsh ground is "average" for the rivals' risk. */

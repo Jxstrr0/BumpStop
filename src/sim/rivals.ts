@@ -14,6 +14,7 @@
  */
 import type { ClassId } from '../data/classes'
 import { CLASS_WORK, RAID, RIVAL_HARSH_AVERAGE, RIVALS, type Rival, type RivalTrouble } from '../data/raids'
+import { pushHarder } from './grudges'
 import { hashString, Rng } from './rng'
 
 export interface RivalStage {
@@ -45,7 +46,8 @@ export function rivalStages(
 ): RivalStage[] {
   const par = legPar.reduce((a, b) => a + b, 0)
   const close = par * RAID.closeAfter
-  return field.map((rival) => {
+  // A driver with a grudge against you drives harder: quicker, more trouble (`grudges.ts`).
+  return field.map(pushHarder).map((rival) => {
     const rng = new Rng(hashString(`${seed}:${rival.id}`))
     const clean = rival.pace * (1 + rival.spread * rng.range(-1, 1))
     const legs = legPar.map((p) => p * clean * (1 + (rival.spread / 2) * rng.range(-1, 1)))

@@ -50,7 +50,7 @@ import { el, num, reveal } from './dom'
 import { endOf, jumpTo } from './fixes'
 import { readFullPage, writeFullPage } from './fullPage'
 import { gradeChip, landingSummary } from './landingText'
-import { dateText, eventProblemText } from './career'
+import { dateText, eventProblemText, grudgeBand, grudgeText } from './career'
 import { entrantName, ordinal } from './raid'
 import { crewNote, fixButtons, traceBlock, whereText } from './report'
 import { rigView } from './rigView'
@@ -439,7 +439,15 @@ export function contestPanel(store: BuildStore, career?: EventCareer): HTMLEleme
     ul.append(el('li', 'readout-line', tf('career.paid.total', { n: signed(s.money) })))
     if (s.rep > 0) ul.append(el('li', 'small', tf('career.paid.rep', { n: String(s.rep) })))
     ul.append(el('li', 'small', tf('contestUi.seriesPoints', { points: String(s.points), round: String(s.round), of: String(s.rounds) })))
-    wrap.append(el('h4', '', t('contestUi.payoutHead')), ul, seriesBlock(c, s.contest, s.cls))
+    wrap.append(el('h4', '', t('contestUi.payoutHead')), ul)
+    // Grudges: rival drivers who took this result to heart (or settled the score).
+    const grudges = s.grudges ?? []
+    if (grudges.length) {
+      const list = el('ul', 'raid-list')
+      for (const g of grudges) list.append(el('li', `small ${grudgeBand(g.to)}`, grudgeText(g)))
+      wrap.append(el('h4', 'raid-sub', t('career.grudges')), list)
+    }
+    wrap.append(seriesBlock(c, s.contest, s.cls))
     return wrap
   }
 
