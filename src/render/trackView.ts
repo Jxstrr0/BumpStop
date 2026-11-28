@@ -29,6 +29,13 @@
  * from wherever they put it, clip after clip, until `swingEnd` gives it
  * back to the TV-style shots. It never goes into the forest on the right
  * or past the cameras' clear lane on the left (`SWING` in `graphics.ts`).
+ *
+ * A hill (`RunSetup.grade`, the hill climb): everything on the ground (the
+ * road, the land, the scenery, the trucks and the dust) sits in one group,
+ * `world`, tilted uphill in the direction of travel. The sky, the sun and
+ * the camera stay level, so the road climbs away from a level horizon. The
+ * shots are still worked out along the road, as on the flat, and turned
+ * into the tilted world in `aim`.
  */
 import * as THREE from 'three'
 import type { ClassId } from '../data/classes'
@@ -128,6 +135,8 @@ export interface RunSetup {
   loop?: boolean
   /** Mud, dust, snow and dents to show on the truck (a raid's); left out for a clean truck. */
   grime?: Grime | null
+  /** The road climbs this much per metre (the hill climb): only the picture tilts, the ride sim is the same. Left out for flat. */
+  grade?: number
 }
 
 /** Photo mode's camera and moment (plan PR 12). */
@@ -243,6 +252,9 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   const camera = new THREE.PerspectiveCamera(TRACK_CAMERA.fov, 1, 0.1, SKY_RADIUS * 1.2)
   const lights = addLights(scene, 8)
   scene.fog = new THREE.Fog(0xffffff, 40, 140)
+  // Everything on the ground, tilted uphill on a hill (see the top of the file).
+  const world = new THREE.Group()
+  scene.add(world)
 
   // Outdoors: the road strip and the land (rebuilt per clip), a lake's water, the scenery and the sky.
   const outdoors = new THREE.Group()
@@ -257,8 +269,10 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   water.rotation.x = -Math.PI / 2
   const sky = new Sky()
   const wires = new Wires()
-  outdoors.add(strip, hills, water, wires.lines, sky.group)
-  scene.add(outdoors)
+  outdoors.add(strip, hills, water, wires.lines)
+  // The sky stays level, out of the tilted world.
+  scene.add(sky.group)
+  world.add(outdoors)
   let ground: Ground | null = null
   // The scenery kit arrives a moment after the first truck does.
   let props: Props | null = null
@@ -278,7 +292,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     shop.add(post.base, post.pan)
     return post
   })
-  scene.add(shop)
+  world.add(shop)
 
   /** Build what's made from the scenery kit: the workshop, the posts, the far hills and the clouds. */
   function useKit(kit: Kit): void {
@@ -305,7 +319,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   // The jump ramp's landing marks: amber on the bump stops, red for a bottom-out.
   const amber = new Puffs(40, 0xf0ae45)
   const red = new Puffs(40, 0xff5050)
-  scene.add(dust.points, smoke.points, amber.points, red.points)
+  world.add(dust.points, smoke.points, amber.points, red.points)
 
   let truck: TruckModel | null = null
   // The ghost truck, and its clip of the same moments.
@@ -432,12 +446,14 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const night = darkNow()
     if (!run.road) {
       outdoors.visible = false
+      sky.group.visible = false
       shop.visible = true
       ground = null
       return
     }
     shop.visible = false
     outdoors.visible = true
+    sky.group.visible = true
     const pieces = placePieces(run.road, run.wheelbase, first.piece, first.distance, first.x)
     // A loop's length: each piece's road overlaps the next by a wheelbase.
     const lap = run.loop ? run.road.reduce((sum, p) => sum + p.length - run!.wheelbase, 0) : 0
@@ -575,7 +591,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     photoTarget(tx, camTarget)
     const focus = opts.focus
     if (focus && focus.corner >= 0) {
-      const corner = t.cornerPosition(focus.corner, focusTarget)
+      const corner = cornerAt(t, focus.corner, focusTarget)
       camTarget.lerp(corner, 0.6 * (reduced.matches ? 1 : smooth(progress * 1.25)))
     }
     orbit(c.turn, c.lift, swingBase() * c.zoom, camTarget, camPos)
@@ -625,7 +641,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const focus = opts.focus
     if (focus && focus.corner >= 0) {
       // Close in on the corner that broke, from its own side.
-      const c = t.cornerPosition(focus.corner, focusTarget)
+      const c = cornerAt(t, focus.corner, focusTarget)
       const out = focus.corner % 2 === 0 ? -1 : 1
       const R = t.radius
       focusPos.set(c.x + 3.4 * R, c.y + 1.6 * R, c.z + out * 5.6 * R)
@@ -644,11 +660,27 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
   /** Point the camera from `camPos` at `camTarget`, keeping it above the ground, and bring the sun and sky along. */
   function aim(tx: number): void {
     if (ground) camPos.y = Math.max(camPos.y, ground.at(camPos.x + origin, camPos.z) + 0.3)
-    camera.position.copy(camPos)
-    camera.lookAt(camTarget)
-    lights.sun.position.set(tx, 0, 0).addScaledVector(SUN_DIRECTION, 19)
-    lights.sun.target.position.set(tx, 0, 0)
-    sky.follow(camPos)
+    // The shot is worked out along the road; on a hill it turns with the tilted world.
+    world.updateMatrixWorld()
+    camera.position.copy(world.localToWorld(aimPos.copy(camPos)))
+    camera.lookAt(world.localToWorld(aimAt.copy(camTarget)))
+    const sun = world.localToWorld(aimAt.set(tx, 0, 0))
+    lights.sun.position.copy(sun).addScaledVector(SUN_DIRECTION, 19)
+    lights.sun.target.position.copy(sun)
+    sky.follow(camera.position)
+  }
+  /** A wheel hub's place along the road (before any tilt), where the puffs and the close-ups go. */
+  function cornerAt(model: TruckModel, corner: number, out: THREE.Vector3): THREE.Vector3 {
+    world.updateMatrixWorld()
+    return world.worldToLocal(model.cornerPosition(corner, out))
+  }
+  const aimPos = new THREE.Vector3()
+  const aimAt = new THREE.Vector3()
+
+  /** The camera's place along the road (before the tilt): what photo mode and the swing camera start from. */
+  function cameraOnRoad(): THREE.Vector3 {
+    world.updateMatrixWorld()
+    return world.worldToLocal(camera.position.clone())
   }
 
   /** Show the break itself, the moment it happens. */
@@ -661,7 +693,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     if (focus.kind === 'axle') truck.breakCorner(corner, 'flop')
     if (focus.kind === 'mount') truck.breakCorner(corner, 'mount')
     if (corner >= 0) {
-      const c = truck.cornerPosition(corner, new THREE.Vector3())
+      const c = cornerAt(truck, corner, new THREE.Vector3())
       const n = focus.kind === 'fade' ? 26 : 18
       for (let i = 0; i < n; i++) {
         const target = focus.kind === 'fade' ? smoke : dust
@@ -685,7 +717,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       if (m.kind === 'bottom' && !reduced.matches) shake = Math.max(shake, 0.5)
       const corners = m.corner >= 0 ? [m.corner] : [0, 1, 2, 3]
       for (const corner of corners) {
-        const c = truck.cornerPosition(corner, focusPos)
+        const c = cornerAt(truck, corner, focusPos)
         for (let i = 0; i < 8; i++) {
           puffs.emit({
             x: c.x + (Math.random() - 0.5) * 0.3, y: Math.max(0.05, c.y - truck.radius * 0.3), z: c.z,
@@ -703,7 +735,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     const chance = Math.min(1, p.speed * dt * 1.2 * tierSettings().dust)
     for (let i = 0; i < 4; i++) {
       if (Math.random() > chance) continue
-      const c = truck.cornerPosition(i, focusPos)
+      const c = cornerAt(truck, i, focusPos)
       dust.emit({
         x: c.x - truck.radius * 0.8, y: Math.max(0.05, c.y - truck.radius * 0.8), z: c.z,
         vx: -p.speed * 0.25 + (Math.random() - 0.5), vy: 0.4 + Math.random() * 0.8, vz: (Math.random() - 0.5) * 1.2,
@@ -716,7 +748,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     if (!truck || focus.kind !== 'fade' || focus.corner < 0) return
     // A hot damper smokes more and more as the oil cooks.
     if (Math.random() > dt * 40 * (0.3 + progress)) return
-    const c = truck.cornerPosition(focus.corner, focusPos)
+    const c = cornerAt(truck, focus.corner, focusPos)
     smoke.emit({
       x: c.x, y: c.y + truck.radius * 0.7, z: c.z,
       vx: -0.4 + Math.random() * 0.3, vy: 0.5 + Math.random() * 0.4, vz: (Math.random() - 0.5) * 0.4,
@@ -735,7 +767,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
     if (!run?.road) {
       // Each pan sits under its wheel and rides up and down with the post; the base stays bolted to the floor.
       for (let i = 0; i < 4; i++) {
-        const c = t.cornerPosition(i, focusPos)
+        const c = cornerAt(t, i, focusPos)
         posts[i]!.pan.position.set(c.x, p.ground, c.z)
         posts[i]!.base.position.set(c.x, 0, c.z)
       }
@@ -931,7 +963,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
         truck?.dispose()
         truck = model
         truck.setLook(truckLook)
-        scene.add(truck.root)
+        world.add(truck.root)
         fitLamps()
       }
       if (next.ghost && ghost?.cls !== next.cls) {
@@ -944,7 +976,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
         ghost = model
         ghost.ghostly(new THREE.Color(GHOST_LOOK.tint), GHOST_LOOK.opacity, GHOST_LOOK.mix)
         ghost.setLook(truckLook)
-        scene.add(ghost.root)
+        world.add(ghost.root)
       }
       if (ghost) {
         ghost.root.visible = false
@@ -957,6 +989,8 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       const indoors = !next.road
       const wasIndoors = !!run && !run.road
       run = next
+      // Uphill along the road (+x): a tilt about the cross-track axis.
+      world.rotation.z = Math.atan(next.road ? next.grade ?? 0 : 0)
       clip = []
       // Indoors and outdoors have different air (haze, background).
       if (indoors !== wasIndoors) look()
@@ -1024,7 +1058,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       // Start from the camera as it is, seen from the middle of the truck.
       const tx = applyPose(poseAt(clipTime))
       const target = photoTarget(tx, new THREE.Vector3())
-      const off = camera.position.clone().sub(target)
+      const off = cameraOnRoad().sub(target)
       photoDistance = Math.max(truck.radius * 3, off.length())
       const length = clipLength()
       photo = {
@@ -1059,7 +1093,7 @@ export function createTrackView(canvas: HTMLCanvasElement): TrackView {
       if (!swing) {
         // Start from the camera as it is, seen from the middle of the truck, so nothing jumps.
         const target = photoTarget(truck.root.position.x, new THREE.Vector3())
-        const off = camera.position.clone().sub(target)
+        const off = cameraOnRoad().sub(target)
         const d = Math.max(truck.radius * 3, off.length())
         swing = {
           turn: Math.atan2(off.x, -off.z),
