@@ -167,6 +167,11 @@ because the rivals' budgets grow and better parts come out.
   20,000, the finale 50,000. The fees (entry 1,000, 3,000 and 7,000, and
   drivers times 0.6, 1 and 2) are set so a podium in a stock truck about
   pays its way and a win pays well (`docs/BALANCE.md`).
+- **A big field pays deeper** (`TierRules.bigField`, Kelbo, 28 November
+  2026): with eight or more trucks in your class, national raids pay every
+  place down to eighth (5th to 8th: 4,000, 3,000, 2,500, 2,000) and the
+  finale too (6th to 8th: 4,000, 3,500, 3,000). Only the light 4x4's field
+  gets that big, from about 2000; the entry card's prize line shows it.
 - **Drivers** charge a fee per raid, more for bigger raids. The charger and
   the gravel ace only drive for a garage with a name (`DRIVER_TERMS`).
 - **Repairs:** after your own raid, each worn part costs 45% of its price

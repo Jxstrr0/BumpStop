@@ -34,7 +34,7 @@ import { t, tf, type StringKey } from '../data/strings'
 import { changeCost, checkBuild, findPart, partIn, shopRules, stockBuild, tidyBuild, type BuildProblem } from '../sim/build'
 import {
   buyTruck, buyUpgrade, cheapestBuild, contractProblems, contractRaid, contractRules, discountOf, driveAutoStage, driverFee, driverName,
-  dropContract, entryFee, entryProblems, enterOwn, eventDays, fitOwn, garageSpares, isBroke, longOneRoad, newCareer, nextEvent, offers, ownRules,
+  dropContract, entryFee, fieldSize, tierPrizes, entryProblems, enterOwn, eventDays, fitOwn, garageSpares, isBroke, longOneRoad, newCareer, nextEvent, offers, ownRules,
   sellTruck, setContractBuild, settle, sponsorName, sponsorOf, sponsorPay, takeContract, truckPrice, truckValue, upgradeProblem,
   type CareerState, type Contract, type EntryProblem, type LongOneStory, type NewsItem, type Settlement,
 } from '../sim/career'
@@ -597,7 +597,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     )
     if (pay > 0) lines.append(el('p', 'small', tf('career.sponsorPays', { pay: money(pay) })))
     lines.append(el('p', 'readout-line', tf('career.entryTotal', { n: money(fees - pay) })))
-    const prizes = TIERS[tier].prizes.map((p) => money(p * CLASS_MONEY[cls])).join(' · ')
+    const prizes = tierPrizes(tier, fieldSize(career, cls)).map((p) => money(p * CLASS_MONEY[cls])).join(' · ')
     lines.append(el('p', 'small', tf('career.prizes', { list: prizes })))
     // A winter raid on plain tires is allowed, just slower: say so before the fees are paid.
     if (RAIDS[nextEvent(career).raid].season === 'winter' && !partIn(store.build(), 'tires').studded) {

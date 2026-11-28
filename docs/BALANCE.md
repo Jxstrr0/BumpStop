@@ -272,4 +272,27 @@ trucks against five to seven, so a mid-field finish (5th to 8th) is outside
 the paid places at the national raids and the finale; with the works
 sponsor a regional raid pays about 4,400 whatever the place, but the
 national raids and the finale lose money unless it reaches the podium.
-Left for Kelbo to decide.
+
+## Big fields pay deeper (1.36.1, 28 November 2026)
+
+Kelbo picked paying more places in big fields. With eight or more trucks
+in the class (yours counted), national raids now pay 5th to 8th (4,000,
+3,000, 2,500, 2,000) and the finale 6th to 8th (4,000, 3,500, 3,000), times
+`CLASS_MONEY` (`TierRules.bigField`). Only the light 4x4's field reaches
+eight, from about 2000 (heavy trucks have six, side-by-sides five to
+seven), so nothing changes for the other classes or the early career.
+
+The same established light 4x4 garage (2005, six seasons), before and
+after:
+
+| | Earned | A season |
+| --- | --- | --- |
+| Before (1.36.0) | 111,000 / 93,000 | about 17,000 |
+| After (1.36.1) | 155,000 / 132,000 | about 24,000 |
+
+A light 4x4 garage from 1985 (eight seasons, seed 1) came out exactly the
+same, as its fields are five or six trucks then. The light 4x4 is still
+behind late on (heavy about 48,000 and side-by-side about 58,000 a season
+in light 4x4 money): the bot finishes 4th to 8th in an eight-truck field,
+where the heavy truck is often on the podium in a field of six. That gap is
+about results, not prize money; a player who reaches the podium closes it.
