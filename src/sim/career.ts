@@ -35,6 +35,7 @@ import {
 import { KITS, type AxleSettings, type TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR, PARTS, SLOTS, SPARE_IDS, type SlotId, type SpareId } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, JOBS, RAID, RAIDS, type DriverId, type PaceId, type RaidId, type Season } from '../data/raids'
+import type { ContestId } from '../data/contests'
 import type { StringKey } from '../data/strings'
 import { UNDER_PARTS } from '../data/underside'
 import {
@@ -49,6 +50,7 @@ import { rivalStages } from './rivals'
 import { hashString, Rng } from './rng'
 import { markEnd, newHall, recordResult, recordSkip, type CareerHall } from './hall'
 import { careerField, copyWinner, teamsForYear, type TeamGarage } from './teams'
+import { endSeries, passRounds, type EventSeason, type SeriesWin } from './careerEvents'
 
 /** A privateer who wants a truck prepped for the next raid. */
 export interface Contract {
@@ -92,6 +94,10 @@ export type NewsItem =
   | { kind: 'broke'; year: number }
   | { kind: 'longOne'; year: number }
   | { kind: 'skipped'; year: number; raid: RaidId }
+  /** Your result at a one-day event's round (`careerEvents.ts`). */
+  | { kind: 'event'; year: number; contest: ContestId; round: number; cls: ClassId; pos: number | null; of: number; money: number; rep: number }
+  /** A one-day series' champion, in a class you scored in. */
+  | { kind: 'series'; year: number; contest: ContestId; cls: ClassId; who: string; points: number }
 
 /**
  * The day the garage first won the Long One (plan PR 13): kept for the
@@ -143,6 +149,8 @@ export interface CareerState {
   hall?: CareerHall
   /** Every truck the garage has owned, oldest first, each with its logbook (`logbook.ts`). The last unsold one is `own`. */
   trucks: TruckLog[]
+  /** This year's one-day event series (`careerEvents.ts`). Missing in saves from before them, and started then. */
+  events?: EventSeason
 }
 
 // ── Starting ──
@@ -535,7 +543,7 @@ export type EntryProblem =
  */
 export function entryProblems(c: CareerState, driver: DriverId, bench?: TruckBuild): EntryProblem[] {
   const out: EntryProblem[] = []
-  if (c.job) out.push({ kind: 'busy' })
+  if (c.job || c.events?.live) out.push({ kind: 'busy' })
   if (!c.own) return [...out, { kind: 'noTruck' }]
   if (isBroke(c)) out.push({ kind: 'broke' })
   const tier = TIERS[nextEvent(c).tier]
@@ -630,6 +638,8 @@ export interface Settlement {
   story: LongOneStory | null
   /** This raid finished the last season of 2025: the career's end, and the hall of fame. Only ever once. */
   careerEnd: boolean
+  /** One-day series you won, when this was the year's last raid. */
+  series: SeriesWin[]
 }
 
 /** What putting a raid's wear right costs, and the spares used. */
@@ -686,7 +696,7 @@ function teamOf(who: string): TeamId | null {
   return null
 }
 
-function addNews(c: CareerState, item: NewsItem): void {
+export function addNews(c: CareerState, item: NewsItem): void {
   c.news.unshift(item)
   if (c.news.length > CAREER.logLength) c.news.length = CAREER.logLength
 }
@@ -709,7 +719,7 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
   const out: Settlement = {
     raid: e.raid, job: state ? job!.kind : null, pos: null, of: 0, finished: false,
     prize: 0, fee: 0, bonus: 0, repairs: 0, spares: 0, bivouac: 0, entry: 0, sponsor: 0, money: 0, rep: 0,
-    winners: {} as Record<ClassId, string>, copies: [], wonLongOne: false, story: null, careerEnd: false,
+    winners: {} as Record<ClassId, string>, copies: [], wonLongOne: false, story: null, careerEnd: false, series: [],
   }
   const rng = new Rng(hashString(`${c.seed}:${c.season}:${c.next}:settle`))
   let mineCls: ClassId | null = null
@@ -804,11 +814,14 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
   })
   if (!brokeBefore && isBroke(c)) addNews(c, { kind: 'broke', year: c.year })
 
-  // On to the next raid, and the next year after the last one.
+  // On to the next raid, and the next year after the last one. One-day events before the raid's end are run without you.
+  passRounds(c, e.day + eventDays(e))
   c.day = e.day + eventDays(e)
   c.job = null
   c.next++
   if (c.next >= CALENDAR.length) {
+    // The year's one-day series are over: their champions.
+    out.series = endSeries(c)
     // The last raid of 2025 ends the career (the seasons carry on after, for anyone who wants more).
     if (c.year === LAST_YEAR) out.careerEnd = markEnd(c)
     newSeason(c)
@@ -818,6 +831,8 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
 
 /** A new year: the teams buy for it, and the news says what parts came out. */
 function newSeason(c: CareerState): void {
+  // Last year's one-day series is over (`endSeries`); this year's starts when it's first needed.
+  delete c.events
   c.season++
   c.next = 0
   c.day = 1

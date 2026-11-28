@@ -180,16 +180,20 @@ export interface RivalRuns {
   runs: (number | null)[]
 }
 
-/** Every rival's runs at the event, the same every time for the same event and class. */
-export function rivalRuns(contest: Contest, cls: ClassId, field: readonly Rival[]): RivalRuns[] {
-  if (contest.kind === 'topSpeed') return rivalPasses(contest, cls, field)
-  if (contest.kind === 'judged') return rivalJumps(contest, cls, field)
+/**
+ * Every rival's runs at the event, the same every time for the same event
+ * and class. `salt` makes each running different (the career's rounds);
+ * free play leaves it out.
+ */
+export function rivalRuns(contest: Contest, cls: ClassId, field: readonly Rival[], salt = ''): RivalRuns[] {
+  if (contest.kind === 'topSpeed') return rivalPasses(contest, cls, field, salt)
+  if (contest.kind === 'judged') return rivalJumps(contest, cls, field, salt)
   const par = coursePar(contest, cls)
   const seed = courseSeed(contest, cls)
   return field.map((rival) => {
     const runs: (number | null)[] = []
     for (let k = 0; k < contest.runs; k++) {
-      const rng = new Rng(hashString(`${seed}:${rival.id}:${k}`))
+      const rng = new Rng(hashString(`${seed}:${rival.id}:${k}${salt}`))
       const timed = contest.timed!
       const clean = par * rival.pace * timed.rivalPace * (1 + rival.spread * rng.range(-1, 1))
       const bottoms = Math.round(rng.range(0, rival.risk * HILL_CLIMB.rivalBottoms * timed.laps))
@@ -203,14 +207,14 @@ export function rivalRuns(contest: Contest, cls: ClassId, field: readonly Rival[
  * A speed trial's rivals: the stock truck's top pass, better for the quicker
  * teams, wandering a little, and now and then a pass short with a break.
  */
-function rivalPasses(contest: Contest, cls: ClassId, field: readonly Rival[]): RivalRuns[] {
+function rivalPasses(contest: Contest, cls: ClassId, field: readonly Rival[], salt: string): RivalRuns[] {
   const p = contest.passes!
   const seed = courseSeed(contest, cls)
   const top = passKmh(contest, p.most)
   return field.map((rival) => {
     const runs: (number | null)[] = []
     for (let k = 0; k < contest.runs; k++) {
-      const rng = new Rng(hashString(`${seed}:${rival.id}:${k}`))
+      const rng = new Rng(hashString(`${seed}:${rival.id}:${k}${salt}`))
       const aim = SPEED_TRIAL.stockTop[cls] + SPEED_TRIAL.kmhPerPace * (1 - rival.pace) * 100 + SPEED_TRIAL.wander * rival.spread * rng.range(-1, 1)
       let kmh = Math.min(top, p.startKmh + Math.floor((aim - p.startKmh) / p.stepKmh) * p.stepKmh)
       if (rng.chance(rival.risk * SPEED_TRIAL.rivalRisk)) kmh -= p.stepKmh
@@ -221,12 +225,12 @@ function rivalPasses(contest: Contest, cls: ClassId, field: readonly Rival[]): R
 }
 
 /** A jump contest's rivals: the stock best, more for the quicker teams, wandering, and now and then botched. */
-function rivalJumps(contest: Contest, cls: ClassId, field: readonly Rival[]): RivalRuns[] {
+function rivalJumps(contest: Contest, cls: ClassId, field: readonly Rival[], salt: string): RivalRuns[] {
   const seed = courseSeed(contest, cls)
   return field.map((rival) => {
     const runs: (number | null)[] = []
     for (let k = 0; k < contest.runs; k++) {
-      const rng = new Rng(hashString(`${seed}:${rival.id}:${k}`))
+      const rng = new Rng(hashString(`${seed}:${rival.id}:${k}${salt}`))
       let points = JUMP_OFF.stockBest[cls] + JUMP_OFF.pointsPerPace * (1 - rival.pace) * 100 + JUMP_OFF.wander * rival.spread * rng.range(-1, 1)
       if (rng.chance(rival.risk * JUMP_OFF.rivalRisk)) points *= JUMP_OFF.botched
       runs.push(Math.round(points))
@@ -254,7 +258,7 @@ export interface ContestStanding {
  * anyone without a score at the bottom (you above rivals there). Ties keep
  * you first.
  */
-export function contestStandings(kind: ContestKind, mine: readonly ContestRun[], rivals: readonly RivalRuns[], runs: number): ContestStanding[] {
+export function contestStandings(kind: ContestKind, mine: readonly Pick<ContestRun, 'score'>[], rivals: readonly RivalRuns[], runs: number): ContestStanding[] {
   const rows: ContestStanding[] = [
     { who: 'you', best: bestOf(mine.slice(0, runs).map((r) => r.score), kind) },
     ...rivals.map((r) => ({ who: r.id, best: bestOf(r.runs.slice(0, runs), kind) })),

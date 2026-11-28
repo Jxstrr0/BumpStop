@@ -24,6 +24,8 @@ import { WEATHER_IDS } from '../data/weather'
 import { findPart, fitsClass, stockBuild, tidyBuild } from '../sim/build'
 import { tidyLoad } from '../sim/load'
 import type { CareerJob, CareerState, Contract, LongOneStory, NewsItem } from '../sim/career'
+import type { EventEntry, EventSeason } from '../sim/careerEvents'
+import { CONTEST_IDS, ROUNDS, type ContestId } from '../data/contests'
 import type { CareerHall, DriverTally, RivalTally, SeasonLine } from '../sim/hall'
 import { RECOVERY_TOOLS, STUCK_KINDS, type RecoveryTool, type StuckKind } from '../data/recovery'
 import { MOMENT_KINDS, newLog, tidyLogs, type TruckLog, type TruckMoment } from '../sim/logbook'
@@ -329,7 +331,7 @@ function readTeams(raw: unknown, year: number): TeamGarage {
   return fresh
 }
 
-const NEWS_KINDS: readonly NewsItem['kind'][] = ['result', 'winner', 'copied', 'newParts', 'sponsor', 'broke', 'longOne', 'skipped']
+const NEWS_KINDS: readonly NewsItem['kind'][] = ['result', 'winner', 'copied', 'newParts', 'sponsor', 'broke', 'longOne', 'skipped', 'event', 'series']
 
 /**
  * The first Long One win (plan PR 13), for the finale card and the record.
@@ -471,7 +473,10 @@ function readCareer(raw: unknown): CareerState {
   for (const k of ['raids', 'wins', 'podiums', 'contracts'] as const) finite(stats[k], `career ${k}`)
   const longOne = arrayOf(raw.longOne, 'career Long One wins').map((y) => finite(y, 'career Long One year'))
   // News is only for reading: anything that doesn't look like news is dropped rather than failing the save.
-  const news = Array.isArray(raw.news) ? raw.news.filter((n): n is NewsItem => isObj(n) && NEWS_KINDS.includes(n.kind as NewsItem['kind'])) : []
+  const news = Array.isArray(raw.news)
+    ? raw.news.filter((n): n is NewsItem => isObj(n) && NEWS_KINDS.includes(n.kind as NewsItem['kind'])
+      && (n.kind !== 'event' && n.kind !== 'series' || (CONTEST_IDS.includes(n.contest as ContestId) && CLASS_IDS.includes(n.cls as ClassId))))
+    : []
   const career: CareerState = {
     seed: finite(raw.seed, 'career seed') >>> 0,
     season,
@@ -490,10 +495,47 @@ function readCareer(raw: unknown): CareerState {
     ...readHall(raw.hall, season),
     stats: { raids: stats.raids as number, wins: stats.wins as number, podiums: stats.podiums as number, contracts: stats.contracts as number },
     trucks: readTrucks(raw.trucks),
+    ...readEvents(raw.events, season),
   }
   // The garage's truck always has a logbook (a save from before logbooks gets a fresh one).
   tidyLogs(career)
   return career
+}
+
+/**
+ * The year's one-day series (added after 1.33, with no new save format: a
+ * save without them starts the series fresh). Points that don't add up are
+ * dropped; an entry under way that can't be read is dropped too (its fee
+ * stays paid), never failing the save.
+ */
+function readEvents(raw: unknown, season: number): { events?: EventSeason } {
+  if (!isObj(raw) || raw.season !== season) return {}
+  const done = count(raw.done)
+  const events: EventSeason = { season, done: Math.min(done, ROUNDS.length), points: {} }
+  if (isObj(raw.points)) {
+    for (const id of CONTEST_IDS) {
+      const byClass = raw.points[id]
+      if (!isObj(byClass)) continue
+      for (const cls of CLASS_IDS) {
+        const table = byClass[cls]
+        if (!isObj(table)) continue
+        const out: Record<string, number> = {}
+        for (const [who, n] of Object.entries(table)) if (typeof n === 'number' && Number.isFinite(n) && n >= 0) out[who] = n
+        ;(events.points[id] ??= {})[cls] = out
+      }
+    }
+  }
+  const live = raw.live
+  if (isObj(live) && Number.isInteger(live.round) && (live.round as number) >= events.done && (live.round as number) < ROUNDS.length
+    && CLASS_IDS.includes(live.cls as ClassId) && DRIVER_IDS.includes(live.driver as DriverId) && Array.isArray(live.scores)
+    && live.scores.every((x) => x === null || (typeof x === 'number' && Number.isFinite(x)))) {
+    const entry: EventEntry = {
+      round: live.round as number, cls: live.cls as ClassId, driver: live.driver as DriverId,
+      scores: (live.scores as (number | null)[]).slice(0, 10), breaks: count(live.breaks), paid: Math.max(0, Number(live.paid) || 0),
+    }
+    events.live = entry
+  }
+  return { events }
 }
 
 /**

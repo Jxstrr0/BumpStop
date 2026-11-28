@@ -26,6 +26,7 @@
  */
 import { CALENDAR, CAREER, CLASS_MONEY, QUIRKS, SPONSORS, TEAMS, TIERS, UPGRADES, type Tier } from '../data/career'
 import { CLASSES, type ClassId } from '../data/classes'
+import { CONTESTS } from '../data/contests'
 import type { TruckBuild } from '../data/kit'
 import { SLOTS, SPARE_IDS } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, RAIDS, type DriverId } from '../data/raids'
@@ -120,6 +121,14 @@ export function newsText(n: NewsItem, career?: CareerState): string {
       return tf('career.news.longOne', { year: String(n.year) })
     case 'skipped':
       return tf('career.news.skipped', { raid: t(RAIDS[n.raid].name) })
+    case 'event': {
+      const vars = { event: t(CONTESTS[n.contest].name), round: String(n.round), cls: className(n.cls).toLowerCase(), money: signed(n.money), rep: String(n.rep) }
+      return n.pos === null ? tf('career.news.eventNone', vars) : tf('career.news.event', { ...vars, place: tf('career.news.place', { pos: ordinal(n.pos), of: String(n.of) }) })
+    }
+    case 'series':
+      return tf(n.who === 'you' ? 'career.news.seriesYou' : 'career.news.series', {
+        event: t(CONTESTS[n.contest].name), cls: className(n.cls).toLowerCase(), who: whoName(n.who), points: String(n.points),
+      })
   }
 }
 

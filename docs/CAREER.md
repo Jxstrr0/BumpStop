@@ -107,6 +107,38 @@ Supper, the Polar Night Raid and the Whole Damn Country share a set of long stag
 roads, eskers, rock country, haul roads, the old burn, the mine roads and
 long fast gravel), each on its own roads.
 
+## One-day events (after 1.33)
+
+The four one-day events (`docs/NAMES.md`) each run a small series of three
+rounds a year, in the summer gaps between the raids (`ROUNDS` in
+`src/data/contests.ts`; the sums in `src/sim/careerEvents.ts`):
+
+| Day | Round |
+| --- | --- |
+| 121, 142, 201 | Tailings Hill Climb |
+| 128, 149, 208 | Gravel Pit Derby |
+| 135, 172, 222 | The Rattle Mile |
+| 179, 215, 236 | Sawbuck Fall Fair Jump-Off (the last is the fall fair itself) |
+
+- Entering needs your own truck as it is on the bench (same parts; settings
+  may differ), no job taken for the next raid, and the fees: 400 cr. entry
+  for a light 4x4, plus a quarter of the driver's regional fee on a timed
+  event (the hill climb and the derby; the crew drives the others). Times
+  `CLASS_MONEY`, like every fee.
+- Entering moves the career's day to the round: the rounds before it are
+  passed. Going to the raid passes the rest before it.
+- Prizes for the top three: 4,000, 2,500 and 1,500 cr.; reputation +2 for
+  a win, +1 for a podium. Each run that broke costs a repair (1,500 cr. at
+  the usual repair share, so the crew and tools make it cheaper).
+- Series points 10, 6, 4, 3, 2, 1. Rounds you don't enter are run by the
+  rivals alone (the regional field, every class), so they score too.
+- At the end of the year each series has a champion. Win one in your class
+  for 8,000 cr. and +3 reputation. The news says who won each series you
+  scored in.
+- A run's score is kept as it ends (`CareerState.events.live`), so a reload
+  carries on mid-event. A save from before the events starts the series
+  fresh, with no new save format.
+
 ## Money
 
 Money is written "cr." after the number, "1,200 cr." (Kelbo's pick,
@@ -321,6 +353,11 @@ rolling to 2025 and past, the same career for the same seed, the teams
 the shop, the save (format 1 moving up, careers and career raids round
 trip, damaged team trucks, bad careers turned away), and the stock trucks
 getting home on the Polar Night Raid and the Whole Damn Country.
+
+`tests/careerEvents.test.ts`: the rounds (in the gaps, three each),
+entering one (fees, the day, rounds passed), why not, the pay-out and
+series points, the rivals running rounds alone, the champions at the end
+of the year, and the series through a save.
 
 `tests/hall.test.ts`: the hall of fame's record (seasons, rivals, drivers,
 best seasons), the end coming once after 2025, the record through a save
