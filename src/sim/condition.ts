@@ -108,12 +108,11 @@ export function wornTruck(truck: BuiltTruck, c: Condition): BuiltTruck {
     }
     const sag = cap(c.spring[axle] ?? 0)
     if (sag > 0) {
-      // The spring sits lower: travel moves from bump to droop, and it's a little softer.
+      // The spring sits lower: travel moves from bump to droop. Its stiffness stays the same.
       const lost = a.bumpTravel * sag * CONDITION.spring.travel
       a.bumpTravel -= lost
       a.droopTravel += lost
       a.bumpStopLength = Math.min(a.bumpStopLength, a.bumpTravel)
-      a.springRate *= 1 - sag * CONDITION.spring.rate
     }
     const bush = cap(c.bushing[axle] ?? 0)
     if (bush > 0) {

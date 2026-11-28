@@ -165,6 +165,14 @@ export interface AxleSetup {
   bumpStopRate: number
   /** How many times stiffer the bump stop is when fully squashed. */
   bumpStopProgression: number
+  /**
+   * Hydraulic bump stops only: damping while the wheel squashes the stop
+   * (N·s/m, compression only). A hydraulic stop is a small damper of its own:
+   * it soaks up the end of a big hit as heat instead of storing it and
+   * kicking the wheel back out, the way a rubber block does. Missing or 0
+   * means a plain springy stop (rubber, urethane). See `BUMP_STOP`.
+   */
+  bumpStopDamping?: number
   /** Stiffness of the metal-to-metal hard limit: bottoming out (N/m). */
   hardStopRate: number
   /** Stiffness of the limit strap at full droop (N/m). */
@@ -368,6 +376,28 @@ export const TEST_MULES: Readonly<Record<ClassId, RideSetup>> = {
  * then works out the rest of the chunk's heating and cooling with the exact
  * formula for a heater in a draught (see `src/sim/stage.ts`).
  */
+/**
+ * Hydraulic bump stops (balance and physics check, 28 November 2026). Real
+ * hydraulic stops are little dampers: they turn the last of a big hit into
+ * heat, so the truck lands and stays down instead of bouncing off its stops.
+ * Before this they were only stiffer springs, so they handed the hit straight
+ * back.
+ *
+ * - `dampingTime`: a hydraulic stop's damping is the class's plain bump stop
+ *   first-touch stiffness (`bumpStopRate` on the test mule) times this. On
+ *   the light 4x4 that's 6,000 N·s/m: about 18 kN at 3 m/s, about what the
+ *   stop's spring pushes halfway in.
+ * - `engage`: the piston takes this much squash to reach full damping (m),
+ *   so it bites quickly but without a jolt at first touch.
+ *
+ * The stop has its own oil, apart from the damper's, so this heat doesn't
+ * count towards damper fade.
+ */
+export const BUMP_STOP = {
+  dampingTime: 0.024,
+  engage: 0.01,
+} as const
+
 export const LONG_STAGE = {
   /** Longest stretch one sample stands for (m). */
   chunkLength: 5000,

@@ -25,7 +25,7 @@ import { CLASSES } from '../data/classes'
 import { KITS, TUNE, type AxleSettings, type Range, type TruckBuild } from '../data/kit'
 import { LEAN, STOCK_LOAD, type TruckLoad } from '../data/load'
 import { PARTS, SLOTS, type Part, type PartIn, type SlotId } from '../data/parts'
-import { SIM, TEST_MULES, type AxleSetup, type DamperSetup, type RideSetup } from '../data/ride'
+import { BUMP_STOP, SIM, TEST_MULES, type AxleSetup, type DamperSetup, type RideSetup } from '../data/ride'
 import { MULE_WEAR, type AxleWear, type FatigueSpec, type WearSetup } from '../data/wear'
 import { powInt } from './det'
 import { beamOf, type Beam } from './night'
@@ -298,6 +298,8 @@ export function buildTruck(input: TruckBuild): BuiltTruck {
       bumpStopLength: Math.min(set.bumpStop, bumpTravel - TUNE.bumpStopRoom),
       bumpStopRate: muleAxle.bumpStopRate * stops.rate,
       bumpStopProgression: stops.progression,
+      // Hydraulic stops damp the end of a hit (rubber and urethane don't): BUMP_STOP in src/data/ride.ts.
+      bumpStopDamping: muleAxle.bumpStopRate * BUMP_STOP.dampingTime * stops.damping,
       antiRollRate: muleAxle.antiRollRate * bars.rate * (1 + TUNE.antiRollStep * set.antiRoll),
       tireRate,
       damper: dmp,
