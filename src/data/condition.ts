@@ -42,10 +42,13 @@ export const CONDITION = {
     perBottomOut: 0.002,
     /** Each kilometre of harsh ground (`RAID.harshGround`) sags them this much. */
     perHarshKm: 0.004,
-    /** A fully sagged spring has lost this share of its bump travel... */
+    /**
+     * A fully sagged spring has lost this share of its bump travel (it moves
+     * to droop). A tired spring gets shorter, not softer: its stiffness comes
+     * from the wire and the coils, which don't change, so only the ride height
+     * drops (balance and physics check, 28 November 2026).
+     */
     travel: 0.3,
-    /** ...and this share of its rate. */
-    rate: 0.08,
   },
   bushing: {
     /** Each kilometre of harsh ground wears the axle's bushings this much. */

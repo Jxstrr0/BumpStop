@@ -19,7 +19,7 @@
  * Positions are measured from where the truck sits at rest on flat ground.
  */
 import { LEAN } from '../data/load'
-import { DAMPER_OIL, SIM, type AxleSetup, type BypassZones, type DamperSetup, type PositionDamping, type RideSetup } from '../data/ride'
+import { BUMP_STOP, DAMPER_OIL, SIM, type AxleSetup, type BypassZones, type DamperSetup, type PositionDamping, type RideSetup } from '../data/ride'
 import { detExp } from './det'
 import { heightAt, type Profile } from './ground'
 
@@ -380,7 +380,12 @@ export function stepRide(
     if (c < -droop) load -= ax.limitStrapRate * (-droop - c)
     // Bump stop: soft at first touch, stiffer as it squashes.
     const e = c - (p.bumpStopStart[i] as number)
-    if (e > 0) load += ax.bumpStopRate * e + (p.bumpStopRise[i] as number) * e * e
+    if (e > 0) {
+      load += ax.bumpStopRate * e + (p.bumpStopRise[i] as number) * e * e
+      // A hydraulic stop also damps while it's being squashed, biting fully once the piston is `engage` in.
+      const bsd = ax.bumpStopDamping ?? 0
+      if (bsd > 0 && v > 0) load += bsd * v * (e < BUMP_STOP.engage ? e / BUMP_STOP.engage : 1)
+    }
     // Hard limit: metal to metal. Bottoming out.
     const hard = c - bump
     const hardForce = hard > 0 ? ax.hardStopRate * hard : 0

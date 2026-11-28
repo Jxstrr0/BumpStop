@@ -133,6 +133,12 @@ export interface BumpStopPart extends PartCommon {
   progression: number
   /** What the shock and bump stop cup can take when the wheel bottoms out. */
   strength: number
+  /**
+   * Hydraulic damping while squashed, as a share of `BUMP_STOP.dampingTime`
+   * (`src/data/ride.ts`): 0 for a springy rubber or urethane block, 1 for a
+   * hydraulic stop that soaks up the hit.
+   */
+  damping: number
 }
 
 export interface AntiRollPart extends PartCommon {
@@ -342,14 +348,14 @@ export const PARTS: readonly Part[] = [
 
   // ── Bump stops ──
   { slot: 'bumpStops', id: 'rubber', name: 'part.rubber', text: 'part.rubberText', year: 1985,
-    mass: { light4x4: 2, heavy: 10, sxs: 1 }, cost: { light4x4: 200, heavy: 800, sxs: 150 }, rate: 1, progression: 8, strength: 1 },
+    mass: { light4x4: 2, heavy: 10, sxs: 1 }, cost: { light4x4: 200, heavy: 800, sxs: 150 }, rate: 1, progression: 8, strength: 1, damping: 0 },
   { slot: 'bumpStops', id: 'urethane', name: 'part.urethane', text: 'part.urethaneText', year: 1985,
-    mass: { light4x4: 2, heavy: 10, sxs: 1 }, cost: { light4x4: 600, heavy: 2000, sxs: 400 }, rate: 1.2, progression: 10, strength: 1.2 },
+    mass: { light4x4: 2, heavy: 10, sxs: 1 }, cost: { light4x4: 600, heavy: 2000, sxs: 400 }, rate: 1.2, progression: 10, strength: 1.2, damping: 0 },
   { slot: 'bumpStops', id: 'hydraulic', name: 'part.hydraulic', text: 'part.hydraulicText', year: 2003,
-    mass: { light4x4: 8, heavy: 40, sxs: 4 }, cost: { light4x4: 4500, heavy: 14000, sxs: 3000 }, rate: 1.5, progression: 5, strength: 1.8 },
+    mass: { light4x4: 8, heavy: 40, sxs: 4 }, cost: { light4x4: 4500, heavy: 14000, sxs: 3000 }, rate: 1.5, progression: 5, strength: 1.8, damping: 1 },
   // Gas-charged (2023): a hydraulic stop with a nitrogen spring behind it, gentler at first touch and tougher still.
   { slot: 'bumpStops', id: 'gasCharged', name: 'part.gasCharged', text: 'part.gasChargedText', year: 2023,
-    mass: { light4x4: 7, heavy: 35, sxs: 3 }, cost: { light4x4: 6500, heavy: 19000, sxs: 4200 }, rate: 1.35, progression: 4.5, strength: 2 },
+    mass: { light4x4: 7, heavy: 35, sxs: 3 }, cost: { light4x4: 6500, heavy: 19000, sxs: 4200 }, rate: 1.35, progression: 4.5, strength: 2, damping: 1 },
 
   // ── Anti-roll bars ──
   { slot: 'antiRoll', id: 'noBars', name: 'part.noBars', text: 'part.noBarsText', year: 1985,
@@ -431,7 +437,7 @@ export const PARTS: readonly Part[] = [
 
   // ── Light bar (night stages, after 1.20) ──
   // A roof bar is wide: it lights the whole road and into the corners, so the driver sees the ruts at the sides.
-  // Halogen first (four or six round lamps, hot and hungry), then LED (2008): further, wider, lighter, a third of the draw.
+  // Halogen first (four or six round lamps, hot and hungry), then LED (2008): further, wider, lighter, under half the draw.
   { slot: 'lightBar', id: 'noLightBar', name: 'part.noLightBar', text: 'part.noLightBarText', year: 1985,
     mass: { light4x4: 0, heavy: 0, sxs: 0 }, cost: { light4x4: 0, heavy: 0, sxs: 0 }, reach: 0, spread: 0, draw: 0 },
   { slot: 'lightBar', id: 'halogenBar', name: 'part.halogenBar', text: 'part.halogenBarText', year: 1985,
