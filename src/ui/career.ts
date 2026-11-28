@@ -26,7 +26,7 @@
  */
 import { CALENDAR, CAREER, CLASS_MONEY, QUIRKS, SPONSORS, TEAMS, TIERS, UPGRADES, type Tier } from '../data/career'
 import { CLASSES, type ClassId } from '../data/classes'
-import { CONTESTS } from '../data/contests'
+import { CONTESTS, ROUNDS } from '../data/contests'
 import type { TruckBuild } from '../data/kit'
 import { SLOTS, SPARE_IDS } from '../data/parts'
 import { DRIVER_IDS, DRIVERS, RAIDS, type DriverId } from '../data/raids'
@@ -39,6 +39,7 @@ import {
   type CareerState, type Contract, type EntryProblem, type LongOneStory, type NewsItem, type Settlement,
 } from '../sim/career'
 import { ownLog } from '../sim/logbook'
+import { roundNo, roundsBeforeRaid, type EventProblem } from '../sim/careerEvents'
 import { raidOf, standings, type RaidState } from '../sim/raid'
 import { keepPhoto } from '../persist/album'
 import type { SlotNo } from '../persist/slots'
@@ -48,6 +49,7 @@ import type { GlossaryId } from '../data/glossary'
 import type { BuildStore } from './buildStore'
 import { el, num, reveal } from './dom'
 import { DEV_EVENT } from './events'
+import type { EventCareer } from './contest'
 import { ordinal, raidRockLine, raidStuckLine, raidTable, sparesList, type RaidCareer } from './raid'
 import { farewellText, logbookBlock, oldTrucksBlock } from './logbook'
 import { firstJobGuide } from './tutorial'
@@ -166,6 +168,11 @@ function entryProblemText(p: EntryProblem): string {
   }
 }
 
+/** Why your truck can't go to a one-day event's round, in words (`busy` and `gone` are worded by the events panel). */
+export function eventProblemText(p: Exclude<EventProblem, { kind: 'busy' | 'gone' }>): string {
+  return entryProblemText(p)
+}
+
 function button(text: string, cls = 'btn'): HTMLButtonElement {
   const b = el('button', cls, text)
   b.type = 'button'
@@ -203,6 +210,8 @@ export interface CareerPanel {
   element: HTMLElement
   /** Hand this to the Raids panel. */
   raid: RaidCareer
+  /** Hand this to the One-day events panel. */
+  events: EventCareer
 }
 
 export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (id: GlossaryId) => void = () => {}): CareerPanel {
@@ -228,6 +237,8 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
   let farewell = ''
 
   const save = () => saves?.onCareer(c ? structuredClone(c) : null)
+  /** The One-day events panel, told when the career changes here. */
+  const eventListeners: (() => void)[] = []
   /** The hall of fame at the foot of the panel, drawn again with the rest. */
   let hall: HallBlock | null = null
 
@@ -415,6 +426,12 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     }))
     jobHolder.append(head, facts, el('p', 'small', t(raid.text)))
     const job = career.job
+    const live = career.events?.live
+    if (live) {
+      // At a one-day event today: it has to finish before anything else.
+      jobHolder.append(el('p', 'small', tf('career.eventOn', { event: t(CONTESTS[ROUNDS[live.round]!.contest].name) })), toEventsButton('career.toEvent'))
+      return
+    }
     if (job?.kind === 'contract') jobHolder.append(contractCard(career, job.contract))
     else if (job?.kind === 'own') {
       const go = button(t('career.toRaid'))
@@ -424,8 +441,23 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
       })
       jobHolder.append(el('p', 'small', t('career.raidOn')), go)
     } else {
+      const rounds = roundsBeforeRaid(career)
+      if (rounds.length && career.own) {
+        const list = rounds.map((i) => `${t(CONTESTS[ROUNDS[i]!.contest].name)} (${dateText(career.year, ROUNDS[i]!.day)})`).join(', ')
+        jobHolder.append(el('p', 'small', tf('career.eventsBefore', { list })), toEventsButton('career.toEvents'))
+      }
       jobHolder.append(offersBlock(career), ownEntryBlock(career), skipBlock(career))
     }
+  }
+
+  /** A button down to the One-day events panel on the Raid tab. */
+  function toEventsButton(key: StringKey): HTMLButtonElement {
+    const go = button(t(key))
+    go.addEventListener('click', () => {
+      const panel = document.getElementById('contest')
+      if (panel) reveal(panel, { behavior: 'smooth', block: 'start' })
+    })
+    return go
   }
 
   function contractLine(o: Contract): string {
@@ -599,6 +631,11 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     if (s.careerEnd) card.append(endBlock())
     if (s.story) card.append(finaleBlock(s.story))
     else if (s.wonLongOne) card.append(el('p', 'career-win', t('career.wonLongOne')))
+    for (const w of s.series) {
+      card.append(el('p', 'career-win', tf('career.seriesWon', {
+        event: t(CONTESTS[w.contest].name), cls: className(w.cls).toLowerCase(), money: money(w.money), rep: String(w.rep),
+      })))
+    }
     if (s.job) {
       card.append(el('p', 'readout-line', s.pos === null ? t('career.retired') : tf('career.place', { pos: ordinal(s.pos), of: String(s.of) })))
       const ul = el('ul', 'raid-list')
@@ -799,6 +836,16 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
       list.append(li)
     })
     wrap.append(list)
+    // The one-day events' rounds, with the ones gone by greyed.
+    const done = career.events?.season === career.season ? career.events.done : 0
+    const rounds = el('ol', 'raid-list')
+    ROUNDS.forEach((r, i) => {
+      const gone = i < done || r.day < career.day
+      rounds.append(el('li', `small${gone ? ' done' : ''}`, tf('career.roundLine', {
+        date: dateText(career.year, r.day), event: t(CONTESTS[r.contest].name), round: String(roundNo(i)),
+      })))
+    })
+    wrap.append(el('h4', 'raid-sub', t('career.eventsCalendar')), rounds)
     return wrap
   }
 
@@ -813,6 +860,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     body.replaceChildren(statusBlock(c), jobHolder, calendarBlock(c), truckBlock(c), shopBlock(c), newsBlock(c), hall.element)
     // Keep it open if it was (opening it draws it).
     if (wasOpen) hall.element.open = true
+    for (const f of eventListeners) f()
   }
 
   syncBench()
@@ -834,6 +882,16 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
       register(start) {
         startRaid = start
         renderJob()
+      },
+    },
+    events: {
+      state: () => c,
+      changed() {
+        save()
+        render()
+      },
+      listen(redraw) {
+        eventListeners.push(redraw)
       },
     },
   }
