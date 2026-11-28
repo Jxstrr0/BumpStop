@@ -74,8 +74,11 @@ export interface RigPiece {
   table?: TableJump
 }
 
+/** A one-day event's course, run like a rig (`src/sim/contest.ts`): `course:` and the event's id. */
+export type CourseId = `course:${string}`
+
 export interface Rig {
-  id: RigId
+  id: RigId | CourseId
   pieces: readonly RigPiece[]
   /** First lap's speed (m/s). */
   startSpeed: number

@@ -48,6 +48,8 @@ export interface RigRun {
   ghost?: { truck: BuiltTruck; log: PoseLog; broken: () => BreakEvent | null } | null
   /** The sim runs at true speed (the jump ramp): show it as one unbroken shot instead of clips. */
   trueSpeed?: boolean
+  /** What the caption says when the truck drives through the finish (a one-day event has no laps). */
+  finishText?: string
 }
 
 /** A landing's moments, kept when it was scored so it can be replayed after the run: your truck's poses and the ghost's. */
@@ -279,7 +281,7 @@ export function rigView(onFail: () => void = () => {}): RigView {
           swing.ready(true)
         } else if (r.road && done && done.mine.length > 0) {
           // Lasted every lap: the last moments before the line, then on through the arch to a stop.
-          caption.textContent = t('view3d.finished')
+          caption.textContent = r.finishText ?? t('view3d.finished')
           const { ghost, ghostBroken } = ghostClip(r, ROLL_OUT.before)
           v.play([...lastPoses(r.log, ROLL_OUT.before), ...done.mine], {
             rate: 1,
