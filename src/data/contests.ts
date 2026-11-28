@@ -15,8 +15,9 @@
  *   you call. The judges score the landing (the jump ramp's own scoring)
  *   and the crowd pays for distance, so faster flies further and lands
  *   harder. Three attempts; the best one counts.
- *
- * More kinds join this table in their own PRs (the short course). Each event is a course made of pieces, the
+ * - **Short course** (`timed` too, over laps): a few laps of a gravel pit,
+ *   whoops and jumps, against the clock. The laps add up the heat, so a
+ *   pace that's quickest for two laps can cook the dampers by the last. Each event is a course made of pieces, the
  * same pieces the shop's rigs use, so the run goes through the same ride
  * sim, the same 3D view and the same wear as the test track.
  *
@@ -29,9 +30,27 @@ import type { Season } from './raids'
 import type { TableJump } from './rigs'
 import type { StringKey } from './strings'
 
-export type ContestId = 'hillClimb' | 'speedTrial' | 'jumpOff'
+export type ContestId = 'hillClimb' | 'speedTrial' | 'jumpOff' | 'shortCourse'
 /** How an event is scored: `timed` is the quickest run, `topSpeed` the fastest clean pass, `judged` the most points. */
 export type ContestKind = 'timed' | 'topSpeed' | 'judged'
+
+/** How a timed event is driven and how the rivals go at it. */
+export interface Timed {
+  /**
+   * A one-day event is a sprint: the driver goes this much harder than on a
+   * raid stage at the same pace call, because there's no tomorrow to save
+   * the truck for. Push is where things start to bottom out and break.
+   */
+  sprint: number
+  /** Uphill all the way: power-to-weight sets how much speed it keeps (`HILL_CLIMB`). */
+  climb: boolean
+  /** Laps of the course a run takes. */
+  laps: number
+  /** Rivals go at their raid `pace` times this, against the course's par... */
+  rivalPace: number
+  /** ...and their `risk` times this is the chance they don't finish a run. */
+  rivalRisk: number
+}
 
 /** A speed trial's passes: the first one's speed, how much faster each next one is, and how many at most. */
 export interface Passes {
@@ -62,6 +81,8 @@ export interface Contest {
   course: readonly CoursePiece[]
   /** Runs each entry gets; the best one counts. */
   runs: number
+  /** How a timed event is driven (`timed` only). */
+  timed?: Timed
   /** A speed trial's passes (`topSpeed` only). */
   passes?: Passes
   /** The approach speeds a jump contest lets you call (km/h, `judged` only). */
@@ -69,7 +90,7 @@ export interface Contest {
 }
 
 /** The events, in the order the screen lists them. New ones go on the end. */
-export const CONTEST_IDS: readonly ContestId[] = ['hillClimb', 'speedTrial', 'jumpOff']
+export const CONTEST_IDS: readonly ContestId[] = ['hillClimb', 'speedTrial', 'jumpOff', 'shortCourse']
 
 export const CONTESTS: Readonly<Record<ContestId, Contest>> = {
   // Up the old mine tailings at Gritstone: rough, rocky and short.
@@ -96,6 +117,7 @@ export const CONTESTS: Readonly<Record<ContestId, Contest>> = {
       { ground: 'graded', length: 120 },
     ],
     runs: 2,
+    timed: { sprint: 1.3, climb: true, laps: 1, rivalPace: 0.92, rivalRisk: 0.25 },
   },
   // A measured mile of washboard and rough gravel, round and round, faster every pass.
   speedTrial: {
@@ -128,20 +150,38 @@ export const CONTESTS: Readonly<Record<ContestId, Contest>> = {
     runs: 3,
     speeds: [46, 50, 54, 58, 62, 66],
   },
+  // Laps of a gravel pit outside Sawbuck: whoops, jumps and churned-up gravel, round and round.
+  shortCourse: {
+    id: 'shortCourse',
+    kind: 'timed',
+    name: 'contest.shortCourse.name',
+    text: 'contest.shortCourse.text',
+    season: 'summer',
+    airC: 27,
+    seed: 8401,
+    course: [
+      { ground: 'graded', length: 140 },
+      { ground: 'whoops', length: 160 },
+      { ground: 'jumps', length: 150 },
+      { ground: 'rough', length: 180 },
+      { ground: 'graded', length: 110 },
+      { ground: 'whoops', length: 130 },
+      { ground: 'jumps', length: 120 },
+      { ground: 'rough', length: 110 },
+    ],
+    runs: 2,
+    timed: { sprint: 1.1, climb: false, laps: 6, rivalPace: 1.02, rivalRisk: 0.3 },
+  },
 }
 
 /**
- * The hill climb. Going uphill takes speed off everywhere; how much depends
- * on power-to-weight, and far more than on a raid (where it only counts on
- * the fast ground), because every metre here is a climb.
+ * The timed events. On the hill climb, going uphill takes speed off
+ * everywhere; how much depends on power-to-weight, and far more than on a
+ * raid (where it only counts on the fast ground), because every metre is a
+ * climb. The bottom-out cost and the rivals' bottom-outs count on any timed
+ * event.
  */
 export const HILL_CLIMB = {
-  /**
-   * A hill climb is a sprint: the driver goes this much harder than on a
-   * raid stage at the same pace call, because there's no tomorrow to save
-   * the truck for. Push is where things start to bottom out and break.
-   */
-  sprint: 1.3,
   /** The stock truck climbs at this share of its usual Steady speed on each ground. */
   climbShare: 0.86,
   /** Power-to-weight against the stock truck's, to this power, sets how much better (or worse) it climbs... */
@@ -150,14 +190,6 @@ export const HILL_CLIMB = {
   climbLimits: [0.76, 0.98] as const,
   /** The driver lifts after each bottom-out (each corner counts): this many seconds lost. */
   bottomOutCost: 1,
-  /**
-   * Rivals go up at their raid `pace` times this, against the course's par:
-   * a hill climb is where the quick teams push, so the stock truck needs a
-   * good driver on Push (or a better truck) to beat the best of them.
-   */
-  rivalPace: 0.92,
-  /** A rival's chance of not making the top on a run: their `risk` times this. */
-  rivalRisk: 0.25,
   /** Rivals bottom out too: up to their `risk` times this many times a run. */
   rivalBottoms: 12,
 } as const
