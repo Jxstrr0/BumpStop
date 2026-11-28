@@ -276,7 +276,7 @@ const STRINGS = {
   'class.heavy': 'Heavy truck',
   'class.heavyText': 'Big and slow to heat-soak, but brutal on axles and ice.',
   'class.sxs': 'Side-by-side',
-  'class.sxsText': 'Huge wheel travel and tiny dampers that cook fast.',
+  'class.sxsText': 'Huge wheel travel and tiny dampers that cook fast. They race from 2005.',
 
 
   'fail.fade': 'Damper fade',
@@ -1044,7 +1044,7 @@ const STRINGS = {
   'weather.dust': 'Dust storm',
   'weather.thawText': 'The gravel goes soft: long, soft ruts, less grip, and the driver slows down, the heavy truck most. The ruts work the springs more than the dampers, so the oil runs cool: it costs time more than parts.',
   'weather.whiteoutText': 'Blowing snow and hardly any view: the driver slows down, drifts and heaves hit harder, the wind is colder, and the tightest corner comes up unseen. Push slides into the snowbank there, studs or not.',
-  'weather.dustText': 'The driver can’t see the ruts and rocks to pick a line, so every bump hits square, and the wind is hot. Slower, but harder on the dampers and tires: think about Conserve.',
+  'weather.dustText': 'The driver can’t see the road ahead, so most ruts and holes come up unseen and are hit at speed, like at night outside the lamps, and the wind is hot. Slower, but harder on the truck: think about Conserve.',
   'weather.thawTurn': 'The gravel goes soft and the driver eases off.',
   'weather.whiteoutTurn': 'Blowing snow: the driver can hardly see.',
   'weather.dustTurn': 'Dust everywhere: the driver can’t see the ruts.',
@@ -1356,6 +1356,7 @@ const STRINGS = {
   'career.noTruck': 'No truck of your own yet. Contracts first, then buy one:',
   'career.buyTruck': 'Buy a {cls}: {price}',
   'career.buyTruckSure': 'Tap again to buy it',
+  'career.classFrom': '{cls}: the first ones race in {year}.',
   'career.resaleNote': 'A truck sells back for {fresh}% of what it cost until its first raid, then {drop}% less after each raid, down to {least}%.',
   'career.truckLine': 'A {cls}, worth {value} if you sold it.',
   'career.sellDown': 'Sell parts down to the cheapest: +{n}',

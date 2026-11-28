@@ -91,7 +91,7 @@ import { leakPerKm, newUnderside, patchHours, rollStrikes, type Underside } from
 import { UNDER_PARTS, UNDERSIDE, type UnderPart } from '../data/underside'
 import { jackFactor, recovery, rollStuck, snowbankRecovery } from './recovery'
 import { RECOVERY, type RecoveryTool, type StuckKind } from '../data/recovery'
-import { groundMod, stageWeather, weatherOn, weatherShare, weatherSpeed, type StageWeather } from './weather'
+import { groundMod, stageWeather, weatherOn, weatherShare, weatherSpeed, weatherUnseen, type StageWeather } from './weather'
 
 /** What the player entered: the truck (parts locked for the raid) and the driver. */
 export interface RaidEntry {
@@ -711,7 +711,9 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     // So is the road after dark.
     const key = `${raidSeed(state)}:${run.stage}:${run.leg}:${run.seg}:${run.restarts}${wet ? ':w' : ''}${night ? ':n' : ''}`
     const seed = hashString(key)
-    const ruts = night ? unseenRuts(ground, unseen) : 0
+    // Unseen ruts: outside the lamps at night, and hidden in a dust storm. Whichever hides more.
+    const hidden = Math.max(night ? unseen : 0, wet ? weatherUnseen(w!.kind, ground) : 0)
+    const ruts = hidden > 0 ? unseenRuts(ground, hidden) : 0
     const mod = ruts > 0 ? { ...(weatherMod ?? CLEAR), ruts } : weatherMod
     const res = runStage(
       run.truck.ride,
@@ -747,7 +749,7 @@ export function advanceStage(state: RaidState, run: StageRun): void {
     run.time += (driven / speed) * lineFactor(driver, ground) * (ground !== seg.ground ? ICE_ROAD.shoreLength : 1)
     if (night) {
       run.ruts.seen += RUTS_PER_KM[ground] * (1 - unseen) * (driven / 1000)
-      run.ruts.unseen += ruts * (driven / 1000)
+      run.ruts.unseen += unseenRuts(ground, unseen) * (driven / 1000)
     }
     run.at += driven
     run.segDone += driven

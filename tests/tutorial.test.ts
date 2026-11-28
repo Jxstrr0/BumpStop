@@ -28,15 +28,19 @@ describe('the first job', () => {
   })
 
   it('only changes the very first offer of the career', () => {
-    // Later raids still roll the first offer's class, so some are side-by-sides.
-    const classes = new Set<string>()
+    // Later raids still roll the first offer's class: light 4x4s before 2005, and some side-by-sides once they race.
+    const early = new Set<string>()
+    const late = new Set<string>()
     for (let seed = 1; seed <= 40; seed++) {
       const c = newCareer(seed)
       settle(c, null)
       expect(isFirstRaid(c)).toBe(false)
-      classes.add(offers(c)[0]!.cls)
+      early.add(offers(c)[0]!.cls)
+      c.year = 2005
+      late.add(offers(c)[0]!.cls)
     }
-    expect(classes.has('sxs')).toBe(true)
+    expect([...early]).toEqual(['light4x4'])
+    expect(late.has('sxs')).toBe(true)
   })
 })
 

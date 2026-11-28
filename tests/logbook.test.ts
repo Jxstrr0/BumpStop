@@ -54,8 +54,8 @@ describe('a truck’s logbook', () => {
     sellTruck(c)
     expect(ownLog(c)).toBeNull()
     expect(first.sold).toBe(1985)
-    buyTruck(c, 'sxs')
-    expect(ownLog(c)).toMatchObject({ n: 2, cls: 'sxs', sold: null })
+    buyTruck(c, 'heavy')
+    expect(ownLog(c)).toMatchObject({ n: 2, cls: 'heavy', sold: null })
     expect(oldTrucks(c).map((x) => x.n)).toEqual([1])
   })
 
@@ -172,13 +172,13 @@ describe('logbooks in the save', () => {
 
   it('give a save from before logbooks a fresh logbook for its truck, with no new save format', () => {
     const c = richCareer()
-    buyTruck(c, 'sxs')
+    buyTruck(c, 'heavy')
     const raw = savedWith(c) as { v: number; career: Record<string, unknown> }
     delete raw.career.trucks
     expect(raw.v).toBe(SAVE.version)
     const back = readSave(raw).career!
     expect(back.trucks).toHaveLength(1)
-    expect(ownLog(back)).toMatchObject({ n: 1, cls: 'sxs', bought: back.year, raids: 0 })
+    expect(ownLog(back)).toMatchObject({ n: 1, cls: 'heavy', bought: back.year, raids: 0 })
     // No truck, no logbook.
     const none = savedWith(richCareer()) as { career: Record<string, unknown> }
     delete none.career.trucks

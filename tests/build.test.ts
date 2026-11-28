@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CLASSES, type ClassId } from '../src/data/classes'
+import { CLASSES, classFrom, type ClassId } from '../src/data/classes'
 import { KITS, type TruckBuild } from '../src/data/kit'
 import { PARTS, SLOTS } from '../src/data/parts'
 import { TEST_MULES } from '../src/data/ride'
@@ -42,10 +42,10 @@ describe('the parts', () => {
     }
   })
 
-  it('give every class a choice in every slot in 1985', () => {
+  it('give every class a choice in every slot in its first year (side-by-sides from 2005)', () => {
     for (const c of IDS) {
       for (const slot of SLOTS) {
-        const first = partsFor(c, slot).filter((p) => p.year <= 1985)
+        const first = partsFor(c, slot).filter((p) => p.year <= classFrom(c))
         expect(first.length, `${c} ${slot}`).toBeGreaterThan(0)
       }
     }
@@ -53,8 +53,8 @@ describe('the parts', () => {
 })
 
 describe('the stock builds', () => {
-  it.each(IDS)('%s: may race in 1985, under its weight window and budget', (c) => {
-    expect(checkBuild(stockBuild(c), shopRules(c, 1985))).toEqual([])
+  it.each(IDS)('%s: may race in its first year, under its weight window and budget', (c) => {
+    expect(checkBuild(stockBuild(c), shopRules(c, classFrom(c)))).toEqual([])
   })
 
   it.each(IDS)('%s: weighs what its test mule weighs and leaves room to spend', (c) => {
@@ -231,9 +231,31 @@ describe('the rules', () => {
   })
 
   it('flag parts that are not out yet', () => {
-    const early = withChange('heavy', (b) => (b.parts.dampers = 'bypass'))
-    expect(checkBuild(early, shopRules('heavy', 1990))).toEqual([{ kind: 'notYet', slot: 'dampers', part: 'bypass', year: 1996 }])
-    expect(checkBuild(early, shopRules('heavy', 1996))).toEqual([])
+    const early = withChange('heavy', (b) => (b.parts.dampers = 'internalBypass'))
+    expect(checkBuild(early, shopRules('heavy', 2000))).toEqual([{ kind: 'notYet', slot: 'dampers', part: 'internalBypass', year: 2008 }])
+    expect(checkBuild(early, shopRules('heavy', 2008))).toEqual([])
+  })
+
+  it('let parts already on a kept truck stay, whatever the year (garages saved before the real-history dates)', () => {
+    // A side-by-side bought in 1990, before side-by-sides moved to 2005: its own parts may stay on...
+    const old = stockBuild('sxs')
+    expect(checkBuild(old, shopRules('sxs', 1990)).map((p) => p.kind)).toContain('notYet')
+    expect(checkBuild(old, { ...shopRules('sxs', 1990), kept: old })).toEqual([])
+    // ...but a new part from the future still can't go on.
+    const turbo = { ...old, parts: { ...old.parts, engine: 'turboTwin' } }
+    expect(checkBuild(turbo, { ...shopRules('sxs', 1990), kept: old })).toEqual([{ kind: 'notYet', slot: 'engine', part: 'turboTwin', year: 2016 }])
+  })
+
+  it('follow real history for the dates Kelbo picked (28 November 2026)', () => {
+    const year = (id: string) => PARTS.find((p) => p.id === id)!.year
+    expect(classFrom('sxs')).toBe(2005)
+    expect(classFrom('light4x4')).toBe(1985)
+    expect(classFrom('heavy')).toBe(1985)
+    expect(year('bypass')).toBe(1986)
+    expect(year('gasCharged')).toBeLessThan(2023)
+    expect(year('gasCharged')).toBeGreaterThan(year('hydraulic'))
+    expect(year('turboTwin')).toBe(2016)
+    for (const p of PARTS) if (p.mass.light4x4 === undefined && p.mass.heavy === undefined) expect(p.year, p.id).toBeGreaterThanOrEqual(2005)
   })
 
   it('refuse a part from another class', () => {

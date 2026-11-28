@@ -32,6 +32,7 @@ describe('rival teams across the classes', () => {
 
   it('every class has a rival quicker than par at every tier, every year', () => {
     for (const { year, teams } of years) for (const cls of CLASSES) for (const tier of ['regional', 'national', 'long'] as const) {
+      if (year < cls.from) continue // side-by-sides race from 2005
       const field = careerField(teams, cls.id, tier, year)
       expect(Math.min(...field.map((r) => r.pace)), `${year} ${cls.id} ${tier}`).toBeLessThan(0.98)
     }
@@ -39,6 +40,7 @@ describe('rival teams across the classes', () => {
 
   it('the quickest team in each class is beatable on Push, not by a stock truck on Steady', () => {
     for (const { year, teams } of years) for (const cls of CLASSES) {
+      if (year < cls.from) continue
       const paces = (Object.keys(TEAMS) as TeamId[]).flatMap((id) => {
         const b = teams[id][cls.id]
         return b ? [teamPace(TEAMS[id], b).pace] : []

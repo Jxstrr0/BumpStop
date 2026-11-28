@@ -124,7 +124,7 @@ When something breaks, the truck stops where it broke:
 
 | What broke | With a spare | Without (a bodge) |
 | --- | --- | --- |
-| Cut tire | 0.4 h, new tire | 1.2 h, plugged: left 60% worn |
+| Cut tire | 10 min, new tire (was 0.4 h; Kelbo, 28 Nov 2026) | 1.2 h, plugged: left 60% worn |
 | Bottomed out (shock) | 0.9 h, new shock | 1.5 h: left 70% worn |
 | Snapped axle | 1 h, new CV joint | 2 h: left 80% worn |
 | Cracked mount | none | 1.2 h, strapped: left 60% worn |
@@ -214,8 +214,9 @@ roll: `src/sim/weather.ts`; driving it: `advanceStage` in `src/sim/raid.ts`.
 | | Thaw | Whiteout | Dust storm |
 | --- | --- | --- | --- |
 | Ground | gravel and dirt (not rock) | everything | all summer ground |
-| Roughness / ripple length | ×2.2 / ×2.5 (long soft ruts) | ×1.3 / ×1 | ×1.2 / ×1 |
-| Features (washboard, whoops, rocks, jumps, heaves) | ×1 | ×1.2 (drifts) | ×1.3 (hit square) |
+| Roughness / ripple length | ×2.2 / ×2.5 (long soft ruts) | ×1.3 / ×1 | ×1 / ×1 (the road is the same) |
+| Features (washboard, whoops, rocks, jumps, heaves) | ×1 | ×1.2 (drifts) | ×1 |
+| Unseen ruts (hit at speed, like at night outside the lamps) | | | 80% of them (`unseen`) |
 | Grip | ×0.7 | ×1 | ×1 |
 | Speed | light 0.85, heavy 0.8, side-by-side 0.88 | 0.75 | 0.8 |
 | Air | −4 °C | −6 °C | +5 °C |
@@ -223,9 +224,12 @@ roll: `src/sim/weather.ts`; driving it: `advanceStage` in `src/sim/raid.ts`.
 
 - **What it does**, from the forced-weather runs while tuning: a thaw costs
   time but runs the oil cool (the long ruts work the springs, not the
-  dampers), so Push can be the right call; a dust storm runs the oil much
-  hotter (a stock light 4x4 at Steady can fade on rock country), so it's a
-  day for Conserve or bigger shocks; a whiteout costs a quarter of the
+  dampers), so Push can be the right call; a dust storm hides the road
+  (since v1.35, Kelbo, 28 November 2026: it used to make the bumps
+  bigger, which real dust can't do): the driver can't see ruts and holes
+  coming and hits most of them at speed, as at night past the lamps, so
+  cut tires and bent parts come from the hits while the oil runs no
+  hotter, a day for Conserve or tougher tires; a whiteout costs a quarter of the
   speed and Push slides into the snowbank once a piece of winter ground.
 - **The piece of ground it turns on** is driven up to the turn, then the rest
   on its own seed (`:w`), so the trace has a point right at the turn.

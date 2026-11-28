@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { CALENDAR, CLASS_MONEY, DRIVER_TERMS, TIERS } from '../src/data/career'
-import { CLASSES } from '../src/data/classes'
+import { CLASSES, classOut, type ClassId } from '../src/data/classes'
 import { CONTEST_IDS, CONTESTS, EVENT_CAREER, ROUNDS } from '../src/data/contests'
 import { newSave, readSave } from '../src/persist/save'
 import { buyTruck, entryProblems, eventDays, newCareer, settle, takeContract, offers, type CareerState } from '../src/sim/career'
@@ -188,16 +188,23 @@ describe('the series', () => {
     expect(eventSeason(c)).toMatchObject({ season: 1, done: 0, points: {} })
   })
 
-  it('every round is run by the rivals by the end of the year, in every class', () => {
+  it('every round is run by the rivals by the end of the year, in every class that races', () => {
     const c = spring()
     passRounds(c, Infinity)
+    const total = (id: (typeof CONTEST_IDS)[number], cls: ClassId) => seriesTable(c, id, cls).reduce((s, r) => s + r.points, 0)
     for (const id of CONTEST_IDS) {
       for (const cls of CLASSES.map((x) => x.id)) {
-        const total = seriesTable(c, id, cls).reduce((s, r) => s + r.points, 0)
-        expect(total).toBeGreaterThan(0)
+        // Side-by-sides race from 2005 (real-history dates), so 1985 has no series for them.
+        if (classOut(cls, c.year)) expect(total(id, cls)).toBeGreaterThan(0)
+        else expect(total(id, cls)).toBe(0)
       }
     }
     expect(endSeries(c)).toEqual([])
+    // From 2005 there's a side-by-side series too.
+    const later = spring(2)
+    later.year = 2005
+    passRounds(later, Infinity)
+    for (const id of CONTEST_IDS) expect(seriesTable(later, id, 'sxs').reduce((s, r) => s + r.points, 0)).toBeGreaterThan(0)
   })
 })
 

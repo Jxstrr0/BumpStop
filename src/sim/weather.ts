@@ -84,6 +84,11 @@ export function groundMod(kind: WeatherId, ground: GroundId): GroundMod | undefi
   return changesGround(kind, ground) ? WEATHER[kind].mod : undefined
 }
 
+/** Share of this ground's ruts the driver can't see in this weather (0 if it leaves the ground alone, or hides nothing). */
+export function weatherUnseen(kind: WeatherId, ground: GroundId): number {
+  return changesGround(kind, ground) ? (WEATHER[kind].unseen ?? 0) : 0
+}
+
 /** The driver's speed on this ground in this weather, as a share of a clear day's (1 if it leaves the ground alone). */
 export function weatherSpeed(kind: WeatherId, cls: ClassId, ground: GroundId): number {
   return changesGround(kind, ground) ? WEATHER[kind].speed[cls] : 1

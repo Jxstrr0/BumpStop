@@ -188,7 +188,7 @@ second). It opens:
 
 | Reputation | What opens |
 | --- | --- |
-| 0 | Regional raids, light 4x4 and side-by-side contracts, the veteran and the mechanic |
+| 0 | Regional raids, light 4x4 contracts (side-by-side ones from 2005), the veteran and the mechanic |
 | 5 | A second mechanic (two more bivouac hours) |
 | 8 | The charger |
 | 10 | A local sponsor, Two Pines Hardware or Loonlight Diner (pays 1,500 a raid), a hydraulic press (cheaper repairs) |
@@ -240,12 +240,20 @@ Four teams (Kelbo's names, `docs/NAMES.md`; the ids in the code are the old work
 
 | Team | Races | Buys | Copies the winner |
 | --- | --- | --- | --- |
-| Tundra Dogs (`brannigan`) | light 4x4 (side-by-side from 2004) | power first | often (half the time, slot by slot) |
-| Goldpan Racing (`highbank`) | light 4x4 from 1990, heavy from 1994, side-by-side from 1998 | the newest parts | sometimes |
+| Tundra Dogs (`brannigan`) | light 4x4 (side-by-side from 2010) | power first | often (half the time, slot by slot) |
+| Goldpan Racing (`highbank`) | light 4x4 from 1990, heavy from 1994, side-by-side from 2008 | the newest parts | sometimes |
 | Ironwood Brothers (`hardpan`) | heavy (light 4x4 from 2000), every raid since plan PR 13 (was national raids and the finale only) | the strongest parts | rarely |
-| Jackrabbit Sport | side-by-side (light 4x4 from 1996) | the lightest parts | sometimes |
+| Jackrabbit Sport | light 4x4 from 1996, side-by-side from 2005 (its first love) | the lightest parts | sometimes |
 
-Plus three privateers per class on stock trucks. The heavy privateers are a
+Plus three privateers per class on stock trucks.
+
+**Side-by-sides race from 2005** (real-history dates, Kelbo, 28 November
+2026), as the real ones arrived in desert racing in the mid-2000s: before
+then there's no side-by-side to buy, no side-by-side contract and no
+side-by-side series at the one-day events (`TruckClass.from`, `classOut`).
+A garage saved with a side-by-side from before that keeps it, races it and
+keeps every part already on it; only new parts wait for their year (the
+`kept` build in `BuildRules`). The heavy privateers are a
 little quicker than the others (their trucks rarely break). How these numbers were
 set: `docs/BALANCE.md`.
 

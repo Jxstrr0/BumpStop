@@ -69,7 +69,7 @@ describe('the hall of fame record', () => {
   it('keeps each driver you hired, with their first year', () => {
     const c = newCareer(6)
     c.money = 500_000
-    buyTruck(c, 'sxs')
+    buyTruck(c, 'light4x4')
     race(c, true, 'veteran')
     race(c, false, 'mechanic')
     race(c, true, 'mechanic')

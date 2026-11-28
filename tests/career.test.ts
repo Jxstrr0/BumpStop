@@ -57,8 +57,10 @@ describe('starting a career', () => {
     expect(c.day).toBeLessThan(CALENDAR[0]!.day)
     expect(Object.keys(c.teams.brannigan)).toEqual(['light4x4'])
     expect(Object.keys(c.teams.hardpan)).toEqual(['heavy'])
-    expect(Object.keys(c.teams.jackrabbit)).toEqual(['sxs'])
+    // Side-by-sides race from 2005 (real history), so Jackrabbit has nothing to race until its light 4x4 in 1996.
+    expect(Object.keys(c.teams.jackrabbit)).toEqual([])
     expect(Object.keys(c.teams.highbank)).toEqual([])
+    expect(Object.keys(teamsForYear(2005).jackrabbit).sort()).toEqual(['light4x4', 'sxs'])
   })
 
   it('has six raids a year, in order: the Cold Start 300 first and the finale last', () => {
@@ -241,6 +243,8 @@ describe('your own truck', () => {
   it('enters with the fees paid, the sponsor paying in, the year roads and the crew hours', () => {
     const c = newCareer(9)
     c.money = 60_000
+    expect(() => buyTruck(c, 'sxs')).toThrow() // no side-by-sides before 2005
+    c.year = 2005
     buyTruck(c, 'sxs')
     c.rep = 12
     buyUpgrade(c, 'secondMechanic')
@@ -376,7 +380,8 @@ describe('rival teams', () => {
   it('buy in their own way, inside their budget and the weight window, with parts that are out', () => {
     for (const year of [1985, 2000, 2025]) {
       for (const team of Object.values(TEAMS)) {
-        for (const { cls } of team.classes) {
+        for (const { cls, from } of team.classes) {
+          if (year < from) continue
           const b = teamBuild(team, cls, year)
           const cl = CLASSES.find((x) => x.id === cls)!
           const { mass, cost } = massAndCost(b)
@@ -574,6 +579,7 @@ describe('the career in the save (format 2)', () => {
     expect(readSave(JSON.parse(JSON.stringify(save)))).toEqual(save)
     // An own raid in progress, with its field and hours.
     const c2 = newCareer(22)
+    skipTo(c2, 2005) // side-by-sides race from 2005
     c2.money = 50_000
     buyTruck(c2, 'sxs')
     const s2 = newSave()
