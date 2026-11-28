@@ -235,3 +235,56 @@ export const JUMP_OFF = {
   rivalRisk: 0.3,
   botched: 0.5,
 } as const
+
+// ── The events in the career ──
+
+/** One running of an event in the career's year: a round of its series. */
+export interface Round {
+  contest: ContestId
+  /** Day of the year (1 is the first of January). */
+  day: number
+}
+
+/**
+ * Each event runs three rounds a year, a small series, in the summer gaps
+ * between the raids (the raids end on days 81, 165 and 195; the next start
+ * on 158, 186 and 244). In day order. The Jump-Off's last round is the fall
+ * fair itself, in late August.
+ */
+export const ROUNDS: readonly Round[] = [
+  { contest: 'hillClimb', day: 121 },
+  { contest: 'shortCourse', day: 128 },
+  { contest: 'speedTrial', day: 135 },
+  { contest: 'hillClimb', day: 142 },
+  { contest: 'shortCourse', day: 149 },
+  { contest: 'speedTrial', day: 172 },
+  { contest: 'jumpOff', day: 179 },
+  { contest: 'hillClimb', day: 201 },
+  { contest: 'shortCourse', day: 208 },
+  { contest: 'jumpOff', day: 215 },
+  { contest: 'speedTrial', day: 222 },
+  { contest: 'jumpOff', day: 236 },
+]
+
+/**
+ * Money, reputation and series points for the events in the career. Money
+ * is for a light 4x4 and scales by class like a raid's (`CLASS_MONEY`). A
+ * one-day event pays less than a raid, and costs less: no bivouacs, no
+ * week of wear, only what breaks.
+ */
+export const EVENT_CAREER = {
+  /** Entry fee. */
+  entryFee: 400,
+  /** Prize money by place, first to third. */
+  prizes: [4000, 2500, 1500] as readonly number[],
+  /** A timed event's driver is paid this share of their fee for a regional raid. The others are driven by the crew. */
+  driverShare: 0.25,
+  /** Putting right a part that broke on a run, at the usual repair share (crew and tools make it cheaper, like a raid's repairs). */
+  breakRepair: 1500,
+  /** Reputation for a podium and a win. */
+  rep: { podium: 1, win: 2 },
+  /** Series points by place, first to sixth. */
+  points: [10, 6, 4, 3, 2, 1] as readonly number[],
+  /** Winning a series, at the end of the year: money (times `CLASS_MONEY`) and reputation. */
+  champion: { money: 8000, rep: 3 },
+} as const
