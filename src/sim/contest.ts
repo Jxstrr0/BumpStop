@@ -12,11 +12,12 @@
  * same event always gives them the same runs, so a second go is fair.
  */
 import { CLASSES, type ClassId } from '../data/classes'
-import { HILL_CLIMB, SPEED_TRIAL, type Contest, type ContestKind } from '../data/contests'
+import { HILL_CLIMB, JUMP_OFF, SPEED_TRIAL, type Contest, type ContestKind } from '../data/contests'
 import { STEADY_KMH, type DriverId, type PaceId, type Rival } from '../data/raids'
 import type { Rig } from '../data/rigs'
 import type { BuiltTruck } from './build'
 import { detPow } from './det'
+import type { LandingScore } from './landing'
 import type { LapRun } from './laps'
 import { groundSpeed, lineFactor, powerRatio } from './raid'
 import { hashString, Rng } from './rng'
@@ -77,6 +78,10 @@ export interface ContestRun {
   bottomOuts: number
   /** Seconds the bottom-outs cost. */
   lost: number
+  /** A jump contest: the speed called (km/h), the landing as judged, and the points for distance. */
+  kmh?: number
+  landing?: LandingScore
+  air?: number
 }
 
 /** Score a finished run: the time the speeds give, plus the driver lifting after every bottom-out. */
@@ -115,23 +120,49 @@ export function scorePasses(contest: Contest, run: LapRun): ContestRun {
   return { pace: 'steady', score: clean > 0 ? passKmh(contest, clean) : null, broken: run.broken, bottomOuts, lost: 0 }
 }
 
-// ── Either kind ──
+// ── The jump contest ──
 
-/** The course as the rig the ride sim drives, for this kind of event. */
-export function eventRig(contest: Contest, truck: BuiltTruck, driver: DriverId, pace: PaceId): { rig: Rig; speeds: number[] } {
+/** One attempt as a one-lap rig: the run-up, the tabletop and the run-out, at the speed called. */
+export function jumpRig(contest: Contest, kmh: number): Rig {
+  return {
+    id: `course:${contest.id}`,
+    pieces: contest.course.map((c) => ({ ground: c.ground, length: c.length, pace: 1, ...(c.table ? { table: c.table } : {}) })),
+    startSpeed: kmh * KMH,
+    speedStep: 0,
+    maxLaps: 1,
+  }
+}
+
+/** Score an attempt: the landing's points plus the crowd's for distance. Nothing if it broke or never jumped. */
+export function scoreJump(run: LapRun, kmh: number): ContestRun {
+  const landing = run.landings[0]
+  const bottomOuts = run.laps.reduce((sum, lap) => sum + lap.bottomOuts, 0)
+  const base = { pace: 'steady' as const, broken: run.broken, bottomOuts, lost: 0, kmh }
+  if (run.broken || !landing || landing.spot === 'none') return { ...base, score: null, ...(landing ? { landing } : {}) }
+  const air = Math.round(landing.flown * JUMP_OFF.perMetre)
+  return { ...base, score: landing.score + air, landing, air }
+}
+
+// ── Any kind ──
+
+/** The course as the rig the ride sim drives, for this kind of event (`kmh` is a jump contest's called speed). */
+export function eventRig(contest: Contest, truck: BuiltTruck, driver: DriverId, pace: PaceId, kmh = 0): { rig: Rig; speeds: number[] } {
   if (contest.kind === 'topSpeed') return { rig: passRig(contest), speeds: [] }
+  if (contest.kind === 'judged') return { rig: jumpRig(contest, kmh), speeds: [] }
   const speeds = courseSpeeds(contest, truck, driver, pace)
   return { rig: courseRig(contest, speeds), speeds }
 }
 
 /** Score a finished run, for this kind of event. */
-export function scoreEvent(contest: Contest, run: LapRun, speeds: readonly number[], driver: DriverId, pace: PaceId): ContestRun {
-  return contest.kind === 'topSpeed' ? scorePasses(contest, run) : scoreRun(contest, run, speeds, driver, pace)
+export function scoreEvent(contest: Contest, run: LapRun, speeds: readonly number[], driver: DriverId, pace: PaceId, kmh = 0): ContestRun {
+  if (contest.kind === 'topSpeed') return scorePasses(contest, run)
+  if (contest.kind === 'judged') return scoreJump(run, kmh)
+  return scoreRun(contest, run, speeds, driver, pace)
 }
 
-/** True if score `a` beats score `b` in this kind of event: quicker on a hill climb, faster on a speed trial. */
+/** True if score `a` beats score `b` in this kind of event: quicker on a hill climb, more on the others. */
 export function beats(kind: ContestKind, a: number, b: number): boolean {
-  return kind === 'topSpeed' ? a > b : a < b
+  return kind === 'timed' ? a < b : a > b
 }
 
 /** The course's par time: the stock truck at Steady with an average driver, sprinting uphill, no bottom-outs (s). */
@@ -148,6 +179,7 @@ export interface RivalRuns {
 /** Every rival's runs at the event, the same every time for the same event and class. */
 export function rivalRuns(contest: Contest, cls: ClassId, field: readonly Rival[]): RivalRuns[] {
   if (contest.kind === 'topSpeed') return rivalPasses(contest, cls, field)
+  if (contest.kind === 'judged') return rivalJumps(contest, cls, field)
   const par = coursePar(contest, cls)
   const seed = courseSeed(contest, cls)
   return field.map((rival) => {
@@ -178,6 +210,21 @@ function rivalPasses(contest: Contest, cls: ClassId, field: readonly Rival[]): R
       let kmh = Math.min(top, p.startKmh + Math.floor((aim - p.startKmh) / p.stepKmh) * p.stepKmh)
       if (rng.chance(rival.risk * SPEED_TRIAL.rivalRisk)) kmh -= p.stepKmh
       runs.push(kmh >= p.startKmh ? kmh : null)
+    }
+    return { id: rival.id, runs }
+  })
+}
+
+/** A jump contest's rivals: the stock best, more for the quicker teams, wandering, and now and then botched. */
+function rivalJumps(contest: Contest, cls: ClassId, field: readonly Rival[]): RivalRuns[] {
+  const seed = courseSeed(contest, cls)
+  return field.map((rival) => {
+    const runs: (number | null)[] = []
+    for (let k = 0; k < contest.runs; k++) {
+      const rng = new Rng(hashString(`${seed}:${rival.id}:${k}`))
+      let points = JUMP_OFF.stockBest[cls] + JUMP_OFF.pointsPerPace * (1 - rival.pace) * 100 + JUMP_OFF.wander * rival.spread * rng.range(-1, 1)
+      if (rng.chance(rival.risk * JUMP_OFF.rivalRisk)) points *= JUMP_OFF.botched
+      runs.push(Math.round(points))
     }
     return { id: rival.id, runs }
   })

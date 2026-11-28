@@ -4,7 +4,8 @@
  *
  * 1. **Entry:** pick the event and (where it matters) the driver. The
  *    truck is the one on the build screen (it must pass the build rules).
- * 2. **A run:** on a hill climb, the pace call first. The truck drives the
+ * 2. **A run:** on a hill climb, the pace call first; on the jump contest,
+ *    the approach speed (and it plays at true speed, one unbroken shot). The truck drives the
  *    course through the ride sim, shown in 3D like the test track (full page
  *    or in the page, the same remembered pick), with how far up it is, or on
  *    a speed trial the pass and the hottest damper.
@@ -38,6 +39,7 @@ import { BAND_WORD, bandOf } from './charts'
 import { el, num, reveal } from './dom'
 import { endOf, jumpTo } from './fixes'
 import { readFullPage, writeFullPage } from './fullPage'
+import { gradeChip, landingSummary } from './landingText'
 import { entrantName, ordinal, type RaidCareer } from './raid'
 import { crewNote, fixButtons, traceBlock, whereText } from './report'
 import { rigView } from './rigView'
@@ -49,7 +51,8 @@ const RUN_SECONDS = 24
 
 /** A score in words: a time (2:18.4) on a hill climb, a speed (80 km/h) on a speed trial. */
 export function scoreText(kind: ContestKind, score: number): string {
-  return kind === 'topSpeed' ? tf('contestUi.kmh', { n: num(score) }) : runClock(score)
+  if (kind === 'topSpeed') return tf('contestUi.kmh', { n: num(score) })
+  return kind === 'judged' ? tf('contestUi.points', { n: num(score) }) : runClock(score)
 }
 
 /** A run's time: 2:18.4. */
@@ -104,6 +107,10 @@ interface Live {
   runner: LapRunner
   speeds: number[]
   pace: PaceId
+  /** The jump contest's called speed (km/h). */
+  kmh: number
+  /** Played at true speed (the jump contest). */
+  trueSpeed: boolean
   /** Sim steps the whole run takes, for the progress bar and the playing speed. */
   total: number
 }
@@ -118,6 +125,8 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
   let contestId: ContestId = CONTEST_IDS[0]!
   let driver: DriverId = 'veteran'
   let pace: PaceId = 'steady'
+  /** The jump contest's approach speed (km/h), from the event's list. */
+  let kmh = 54
   let entry: Entry | null = null
   let live: Live | null = null
   let raf = 0
@@ -225,11 +234,13 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     const sync = () => {
       const c = CONTESTS[contestId]
       about.textContent = t(c.text)
-      courseLine.textContent = c.passes
+      courseLine.textContent = c.kind === 'judged'
+        ? tf('contestUi.jumpLine', { runs: String(c.runs), speeds: c.speeds!.map((x) => num(x)).join(', ') })
+        : c.passes
         ? tf('contestUi.passesLine', { km: num(courseLength(c) / 1000, 1), from: num(c.passes.startKmh), step: num(c.passes.stepKmh), runs: String(c.runs) })
         : tf('contestUi.courseLine', { km: num(courseLength(c) / 1000, 1), runs: String(c.runs) })
       // The speed trial is driven at the set speeds, so the driver makes no odds there.
-      driverBox.hidden = c.kind === 'topSpeed'
+      driverBox.hidden = c.kind !== 'timed'
       driverText.textContent = tf('driver.about', { trade: t(DRIVERS[driver].name), text: t(DRIVERS[driver].text) })
     }
     const contestRow = picker(CONTEST_IDS, (id) => t(CONTESTS[id].name), () => contestId, (id) => {
@@ -295,7 +306,8 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
       syncPace()
     })
     syncPace()
-    const go = button(tf('contestUi.startRun', { n: String(n) }), 'btn start-btn')
+    const jumps = c.kind === 'judged'
+    const go = button(tf(jumps ? 'contestUi.startJump' : 'contestUi.startRun', { n: String(n) }), 'btn start-btn')
     const problem = store.cls() !== e.cls ? t('contestUi.otherClass') : buildProblem()
     const cant = el('p', 'small hot-text', problem)
     cant.hidden = problem === ''
@@ -309,11 +321,19 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     })
     const retire = button(t('contestUi.leave'), 'btn small-btn')
     retire.addEventListener('click', () => entryScreen())
-    nodes.push(el('h3', 'raid-sub', tf('contestUi.runHead', { n: String(n), of: String(c.runs) })))
+    nodes.push(el('h3', 'raid-sub', tf(jumps ? 'contestUi.jumpHead' : 'contestUi.runHead', { n: String(n), of: String(c.runs) })))
     if (n > 1) nodes.push(el('p', 'small', t('contestUi.tuneNote')))
     // The speed trial's speeds are set: no pace call, and every run starts with cold oil.
     if (c.kind === 'topSpeed') nodes.push(el('p', 'small', t('contestUi.coldStart')), cant, go, retire)
-    else nodes.push(paceRow, paceText, cant, go, retire)
+    else if (c.kind === 'judged') {
+      // The approach speed: faster flies further for the crowd, and lands harder for the judges.
+      const list = c.speeds!.map(String)
+      if (!list.includes(String(kmh))) kmh = c.speeds![Math.floor(list.length / 2)]!
+      const speedRow = picker(list, (id) => tf('contestUi.kmh', { n: id }), () => String(kmh), (id) => {
+        kmh = Number(id)
+      })
+      nodes.push(el('p', 'small', t('contestUi.jumpSpeed')), speedRow, cant, go, retire)
+    } else nodes.push(paceRow, paceText, cant, go, retire)
     show(...nodes)
   }
 
@@ -325,7 +345,19 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     const head = el('p', 'end-head')
     const c = CONTESTS[e.contest]
     const ev = run.broken
-    if (c.kind === 'topSpeed') {
+    if (c.kind === 'judged') {
+      if (run.score !== null && run.landing) {
+        head.append(gradeChip(run.landing), ' ', tf('contestUi.jumpScore', { n: String(n), kmh: num(run.kmh ?? 0), pts: num(run.score) }))
+        block.append(head, el('p', 'small', tf('contestUi.jumpSplit', { landing: String(run.landing.score), air: String(run.air ?? 0), m: num(run.landing.flown, 1) })),
+          el('p', 'small', landingSummary(run.landing)))
+      } else if (ev) {
+        head.append(el('span', 'chip hot', t('trace.hot')), ' ', tf('contestUi.jumpBroke', { n: String(n), what: t(FAILURES[ev.kind].name), where: whereText(ev) }))
+        block.append(head)
+      } else {
+        head.append(el('span', 'chip hot', t('trace.hot')), ' ', tf('contestUi.jumpNone', { n: String(n) }))
+        block.append(head)
+      }
+    } else if (c.kind === 'topSpeed') {
       // A speed trial always ends on something (usually the fade): the score is the pass before.
       if (run.score !== null) head.append(el('span', 'chip cool', t('trace.cool')), ' ', tf('contestUi.topPass', { n: String(n), kmh: num(run.score) }))
       else head.append(el('span', 'chip hot', t('trace.hot')), ' ', tf('contestUi.noCleanPass', { n: String(n) }))
@@ -359,7 +391,7 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
       tr.append(
         el('td', 'pos', row.best === null ? '–' : String(k + 1)),
         el('td', 'who', entrantName(row.who)),
-        el('td', 'time', row.best === null ? t(kind === 'topSpeed' ? 'contestUi.noPass' : 'contestUi.noTime') : scoreText(kind, row.best)),
+        el('td', 'time', row.best === null ? t(kind === 'topSpeed' ? 'contestUi.noPass' : kind === 'judged' ? 'contestUi.noScore' : 'contestUi.noTime') : scoreText(kind, row.best)),
       )
       table.append(tr)
     })
@@ -381,11 +413,12 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     sound.wake()
     const c = CONTESTS[e.contest]
     const truck = store.truck()
-    const { rig, speeds } = eventRig(c, truck, e.driver, pace)
+    const { rig, speeds } = eventRig(c, truck, e.driver, pace, kmh)
     const runner = startLaps(truck.ride, truck.wear, rig, courseSeed(c, e.cls), { airTemp: fromCelsius(c.airC), poses: VIEW_3D.poseSeconds })
-    // A hill climb plays in about RUN_SECONDS; a speed trial a pass at a time like the test track's loops.
-    const total = c.kind === 'topSpeed' ? 0 : rig.pieces.reduce((sum, p: RigPiece) => sum + p.length / p.pace, 0) * STEPS_PER_SECOND
-    live = { truck, runner, speeds, pace, total }
+    // A hill climb plays in about RUN_SECONDS; a speed trial a pass at a time like the test track's loops;
+    // a jump at true speed, like the jump ramp, so the jump in 3D is the jump as it happened.
+    const total = c.kind === 'timed' ? rig.pieces.reduce((sum, p: RigPiece) => sum + p.length / p.pace, 0) * STEPS_PER_SECOND : 0
+    live = { truck, runner, speeds, pace, kmh, total, trueSpeed: c.kind === 'judged' }
     sound.startLaps(truck.build.parts.engine, e.cls)
     fast = false
     skipping = false
@@ -395,7 +428,7 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     skipBtn.disabled = false
     fastBtn.setAttribute('aria-pressed', 'false')
     show(liveBox)
-    view3d.begin({ truck, road: runner.road, log: runner.poses!, finishText: t('contestUi.finished') })
+    view3d.begin({ truck, road: runner.road, log: runner.poses!, trueSpeed: live.trueSpeed, finishText: t(c.kind === 'judged' ? 'contestUi.finishedJump' : 'contestUi.finished') })
     layout()
     drawLive()
     reveal(liveBox, { behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' })
@@ -425,6 +458,7 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
 
   /** Sim steps to play each real second at normal speed. */
   function stepsPerSecond(l: Live): number {
+    if (l.trueSpeed) return STEPS_PER_SECOND
     if (l.total > 0) return l.total / RUN_SECONDS
     const r = l.runner
     const lap = r.rig.pieces.reduce((sum, p: RigPiece) => sum + p.length / (r.lapSpeed * p.pace), 0)
@@ -468,6 +502,10 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
         }
       }
       clockLine.textContent = tf('contestUi.liveOil', { c: num(oil), word: BAND_WORD[band] })
+    } else if (c.kind === 'judged') {
+      liveHead.textContent = tf('contestUi.liveJump', { n: String(e.runs.length + 1), kmh: num(l.kmh) })
+      share = Math.min(1, r.run.w.distance / len)
+      clockLine.textContent = tf('contestUi.liveRun', { m: num(Math.min(r.run.w.distance, len)), of: num(len) })
     } else {
       liveHead.textContent = tf('contestUi.live', { n: String(e.runs.length + 1), ground: t(`ground.${piece.ground}` as StringKey), speed: num(msToKmh(piece.pace)) })
       share = Math.min(1, r.run.w.distance / len)
@@ -486,7 +524,7 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     if (!l || !e) return
     const c = CONTESTS[e.contest]
     const result = lapResult(l.runner)
-    const run = scoreEvent(c, result, l.speeds, e.driver, l.pace)
+    const run = scoreEvent(c, result, l.speeds, e.driver, l.pace, l.kmh)
     e.runs.push(run)
     if (run.broken) sound.broke(run.broken.kind)
     else sound.stop()
@@ -498,7 +536,7 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
       const ev = run.broken
       const info = FAILURES[ev.kind]
       report = el('div', 'contest-break')
-      report.append(el('p', 'cause', t(info.cause)), crewNote(t(c.kind === 'topSpeed' ? 'contestUi.crewFaded' : 'contestUi.crewBroke')))
+      report.append(el('p', 'cause', t(info.cause)), crewNote(t(c.kind === 'topSpeed' ? 'contestUi.crewFaded' : c.kind === 'judged' ? 'contestUi.crewBrokeJump' : 'contestUi.crewBroke')))
       if (result.trace) report.append(traceBlock(ev, result.trace, null, l.truck))
       // The "slower pace" fix talks about the raids, so it's left off here.
       report.append(el('h4', '', t('report.fixes')), fixButtons(info.fixes.filter((f) => f.target !== 'pace').map((f) => ({ ...f, end: endOf(ev.corner) })), {

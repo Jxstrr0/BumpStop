@@ -11,9 +11,12 @@
  *   with no rest, 5 km/h faster each pass, until the dampers fade (or
  *   something breaks). The fastest clean pass counts. It asks one thing:
  *   how well the dampers shed heat.
+ * - **Jump contest** (`judged`): one tabletop jump an attempt, at the speed
+ *   you call. The judges score the landing (the jump ramp's own scoring)
+ *   and the crowd pays for distance, so faster flies further and lands
+ *   harder. Three attempts; the best one counts.
  *
- * More kinds join this table in their own PRs (the jump contest, the short
- * course). Each event is a course made of pieces, the
+ * More kinds join this table in their own PRs (the short course). Each event is a course made of pieces, the
  * same pieces the shop's rigs use, so the run goes through the same ride
  * sim, the same 3D view and the same wear as the test track.
  *
@@ -23,11 +26,12 @@
 import type { ClassId } from './classes'
 import type { GroundId } from './ground'
 import type { Season } from './raids'
+import type { TableJump } from './rigs'
 import type { StringKey } from './strings'
 
-export type ContestId = 'hillClimb' | 'speedTrial'
-/** How an event is scored: `timed` is the quickest run, `topSpeed` the fastest clean pass. */
-export type ContestKind = 'timed' | 'topSpeed'
+export type ContestId = 'hillClimb' | 'speedTrial' | 'jumpOff'
+/** How an event is scored: `timed` is the quickest run, `topSpeed` the fastest clean pass, `judged` the most points. */
+export type ContestKind = 'timed' | 'topSpeed' | 'judged'
 
 /** A speed trial's passes: the first one's speed, how much faster each next one is, and how many at most. */
 export interface Passes {
@@ -40,6 +44,8 @@ export interface Passes {
 export interface CoursePiece {
   ground: GroundId
   length: number
+  /** A built jump on this piece (the jump contest). */
+  table?: TableJump
 }
 
 export interface Contest {
@@ -58,10 +64,12 @@ export interface Contest {
   runs: number
   /** A speed trial's passes (`topSpeed` only). */
   passes?: Passes
+  /** The approach speeds a jump contest lets you call (km/h, `judged` only). */
+  speeds?: readonly number[]
 }
 
 /** The events, in the order the screen lists them. New ones go on the end. */
-export const CONTEST_IDS: readonly ContestId[] = ['hillClimb', 'speedTrial']
+export const CONTEST_IDS: readonly ContestId[] = ['hillClimb', 'speedTrial', 'jumpOff']
 
 export const CONTESTS: Readonly<Record<ContestId, Contest>> = {
   // Up the old mine tailings at Gritstone: rough, rocky and short.
@@ -105,6 +113,20 @@ export const CONTESTS: Readonly<Record<ContestId, Contest>> = {
     ],
     runs: 2,
     passes: { startKmh: 50, stepKmh: 5, most: 20 },
+  },
+  // The fall fair at Sawbuck: one big tabletop in front of the grandstand.
+  jumpOff: {
+    id: 'jumpOff',
+    kind: 'judged',
+    name: 'contest.jumpOff.name',
+    text: 'contest.jumpOff.text',
+    season: 'summer',
+    airC: 15,
+    seed: 8301,
+    // The jump ramp's own tabletop (`RIGS.jumpRig`), so what you learn on the test track works here.
+    course: [{ ground: 'graded', length: 200, table: { at: 90, entry: 8, slope: 0.18, height: 1, top: 4, landing: 12 } }],
+    runs: 3,
+    speeds: [46, 50, 54, 58, 62, 66],
   },
 }
 
@@ -157,4 +179,27 @@ export const SPEED_TRIAL = {
   wander: 25,
   /** ...and their `risk` times this is the chance a run ends a pass early with something broken. */
   rivalRisk: 0.5,
+} as const
+
+/**
+ * The jump contest. A jump's points are its landing score (out of 100, the
+ * jump ramp's `LANDING` rules) plus `perMetre` for every metre flown. A
+ * stock truck does best a notch or two under the speed where it starts to
+ * fly past the landing slope.
+ */
+export const JUMP_OFF = {
+  /** Points for each metre flown, take-off to touch-down. */
+  perMetre: 4,
+  /**
+   * The stock truck's best jump in each class, picking its best speed
+   * (points; `tests/contests.test.ts` checks it still is).
+   */
+  stockBest: { light4x4: 112, heavy: 121, sxs: 108 } as Readonly<Record<ClassId, number>>,
+  /** A rival's jump: the stock best plus this many points for each 0.01 their raid `pace` is under 1... */
+  pointsPerPace: 0.6,
+  /** ...wandering by up to this many points either way, from their `spread`... */
+  wander: 120,
+  /** ...and their `risk` times this is the chance of a botched landing, worth `botched` of the points. */
+  rivalRisk: 0.3,
+  botched: 0.5,
 } as const
