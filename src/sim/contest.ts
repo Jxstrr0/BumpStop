@@ -45,13 +45,15 @@ export function climbFactor(truck: BuiltTruck): number {
 
 /** The speed the driver takes each piece of the course at, on this pace call (m/s). */
 export function courseSpeeds(contest: Contest, truck: BuiltTruck, driver: DriverId, pace: PaceId): number[] {
-  const k = climbFactor(truck) * HILL_CLIMB.sprint
+  const timed = contest.timed!
+  const k = (timed.climb ? climbFactor(truck) : 1) * timed.sprint
   return contest.course.map((p) => groundSpeed(truck, driver, p.ground, pace) * k)
 }
 
 /**
- * The course as a one-lap rig for `laps.ts`. The lap's speed is 1 m/s and
- * each piece's `pace` is its real speed, so each piece runs at its own speed.
+ * The course as a rig for `laps.ts`, one lap for each of the event's laps.
+ * The lap's speed is 1 m/s and each piece's `pace` is its real speed, so
+ * each piece runs at its own speed.
  */
 export function courseRig(contest: Contest, speeds: readonly number[]): Rig {
   return {
@@ -59,7 +61,7 @@ export function courseRig(contest: Contest, speeds: readonly number[]): Rig {
     pieces: contest.course.map((p, i) => ({ ground: p.ground, length: p.length, pace: speeds[i] as number })),
     startSpeed: 1,
     speedStep: 0,
-    maxLaps: 1,
+    maxLaps: contest.timed?.laps ?? 1,
   }
 }
 
@@ -89,8 +91,8 @@ export function scoreRun(contest: Contest, run: LapRun, speeds: readonly number[
   const bottomOuts = run.laps.reduce((sum, lap) => sum + lap.bottomOuts, 0)
   const lost = bottomOuts * HILL_CLIMB.bottomOutCost
   if (run.broken) return { pace, score: null, broken: run.broken, bottomOuts, lost }
-  const clean = contest.course.reduce((sum, p, i) => sum + (p.length / (speeds[i] as number)) * lineFactor(driver, p.ground), 0)
-  return { pace, score: clean + lost, broken: null, bottomOuts, lost }
+  const lap = contest.course.reduce((sum, p, i) => sum + (p.length / (speeds[i] as number)) * lineFactor(driver, p.ground), 0)
+  return { pace, score: lap * (contest.timed?.laps ?? 1) + lost, broken: null, bottomOuts, lost }
 }
 
 // ── The speed trial ──
@@ -165,9 +167,11 @@ export function beats(kind: ContestKind, a: number, b: number): boolean {
   return kind === 'timed' ? a < b : a > b
 }
 
-/** The course's par time: the stock truck at Steady with an average driver, sprinting uphill, no bottom-outs (s). */
+/** The course's par time: the stock truck at Steady with an average driver, sprinting (uphill on a climb), every lap, no bottom-outs (s). */
 export function coursePar(contest: Contest, cls: ClassId): number {
-  return contest.course.reduce((sum, p) => sum + p.length / (STEADY_KMH[cls][p.ground] * KMH * HILL_CLIMB.climbShare * HILL_CLIMB.sprint), 0)
+  const timed = contest.timed!
+  const k = (timed.climb ? HILL_CLIMB.climbShare : 1) * timed.sprint
+  return contest.course.reduce((sum, p) => sum + p.length / (STEADY_KMH[cls][p.ground] * KMH * k), 0) * timed.laps
 }
 
 /** A rival's runs at an event: each run's time, or null where they didn't make the top. */
@@ -186,9 +190,10 @@ export function rivalRuns(contest: Contest, cls: ClassId, field: readonly Rival[
     const runs: (number | null)[] = []
     for (let k = 0; k < contest.runs; k++) {
       const rng = new Rng(hashString(`${seed}:${rival.id}:${k}`))
-      const clean = par * rival.pace * HILL_CLIMB.rivalPace * (1 + rival.spread * rng.range(-1, 1))
-      const bottoms = Math.round(rng.range(0, rival.risk * HILL_CLIMB.rivalBottoms))
-      runs.push(rng.chance(rival.risk * HILL_CLIMB.rivalRisk) ? null : clean + bottoms * HILL_CLIMB.bottomOutCost)
+      const timed = contest.timed!
+      const clean = par * rival.pace * timed.rivalPace * (1 + rival.spread * rng.range(-1, 1))
+      const bottoms = Math.round(rng.range(0, rival.risk * HILL_CLIMB.rivalBottoms * timed.laps))
+      runs.push(rng.chance(rival.risk * timed.rivalRisk) ? null : clean + bottoms * HILL_CLIMB.bottomOutCost)
     }
     return { id: rival.id, runs }
   })
