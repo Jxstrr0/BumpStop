@@ -50,6 +50,8 @@ export interface RigRun {
   trueSpeed?: boolean
   /** What the caption says when the truck drives through the finish (a one-day event has no laps). */
   finishText?: string
+  /** The road climbs this much per metre in 3D (the hill climb); left out for flat. */
+  grade?: number
 }
 
 /** A landing's moments, kept when it was scored so it can be replayed after the run: your truck's poses and the ghost's. */
@@ -216,7 +218,7 @@ export function rigView(onFail: () => void = () => {}): RigView {
         if (!v || current !== run) return
         try {
           const ghost = run.ghost ? { stance: stanceOf(run.ghost.truck), parts: run.ghost.truck.build.parts } : null
-          await v.setRun({ cls: run.truck.build.cls, stance: stanceOf(run.truck), parts: run.truck.build.parts, road: run.road, wheelbase: setup.cgToFront + setup.cgToRear, ghost, loop: true })
+          await v.setRun({ cls: run.truck.build.cls, stance: stanceOf(run.truck), parts: run.truck.build.parts, road: run.road, wheelbase: setup.cgToFront + setup.cgToRear, ghost, loop: true, grade: run.grade })
         } catch (err) {
           fail(err)
           return

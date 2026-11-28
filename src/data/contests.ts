@@ -192,6 +192,11 @@ export const HILL_CLIMB = {
   bottomOutCost: 1,
   /** Rivals bottom out too: up to their `risk` times this many times a run. */
   rivalBottoms: 12,
+  /**
+   * How steep the hill climb looks in 3D: rise per metre (12%, about 7°).
+   * Only the picture: what the climb costs is `climbShare` and power-to-weight.
+   */
+  grade: 0.12,
 } as const
 
 /**
