@@ -131,6 +131,12 @@ of each. Names in `driverName.*` in `src/data/strings.ts`; the trade
 | The gravel ace | Sami Rautio, Benny Stone, Ida Grimsrud, Lou Cobble |
 | The mechanic | Ozzie Wrenn, Hank Ratchet, Fran Holt, Doc Pelletier |
 
+Since 1.36.0.0 (rival drivers with grudges, Kelbo's pick on 28 November
+2026) the names a career didn't hire drive for the rival teams, one per
+team truck (`rivalDrivers` in `src/sim/grudges.ts`), so the pools cover
+both sides with no new names. The grudge levels are plain words: Sore,
+Grudge, Feud.
+
 Jo "Flatout" Kessler was offered as a charger, but Scrapline already has a
 rival called Rudi Kessler, so Dee Rask (from Kelbo's first round of picks)
 took the place. Also offered in that first round: Hal "Gramps" Okerlund, Mo

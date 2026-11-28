@@ -53,6 +53,7 @@ import { checkBuild, partIn } from '../sim/build'
 import { conditionEffect, wornTruck } from '../sim/condition'
 import { groundsToCheck } from '../sim/paceCheck'
 import { driverName } from '../sim/career'
+import { dustBumps, grudgeLevel, raidGrudges } from '../sim/grudges'
 import { raidGrime } from '../sim/grime'
 import { legHighlights, type Clip } from '../sim/highlight'
 import {
@@ -106,7 +107,16 @@ export function ordinal(n: number): string {
 export function entrantName(who: string, field?: readonly Rival[]): string {
   if (who === 'you') return t('raidUi.you')
   const r = (field ?? RIVALS).find((x) => x.id === who) ?? RIVALS.find((x) => x.id === who)
-  return r ? tf('raidUi.rivalName', { team: t(r.team), n: String(r.number) }) : who
+  if (!r) return who
+  // Career teams have a named driver (grudges); privateers and free play go by team and number.
+  return r.driver
+    ? tf('raidUi.rivalDriverName', { team: t(r.team), n: String(r.number), driver: t(r.driver) })
+    : tf('raidUi.rivalName', { team: t(r.team), n: String(r.number) })
+}
+
+/** A rival's team and number only ("Tundra Dogs #7"), for a line that names the driver already. */
+function teamAndNumber(r: Rival): string {
+  return tf('raidUi.rivalName', { team: t(r.team), n: String(r.number) })
 }
 
 /** A results table: place, who (with any trouble noted) and the gap to the leader. `you` names the player's line. */
@@ -656,8 +666,16 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
       run = startStage(s, raidTruck(s, store.build()), pace)
       stageScreen()
     })
+    // Grudges (career): the drivers in the field out to get you, door rubs earlier in this raid included.
+    const angry = s.entry.field ? raidGrudges(s, s.entry.field).filter((r) => r.driver && grudgeLevel(r.grudge ?? 0) > 0) : []
+    const grudgeLine = el('p', 'small warm-text')
+    if (angry.length) {
+      grudgeLine.textContent = tf('raidUi.grudgeField', {
+        list: angry.map((r) => tf('raidUi.grudgeName', { driver: t(r.driver!), level: t(`grudge.level.${grudgeLevel(r.grudge ?? 0)}` as StringKey) })).join(', '),
+      })
+    } else grudgeLine.hidden = true
     show(
-      head, facts, fuelLine, rocks, stuck,
+      head, facts, fuelLine, rocks, stuck, grudgeLine,
       el('h4', 'raid-sub', t('raidUi.roadbook')), book, weatherBox, nightBox, iceBox,
       el('h4', 'raid-sub', t('raidUi.condition')), conditionList(s),
       el('p', 'small', tf('raidUi.sparesLine', { list: sparesList(s.spares) })), settings,
@@ -1041,6 +1059,14 @@ export function raidPanel(store: BuildStore, saves?: RaidSaves, career?: RaidCar
     if (w?.comes) lines.append(el('p', 'small warm-text', tf('raidUi.resWeather', { kind: weatherName(w.kind), km: num(w.at / 1000) })))
     else if (w) lines.append(el('p', 'small', tf('raidUi.cpWeatherHeld', { kind: weatherName(w.kind, true) })))
     if (rec.limped) lines.append(el('p', 'small hot-text', t('raidUi.limped')))
+    // Grudges (career): trucks caught and rubbed doors with on the way past.
+    const bumped = dustBumps(s, n - 1)
+    const spray = t(raidOf(s).season === 'winter' ? 'raidUi.spray.snow' : 'raidUi.spray.dust')
+    for (const id of bumped) {
+      const r = s.entry.field?.find((x) => x.id === id)
+      if (r?.driver) lines.append(el('p', 'small warm-text', tf('raidUi.dustBump', { driver: t(r.driver), who: teamAndNumber(r), spray })))
+    }
+    if (bumped.length && rec.paces.includes('push')) lines.append(el('p', 'small', t('raidUi.dustPush')))
     // Night: what the lamps showed, and the way to the lamps if ruts came up unseen.
     const nt = rec.night
     if (nt) {

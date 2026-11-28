@@ -274,6 +274,56 @@ quick estimate in `rivals.ts` does the rest.
 In classes you're not in, the raid is still run on the estimates, so every
 class has a winner and the copying goes on everywhere.
 
+## Rival drivers with grudges (after 1.35)
+
+Kelbo picked it on 28 November 2026. Each team's truck in each class has
+its own **driver**, from the same pools as your hires (`docs/NAMES.md`):
+the names your garage didn't hire this career, so you never meet your own
+driver on the other side. Which trade drives for which team is in
+`RIVAL_TRADES` (`src/data/grudges.ts`): Tundra Dogs run chargers, Ironwood
+Brothers a mechanic and a veteran, Jackrabbit and Goldpan gravel aces (and
+Goldpan's heavy truck a veteran). The standings, the class winners and the
+news name them ("Tundra Dogs #7 · Dee Rask"). Privateers stay known by
+their race number.
+
+Those drivers **remember you**. Each one has some heat against your garage
+(`CareerState.grudges`, by entry id), and the heat sets a level:
+
+| Heat | Level | On the clock |
+| --- | --- | --- |
+| 0–1 | none | as their truck says |
+| 2–3 | Sore | 1% quicker, 15% more trouble |
+| 4–5 | Grudge | 2% quicker, 30% more trouble |
+| 6–8 | Feud | 3% quicker, 50% more trouble |
+
+So a driver with a grudge is harder to beat, but more likely to break down
+trying. Heat moves like this (`GRUDGE`):
+
+- **Beat them** at a raid or a one-day round: +1. **Win with them second:** +1 more.
+- **Rub doors on a stage:** +2 (once a raid). Starters go two minutes apart,
+  leader first (you start behind the field on day one, as the newest
+  entry); if your truck makes up the gap to one that started ahead, it has
+  to squeeze past. A quarter of the time on Steady that ends in a door rub,
+  half the time on Push, a tenth on Conserve. Passing a truck stopped with
+  trouble doesn't count. The heat counts from the **next stage** of the
+  same raid, and the stage's results say who it was.
+- **They beat you:** −2 (score settled).
+- **A raid where they don't meet you** (another class or tier, or you sat it
+  out): −1. **A new year** halves every grudge.
+
+The heat goes onto each rival in the field (`Rival.grudge`), and
+`pushHarder` (`src/sim/grudges.ts`) turns it into pace and trouble wherever
+the rivals are worked out: `rivalStages` for raids, `rivalRuns` for the
+one-day rounds. Contract raids count too: your garage's name is on the
+truck. Where it shows: the morning card ("Out to get you: …"), the stage
+results (door rubs), the results card and the one-day payout ("Grudges":
+every driver whose level changed, and why), the news, and the **Rival
+drivers** list under the calendar (every team driver this year, your class
+first, with their level). Colour always comes with the word.
+
+Kept in the save with no new format: a save from before has nobody holding
+a grudge, and a career raid under way keeps its field's drivers and heat.
+
 ## Broke: the soft landing
 
 Money can go below zero after a repair bill. Then:
@@ -370,6 +420,11 @@ rolling to 2025 and past, the same career for the same seed, the teams
 the shop, the save (format 1 moving up, careers and career raids round
 trip, damaged team trucks, bad careers turned away), and the stock trucks
 getting home on the Polar Night Raid and the Whole Damn Country.
+
+`tests/grudges.test.ts`: the rival drivers (one each, never your own
+hires), levels and harder driving, heat after raids and rounds, door rubs
+(Push makes more, trouble and slow catches don't count, hotter for the rest
+of the raid), and grudges through a save.
 
 `tests/careerEvents.test.ts`: the rounds (in the gaps, three each),
 entering one (fees, the day, rounds passed), why not, the pay-out and

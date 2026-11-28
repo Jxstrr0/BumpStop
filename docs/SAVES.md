@@ -32,7 +32,11 @@ the save format): since 1.5.0.0 a raid keeps its truck's condition (`cond`:
 shock oil, bushings and springs per axle), the money spent on parts at the
 bivouacs (`spent`) and, for a career raid, the money it had for parts
 (`entry.budget`). A raid saved before that reads back with a fresh truck and
-nothing spent, in `readRaid`.
+nothing spent, in `readRaid`. Since 1.36.0.0 a career keeps each rival
+driver's heat against you (`grudges`, by entry id; `readGrudges` drops
+anything that isn't a team entry with heat above zero), the news may have
+`grudge` lines, and a career raid's rivals may carry their `driver` and
+`grudge`; saves from before have none, so nobody holds a grudge.
 
 ## Three slots
 

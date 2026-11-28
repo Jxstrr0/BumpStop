@@ -40,6 +40,8 @@ import {
 } from '../sim/career'
 import { ownLog } from '../sim/logbook'
 import { roundNo, roundsBeforeRaid, type EventProblem } from '../sim/careerEvents'
+import { grudgeLevel, grudgesNow, rivalDriver, type GrudgeNote } from '../sim/grudges'
+import { teamClass } from '../sim/teams'
 import { raidOf, standings, type RaidState } from '../sim/raid'
 import { keepPhoto } from '../persist/album'
 import type { SlotNo } from '../persist/slots'
@@ -77,12 +79,29 @@ const signed = (n: number) => (n < 0 ? `−${money(-n)}` : `+${money(n)}`)
 const className = (cls: ClassId) => t(CLASSES.find((c) => c.id === cls)!.name)
 const tierName = (tier: Tier) => t(`career.tier.${tier}` as StringKey)
 
-/** A rival's name from its id (`brannigan7`, `privateer31`), or "your truck". */
-export function whoName(who: string, privateer?: number): string {
+/**
+ * A rival's name from its id (`brannigan7`, `privateer31`), or "your truck".
+ * With the career, a team's entry names its driver too.
+ */
+export function whoName(who: string, privateer?: number, career?: CareerState | null): string {
   if (who === 'you') return privateer !== undefined ? tf('career.privateerTruck', { n: String(privateer) }) : t('raidUi.you')
   const n = who.replace(/^\D+/, '')
   const team = Object.values(TEAMS).find((x) => who.startsWith(x.id))
-  return tf('raidUi.rivalName', { team: t(team ? team.name : 'team.privateer'), n })
+  const driver = career ? rivalDriver(career.seed, who) : null
+  const vars = { team: t(team ? team.name : 'team.privateer'), n }
+  return driver ? tf('raidUi.rivalDriverName', { ...vars, driver: t(driver) }) : tf('raidUi.rivalName', vars)
+}
+
+/** A grudge that moved, in words: who, why, and how sore they are now. */
+export function grudgeText(g: GrudgeNote): string {
+  return tf('grudge.line', {
+    driver: t(g.driver), who: whoName(g.who), why: t(`grudge.why.${g.why}` as StringKey), now: t(`grudge.now.${g.to}` as StringKey),
+  })
+}
+
+/** The colour that goes with a grudge level, beside its word (the trace rule: never colour alone). */
+export function grudgeBand(level: number): string {
+  return level >= 3 ? 'hot-text' : level >= 1 ? 'warm-text' : ''
 }
 
 /** The parts the finale names on the winning truck. */
@@ -104,7 +123,7 @@ export function newsText(n: NewsItem, career?: CareerState): string {
       return tf('career.news.result', { raid: t(RAIDS[n.raid].name), who, cls: className(n.cls).toLowerCase(), place, money: signed(n.money), rep: String(n.rep) })
     }
     case 'winner':
-      return tf('career.news.winner', { raid: t(RAIDS[n.raid].name), cls: className(n.cls).toLowerCase(), who: whoName(n.who) })
+      return tf('career.news.winner', { raid: t(RAIDS[n.raid].name), cls: className(n.cls).toLowerCase(), who: whoName(n.who, undefined, career) })
     case 'copied': {
       const slots = n.slots.map((s) => t(`slot.${s}` as StringKey).toLowerCase()).join(', ')
       return tf(n.from === 'you' ? 'career.news.copiedYou' : 'career.news.copied', {
@@ -129,8 +148,10 @@ export function newsText(n: NewsItem, career?: CareerState): string {
     }
     case 'series':
       return tf(n.who === 'you' ? 'career.news.seriesYou' : 'career.news.series', {
-        event: t(CONTESTS[n.contest].name), cls: className(n.cls).toLowerCase(), who: whoName(n.who), points: String(n.points),
+        event: t(CONTESTS[n.contest].name), cls: className(n.cls).toLowerCase(), who: whoName(n.who, undefined, career), points: String(n.points),
       })
+    case 'grudge':
+      return grudgeText(n)
   }
 }
 
@@ -658,9 +679,14 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     const winners = el('ul', 'raid-list')
     for (const cls of CLASSES) {
       const who = s.winners[cls.id]
-      if (who) winners.append(el('li', 'small', tf('career.winnerLine', { cls: t(cls.name), who: whoName(who) })))
+      if (who) winners.append(el('li', 'small', tf('career.winnerLine', { cls: t(cls.name), who: whoName(who, undefined, c) })))
     }
     card.append(el('h4', 'raid-sub', t('career.winners')), winners)
+    if (s.grudges.length) {
+      const list = el('ul', 'raid-list')
+      for (const g of s.grudges) list.append(el('li', `small ${grudgeBand(g.to)}`, grudgeText(g)))
+      card.append(el('h4', 'raid-sub', t('career.grudges')), list)
+    }
     if (s.copies.length) {
       const list = el('ul', 'raid-list')
       for (const n of s.copies) list.append(el('li', 'small', newsText(n)))
@@ -854,6 +880,36 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     return wrap
   }
 
+  /** The rival teams' drivers this year, your truck's class first, and how sore each one is. */
+  function rivalsBlock(career: CareerState): HTMLElement {
+    const wrap = el('details', 'career-calendar career-rivals')
+    const angry = grudgesNow(career)
+    const hottest = angry[0]
+    wrap.append(el('summary', '', hottest
+      ? `${t('career.rivals')} · ${tf('raidUi.grudgeName', { driver: t(hottest.driver), level: t(`grudge.level.${hottest.level}` as StringKey) })}`
+      : t('career.rivals')))
+    wrap.append(el('p', 'small', t('career.rivalsLead')))
+    const mine = career.own?.cls
+    const classes = CLASSES.map((x) => x.id).sort((a, b) => Number(b === mine) - Number(a === mine))
+    const list = el('ul', 'raid-list')
+    for (const cls of classes) {
+      for (const team of Object.values(TEAMS)) {
+        const entry = teamClass(team, cls, career.year)
+        if (!entry) continue
+        const who = `${team.id}${entry.number}`
+        const driver = rivalDriver(career.seed, who)
+        if (!driver) continue
+        const level = grudgeLevel(career.grudges?.[who] ?? 0)
+        list.append(el('li', `small ${grudgeBand(level)}`, tf('career.rivalLine', {
+          driver: t(driver), who: whoName(who), cls: className(cls).toLowerCase(), level: t(`grudge.level.${level}` as StringKey),
+        })))
+      }
+    }
+    if (!angry.length) wrap.append(el('p', 'small', t('career.rivalsNone')))
+    wrap.append(list)
+    return wrap
+  }
+
   function render(): void {
     if (!c) {
       startScreen()
@@ -862,7 +918,7 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
     renderJob()
     const wasOpen = hall?.element.open ?? false
     hall = hallBlock(c, { slot })
-    body.replaceChildren(statusBlock(c), jobHolder, calendarBlock(c), truckBlock(c), shopBlock(c), newsBlock(c), hall.element)
+    body.replaceChildren(statusBlock(c), jobHolder, calendarBlock(c), rivalsBlock(c), truckBlock(c), shopBlock(c), newsBlock(c), hall.element)
     // Keep it open if it was (opening it draws it).
     if (wasOpen) hall.element.open = true
     for (const f of eventListeners) f()

@@ -34,7 +34,7 @@ import {
 } from '../data/career'
 import { KITS, type AxleSettings, type TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR, PARTS, SLOTS, SPARE_IDS, type SlotId, type SpareId } from '../data/parts'
-import { DRIVER_IDS, DRIVERS, JOBS, RAID, RAIDS, type DriverId, type PaceId, type RaidId, type Season } from '../data/raids'
+import { DRIVER_IDS, JOBS, RAID, RAIDS, type DriverId, type PaceId, type RaidId, type Rival, type Season } from '../data/raids'
 import type { ContestId } from '../data/contests'
 import type { StringKey } from '../data/strings'
 import { UNDER_PARTS } from '../data/underside'
@@ -50,6 +50,9 @@ import { rivalStages } from './rivals'
 import { hashString, Rng } from './rng'
 import { markEnd, newHall, recordResult, recordSkip, type CareerHall } from './hall'
 import { careerField, copyWinner, teamsForYear, type TeamGarage } from './teams'
+import {
+  coolGrudges, hiredName, meetRivals, newYearGrudges, raidBumps, withGrudges, type GrudgeNote,
+} from './grudges'
 import { endSeries, passRounds, type EventSeason, type SeriesWin } from './careerEvents'
 
 /** A privateer who wants a truck prepped for the next raid. */
@@ -98,6 +101,8 @@ export type NewsItem =
   | { kind: 'event'; year: number; contest: ContestId; round: number; cls: ClassId; pos: number | null; of: number; money: number; rep: number }
   /** A one-day series' champion, in a class you scored in. */
   | { kind: 'series'; year: number; contest: ContestId; cls: ClassId; who: string; points: number }
+  /** A rival driver's grudge against you moved to a new level (`grudges.ts`). */
+  | ({ kind: 'grudge'; year: number } & GrudgeNote)
 
 /**
  * The day the garage first won the Long One (plan PR 13): kept for the
@@ -151,6 +156,11 @@ export interface CareerState {
   trucks: TruckLog[]
   /** This year's one-day event series (`careerEvents.ts`). Missing in saves from before them, and started then. */
   events?: EventSeason
+  /**
+   * Each rival driver's heat against you, by entry id (`brannigan7`): grudges
+   * (`grudges.ts`). Missing or left out means none; saves from before have none.
+   */
+  grudges?: Record<string, number>
 }
 
 // ── Starting ──
@@ -231,8 +241,15 @@ export function sponsorName(c: CareerState, s: Sponsor): StringKey {
  * play (no career) has the first.
  */
 export function driverName(c: CareerState | null, id: DriverId): StringKey {
-  const pool = DRIVERS[id].pool
-  return c ? pool[hashString(`${c.seed}:driver:${id}`) % pool.length]! : pool[0]!
+  return hiredName(c ? c.seed : null, id)
+}
+
+/**
+ * The career's rivals in a class at a raid of this tier: the teams' entries
+ * with their drivers' names and grudges on them (`grudges.ts`), and the privateers.
+ */
+export function careerRivals(c: CareerState, cls: ClassId, tier: Tier): Rival[] {
+  return withGrudges(c, careerField(c.teams, cls, tier, c.year))
 }
 
 export function sponsorOf(c: CareerState): Sponsor | null {
@@ -406,7 +423,7 @@ export function contractRaid(c: CareerState): RaidState {
   const cls = c.job.contract.cls
   return enterRaid(e.raid, c.job.build, c.job.contract.driver, {
     seed: eventSeed(c),
-    field: careerField(c.teams, cls, e.tier, c.year),
+    field: careerRivals(c, cls, e.tier),
     hours: RAID.bivouacHours,
   })
 }
@@ -578,7 +595,7 @@ export function enterOwn(c: CareerState, driver: DriverId, bench?: TruckBuild): 
   const b: TruckBuild = bench ? { cls: own.cls, parts: own.parts, front: bench.front, rear: bench.rear, ...(bench.load ? { load: bench.load } : {}) } : own
   // Parts at the bivouacs come out of the garage's own money (none when broke), and are settled after the raid.
   return enterRaid(e.raid, b, driver, {
-    seed: eventSeed(c), field: careerField(c.teams, cls, e.tier, c.year), hours: crewHours(c), budget: Math.max(0, c.money),
+    seed: eventSeed(c), field: careerRivals(c, cls, e.tier), hours: crewHours(c), budget: Math.max(0, c.money),
     extraSpares: garageSpares(c), ...garageCare(c),
   })
 }
@@ -646,6 +663,8 @@ export interface Settlement {
   careerEnd: boolean
   /** One-day series you won, when this was the year's last raid. */
   series: SeriesWin[]
+  /** Rival drivers whose grudge against you moved to a new level. */
+  grudges: GrudgeNote[]
 }
 
 /** What putting a raid's wear right costs, and the spares used. */
@@ -686,7 +705,7 @@ export function repairBill(c: CareerState, state: RaidState): { repairs: number;
 function rivalsOnly(c: CareerState, cls: ClassId): string[] {
   const e = nextEvent(c)
   const raid = RAIDS[e.raid]
-  const field = careerField(c.teams, cls, e.tier, c.year)
+  const field = careerRivals(c, cls, e.tier)
   const sums = new Map<string, number>()
   raid.stages.forEach((spec, k) => {
     const legs = stageLegs(cls, spec)
@@ -725,7 +744,7 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
   const out: Settlement = {
     raid: e.raid, job: state ? job!.kind : null, pos: null, of: 0, finished: false,
     prize: 0, fee: 0, bonus: 0, repairs: 0, spares: 0, bivouac: 0, entry: 0, sponsor: 0, money: 0, rep: 0,
-    winners: {} as Record<ClassId, string>, copies: [], wonLongOne: false, story: null, careerEnd: false, series: [],
+    winners: {} as Record<ClassId, string>, copies: [], wonLongOne: false, story: null, careerEnd: false, series: [], grudges: [],
   }
   const rng = new Rng(hashString(`${c.seed}:${c.season}:${c.next}:settle`))
   let mineCls: ClassId | null = null
@@ -787,11 +806,19 @@ export function settle(c: CareerState, state: RaidState | null, retired = false)
       raid: e.raid, cls, job: job.kind, pos: out.pos, of: out.of, money: out.money, rep: out.rep, wonLongOne: out.wonLongOne,
       driver: job.kind === 'own' ? job.driver : undefined, table,
     })
+    // Grudges: the drivers you met remember the result and any door rubs; the rest cool off a little.
+    // Their news goes in first, so the result reads above it (newest first).
+    const field = state.entry.field ?? []
+    const classified = retired ? table.filter((x) => x.who !== 'you') : table
+    out.grudges = meetRivals(c, classified, field, raidBumps(state))
+    coolGrudges(c, new Set(field.map((r) => r.id)))
+    for (const n of out.grudges) addNews(c, { kind: 'grudge', year: c.year, ...n })
     addNews(c, { kind: 'result', year: c.year, raid: e.raid, cls, job: job.kind, pos: out.pos, of: out.of, money: out.money, rep: out.rep })
     if (out.wonLongOne) addNews(c, { kind: 'longOne', year: c.year })
   } else {
     addNews(c, { kind: 'skipped', year: c.year, raid: e.raid })
     recordSkip(c)
+    coolGrudges(c)
   }
 
   // Every class has a winner, and the teams copy what won.
@@ -846,6 +873,7 @@ function newSeason(c: CareerState): void {
   const newYear = year !== c.year
   c.year = year
   c.teams = teamsForYear(year, c.teams)
+  newYearGrudges(c)
   if (newYear) {
     const parts = PARTS.filter((p) => p.year === year).map((p) => p.id)
     if (parts.length) addNews(c, { kind: 'newParts', year, parts })

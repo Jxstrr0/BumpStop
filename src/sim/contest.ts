@@ -19,6 +19,7 @@ import type { BuiltTruck } from './build'
 import { detPow } from './det'
 import type { LandingScore } from './landing'
 import type { LapRun } from './laps'
+import { pushHarder } from './grudges'
 import { groundSpeed, lineFactor, powerRatio } from './raid'
 import { hashString, Rng } from './rng'
 import type { BreakEvent } from './wear'
@@ -185,7 +186,9 @@ export interface RivalRuns {
  * and class. `salt` makes each running different (the career's rounds);
  * free play leaves it out.
  */
-export function rivalRuns(contest: Contest, cls: ClassId, field: readonly Rival[], salt = ''): RivalRuns[] {
+export function rivalRuns(contest: Contest, cls: ClassId, angry: readonly Rival[], salt = ''): RivalRuns[] {
+  // A driver with a grudge against you drives harder: quicker, more trouble (`grudges.ts`).
+  const field = angry.map(pushHarder)
   if (contest.kind === 'topSpeed') return rivalPasses(contest, cls, field, salt)
   if (contest.kind === 'judged') return rivalJumps(contest, cls, field, salt)
   const par = coursePar(contest, cls)
