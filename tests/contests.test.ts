@@ -181,6 +181,38 @@ describe('the jump contest', () => {
   })
 })
 
+const PIT = CONTESTS.shortCourse
+
+function heat(cls: (typeof CLASSES)[number]['id'], driver: 'veteran' | 'charger', pace: 'conserve' | 'steady' | 'push'): { run: ContestRun; peak: number[] } {
+  const truck = buildTruck(stockBuild(cls))
+  const speeds = courseSpeeds(PIT, truck, driver, pace)
+  const laps = runLaps(truck.ride, truck.wear, courseRig(PIT, speeds), courseSeed(PIT, cls), { airTemp: fromCelsius(PIT.airC), trace: false })
+  return { run: scoreRun(PIT, laps, speeds, driver, pace), peak: laps.laps.map((l) => Math.max(...l.peakTemp)) }
+}
+
+describe('the short course', () => {
+  it('runs every lap of the course, and times them all', () => {
+    const truck = buildTruck(stockBuild('heavy'))
+    const speeds = courseSpeeds(PIT, truck, 'veteran', 'conserve')
+    expect(courseRig(PIT, speeds).maxLaps).toBe(PIT.timed!.laps)
+    const { run, peak } = heat('heavy', 'veteran', 'conserve')
+    expect(peak.length).toBe(PIT.timed!.laps)
+    const lap = PIT.course.reduce((sum, p, i) => sum + p.length / speeds[i]!, 0)
+    expect(run.score!).toBeGreaterThan(lap * PIT.timed!.laps * 0.9)
+  }, SLOW)
+
+  it('takes every stock truck to the flag at Steady with the veteran', () => {
+    for (const c of CLASSES) expect(heat(c.id, 'veteran', 'steady').run.broken, c.id).toBeNull()
+  }, SLOW)
+
+  it('adds up the heat lap by lap, and more of it on Push', () => {
+    const steady = heat('sxs', 'veteran', 'steady').peak
+    const push = heat('sxs', 'veteran', 'push').peak
+    for (let i = 1; i < steady.length; i++) expect(steady[i]!).toBeGreaterThan(steady[i - 1]!)
+    expect(push[push.length - 1]!).toBeGreaterThan(steady[steady.length - 1]!)
+  }, SLOW)
+})
+
 describe('rivals and standings', () => {
   it('gives the rivals the same runs every time', () => {
     for (const c of CLASSES) {
