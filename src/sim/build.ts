@@ -440,6 +440,19 @@ export interface BuildRules {
    * what the old one sells for, and `budget` is the money in the bank.
    */
   owned?: { build: TruckBuild; resale: number; discount: number }
+  /**
+   * A truck whose parts are already bought: they may stay on even if the year
+   * says they aren't out yet. This keeps garages saved before the real-history
+   * dates (28 November 2026) working, such as a side-by-side bought before
+   * 2005 or a privateer's truck brought in before then. The career's own
+   * truck counts as kept too (`owned`).
+   */
+  kept?: TruckBuild
+}
+
+/** Is this part already on the truck the rules keep (`kept`, or the career's own truck)? */
+function alreadyOn(rules: BuildRules, slot: SlotId, id: string): boolean {
+  return rules.kept?.parts[slot] === id || rules.owned?.build.parts[slot] === id
 }
 
 /**
@@ -497,7 +510,7 @@ export function checkBuild(b: TruckBuild, rules: BuildRules): BuildProblem[] {
   if (spend > 0 && spend > rules.budget) out.push({ kind: 'overBudget', by: spend - rules.budget, budget: rules.budget })
   for (const slot of SLOTS) {
     const p = partIn(b, slot)
-    if (!partOnSale(p, rules.year)) out.push({ kind: 'notYet', slot, part: p.id, year: p.year })
+    if (!partOnSale(p, rules.year) && !alreadyOn(rules, slot, p.id)) out.push({ kind: 'notYet', slot, part: p.id, year: p.year })
   }
   return out
 }

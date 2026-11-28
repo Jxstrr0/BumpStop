@@ -363,6 +363,8 @@ export function buildPanel(store: BuildStore, showTerm?: ShowTerm): HTMLElement 
     }
     const cls = CLASSES.find((c) => c.id === b.cls)!
     blurb.textContent = t(cls.blurb)
+    // The slider starts at the class's first year (side-by-sides from 2005).
+    yearInput.min = String(cls.from)
     yearInput.value = String(store.year())
     yearOut.textContent = String(store.year())
     yearInput.disabled = bench !== null

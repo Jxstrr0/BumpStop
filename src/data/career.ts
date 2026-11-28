@@ -303,7 +303,7 @@ export interface TeamSpec {
 export const TEAMS: Readonly<Record<TeamId, TeamSpec>> = {
   brannigan: {
     id: 'brannigan', name: 'team.brannigan', habit: 'habit.brannigan',
-    classes: [{ cls: 'light4x4', from: 1985, number: 7 }, { cls: 'sxs', from: 2004, number: 307 }],
+    classes: [{ cls: 'light4x4', from: 1985, number: 7 }, { cls: 'sxs', from: 2010, number: 307 }],
     tiers: ['regional', 'national', 'long'],
     pace: 0.95, hardness: 1.5, buy: 'power',
     priority: ['engine', 'dampers', 'tires', 'frontSusp', 'rearSusp', 'wheels'],
@@ -311,7 +311,7 @@ export const TEAMS: Readonly<Record<TeamId, TeamSpec>> = {
   },
   highbank: {
     id: 'highbank', name: 'team.highbank', habit: 'habit.highbank',
-    classes: [{ cls: 'light4x4', from: 1990, number: 11 }, { cls: 'heavy', from: 1994, number: 505 }, { cls: 'sxs', from: 1998, number: 305 }],
+    classes: [{ cls: 'light4x4', from: 1990, number: 11 }, { cls: 'heavy', from: 1994, number: 505 }, { cls: 'sxs', from: 2008, number: 305 }],
     tiers: ['regional', 'national', 'long'],
     pace: 0.96, hardness: 1.1, buy: 'newest',
     priority: ['dampers', 'frontSusp', 'rearSusp', 'frame', 'bumpStops', 'axles', 'engine', 'wheels'],
@@ -327,7 +327,7 @@ export const TEAMS: Readonly<Record<TeamId, TeamSpec>> = {
   },
   jackrabbit: {
     id: 'jackrabbit', name: 'team.jackrabbit', habit: 'habit.jackrabbit',
-    classes: [{ cls: 'sxs', from: 1985, number: 301 }, { cls: 'light4x4', from: 1996, number: 33 }],
+    classes: [{ cls: 'sxs', from: 2005, number: 301 }, { cls: 'light4x4', from: 1996, number: 33 }],
     tiers: ['regional', 'national', 'long'],
     pace: 0.935, hardness: 1.3, buy: 'light',
     priority: ['frame', 'wheels', 'frontSusp', 'rearSusp', 'dampers', 'engine'],

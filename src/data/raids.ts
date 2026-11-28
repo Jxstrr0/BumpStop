@@ -154,7 +154,9 @@ export interface RoadsideFix {
 }
 
 export const ROADSIDE: Readonly<Record<Exclude<FailureKind, 'fade'>, RoadsideFix>> = {
-  tire: { spare: 'tire', withSpare: 0.4, bodge: 1.2, bodgeWear: 0.6 },
+  // A wheel swap with the spare takes 10 minutes on a light 4x4 (Kelbo, 28 November 2026: it was 24, slower than a
+  // real amateur crew); 15 on a heavy truck, 8 on a side-by-side (CLASS_WORK).
+  tire: { spare: 'tire', withSpare: 10 / 60, bodge: 1.2, bodgeWear: 0.6 },
   bottoming: { spare: 'shock', withSpare: 0.9, bodge: 1.5, bodgeWear: 0.7 },
   axle: { spare: 'cv', withSpare: 1, bodge: 2, bodgeWear: 0.8 },
   mount: { spare: null, withSpare: 0, bodge: 1.2, bodgeWear: 0.6 },

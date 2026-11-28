@@ -12,7 +12,7 @@ import { stockBuild } from '../src/sim/build'
 import { buildProfile } from '../src/sim/ground'
 import { airNow, driveStage, enterRaid, finishStage, raidTruck, raidWeather, stageKm, stageLegs, startStage, type StageRun } from '../src/sim/raid'
 import { Rng } from '../src/sim/rng'
-import { forecastWord, stageWeather, weatherOn, type StageWeather } from '../src/sim/weather'
+import { forecastWord, stageWeather, weatherOn, weatherUnseen, type StageWeather } from '../src/sim/weather'
 
 describe('the forecast', () => {
   it('fits the season and the air, and its window holds the place it turns', () => {
@@ -69,11 +69,15 @@ describe('the ground in the weather', () => {
     }
   })
 
-  it('a dust storm makes the same rocks hit bigger; a thaw softens the grip', () => {
+  it('a dust storm hides the road without changing it; a thaw softens the grip', () => {
     const clear = buildProfile('rocks', 400, new Rng(4))
-    const dust = buildProfile('rocks', 400, new Rng(4), WEATHER.dust.mod)
-    const top = (p: typeof clear) => Math.max(...p.left, ...p.right)
-    expect(top(dust)).toBeGreaterThan(top(clear) * 1.2)
+    // Dust doesn't make the bumps bigger (Kelbo, 28 November 2026): the same road...
+    expect(buildProfile('rocks', 400, new Rng(4), WEATHER.dust.mod)).toEqual(clear)
+    // ...but most of its ruts come up unseen, like outside the lamps at night.
+    expect(weatherUnseen('dust', 'rough')).toBe(WEATHER.dust.unseen)
+    expect(weatherUnseen('dust', 'rough')).toBeGreaterThan(0.5)
+    expect(weatherUnseen('dust', 'ice')).toBe(0)
+    expect(weatherUnseen('thaw', 'rough')).toBe(0)
     expect(buildProfile('graded', 400, new Rng(4), WEATHER.thaw.mod).grip).toBe(WEATHER.thaw.mod.grip)
     expect(clear.grip).toBeUndefined()
   })

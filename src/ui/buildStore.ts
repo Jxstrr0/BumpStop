@@ -4,7 +4,7 @@
  * break test read it. The garage (`src/ui/garage.ts`) saves it into the
  * slot after each change (plan PR 8).
  */
-import { CLASSES, type ClassId } from '../data/classes'
+import { CLASSES, classFrom, type ClassId } from '../data/classes'
 import type { AxleSettings, TruckBuild } from '../data/kit'
 import { FIRST_YEAR, LAST_YEAR } from '../data/parts'
 import { buildTruck, shopRules, stockBuild, tidyBuild, type BuildRules, type BuiltTruck } from '../sim/build'
@@ -67,7 +67,8 @@ export { FIRST_YEAR, LAST_YEAR }
 export function makeBuildStore(start?: StoreStart): BuildStore {
   const builds = Object.fromEntries(CLASSES.map((c) => [c.id, start ? tidyBuild(start.builds[c.id]) : stockBuild(c.id)])) as Record<ClassId, TruckBuild>
   let cls: ClassId = start?.cls ?? 'light4x4'
-  let year = start?.year ?? FIRST_YEAR
+  // A class can't be built before it races (side-by-sides from 2005): the year moves up to meet it.
+  let year = Math.max(start?.year ?? FIRST_YEAR, classFrom(start?.cls ?? 'light4x4'))
   let built: BuiltTruck | null = null
   let bench: Bench | null = null
   const listeners: ((change: Change) => void)[] = []
@@ -85,11 +86,12 @@ export function makeBuildStore(start?: StoreStart): BuildStore {
     setClass(next) {
       if (next === cls || (bench?.cls && bench.cls !== next)) return
       cls = next
+      if (!bench) year = Math.max(year, classFrom(cls))
       changed('class')
     },
     setYear(next) {
       if (bench) return
-      year = next
+      year = Math.max(next, classFrom(cls))
       changed('year')
     },
     setBuild(b, change) {

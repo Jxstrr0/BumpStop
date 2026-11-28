@@ -96,7 +96,8 @@ export const RADIO_DISTANCES: readonly { m: number; line: RadioLine }[] = [
  * of `window` metres whose highest and lowest points are more than `min`
  * apart: that's a whoop, a rock, a jump or a heave. If the biggest one there
  * is `big` or more, it gets a "Caution". Weather that roughens the ground
- * (a thaw, a dust storm) makes the same bumps bigger, so it gets more of them.
+ * (a thaw) makes the same bumps bigger, so it gets more of them; in a dust
+ * storm the unseen ruts are in the road too, so he calls those.
  *
  * The heights come from the ground recipes in `src/data/ground.ts`: whoops
  * are 12 to 30 cm, rocks 3 to 16 cm, jumps 0.5 to 1.1 m, frost heaves 6 to

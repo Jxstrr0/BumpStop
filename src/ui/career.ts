@@ -25,7 +25,7 @@
  * truck and year through the build store's bench (`setBench`).
  */
 import { CALENDAR, CAREER, CLASS_MONEY, QUIRKS, SPONSORS, TEAMS, TIERS, UPGRADES, type Tier } from '../data/career'
-import { CLASSES, type ClassId } from '../data/classes'
+import { CLASSES, classOut, type ClassId } from '../data/classes'
 import { CONTESTS, ROUNDS } from '../data/contests'
 import type { TruckBuild } from '../data/kit'
 import { SLOTS, SPARE_IDS } from '../data/parts'
@@ -715,6 +715,11 @@ export function careerPanel(store: BuildStore, saves?: CareerSaves, showTerm: (i
       wrap.append(el('p', 'small', t('career.noTruck')))
       const row = el('div', 'btn-row')
       for (const cls of CLASSES) {
+        // Side-by-sides only race from 2005 (real history): before then, say when instead of selling one.
+        if (!classOut(cls.id, career.year)) {
+          row.append(el('p', 'small', tf('career.classFrom', { cls: t(cls.name), year: String(cls.from) })))
+          continue
+        }
         const price = truckPrice(career, cls.id)
         // Two taps, like selling: a truck is the biggest thing the garage buys (playtest, 26 November 2026).
         const b = sureButton(tf('career.buyTruck', { cls: t(cls.name), price: money(price) }), t('career.buyTruckSure'), () => {

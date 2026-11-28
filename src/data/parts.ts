@@ -9,9 +9,13 @@
  *   (all four corners), and money (cr.). A part only exists in the classes it
  *   lists, so a heavy-truck-only part has just a `heavy` number.
  * - `year` is the first year it can be bought (the career runs 1985 to 2025).
- *   The newest parts (2017 to 2025) give the last career years something to
- *   chase: spool-valve dampers, aramid tires, forged beadlocks, gas-charged
- *   bump stops and twin-turbo engines for the light 4x4 and the heavy truck.
+ *   The years follow real history (Kelbo, 28 November 2026): bypass shocks
+ *   from 1986, gas-charged bump stops from 2010, and the side-by-side's own
+ *   parts from 2005, when the class starts (`from` in `src/data/classes.ts`),
+ *   with the big non-turbo engine in 2011 and the turbo in 2016. The newest
+ *   parts (2017 to 2025) give the last career years something to chase:
+ *   spool-valve dampers, aramid tires, forged beadlocks and twin-turbo
+ *   engines for the light 4x4 and the heavy truck.
  * - The other numbers are multipliers on the class's test mule
  *   (`src/data/ride.ts` and `src/data/wear.ts`), so 1 means "the same as the
  *   mule". Each class's stock build (`src/data/kit.ts`) uses parts that are
@@ -274,11 +278,11 @@ export const PARTS: readonly Part[] = [
     mass: { light4x4: 230, heavy: 1150 }, cost: { light4x4: 6500, heavy: 18000 }, strength: 1.5 },
   { slot: 'frame', id: 'spaceframe', name: 'part.spaceframe', text: 'part.spaceframeText', year: 1993,
     mass: { light4x4: 150 }, cost: { light4x4: 16000 }, strength: 1.3 },
-  { slot: 'frame', id: 'tubeFrame', name: 'part.tubeFrame', text: 'part.tubeFrameText', year: 1985,
+  { slot: 'frame', id: 'tubeFrame', name: 'part.tubeFrame', text: 'part.tubeFrameText', year: 2005,
     mass: { sxs: 70 }, cost: { sxs: 2500 }, strength: 1 },
-  { slot: 'frame', id: 'gussetedTube', name: 'part.gussetedTube', text: 'part.gussetedTubeText', year: 1985,
+  { slot: 'frame', id: 'gussetedTube', name: 'part.gussetedTube', text: 'part.gussetedTubeText', year: 2005,
     mass: { sxs: 85 }, cost: { sxs: 4500 }, strength: 1.5 },
-  { slot: 'frame', id: 'chromolyTube', name: 'part.chromolyTube', text: 'part.chromolyTubeText', year: 1996,
+  { slot: 'frame', id: 'chromolyTube', name: 'part.chromolyTube', text: 'part.chromolyTubeText', year: 2010,
     mass: { sxs: 60 }, cost: { sxs: 9000 }, strength: 1.35 },
 
   // ── Front suspension ──
@@ -292,9 +296,9 @@ export const PARTS: readonly Part[] = [
     mass: { heavy: 420 }, cost: { heavy: 8000 }, travel: 1, unsprung: 1, arm: 1, maxAngle: 1, mount: 1 },
   { slot: 'frontSusp', id: 'beamCoil', name: 'part.beamCoil', text: 'part.beamCoilText', year: 1990,
     mass: { heavy: 400 }, cost: { heavy: 16000 }, travel: 1.15, unsprung: 0.95, arm: 1, maxAngle: 1, mount: 0.9 },
-  { slot: 'frontSusp', id: 'sxsWishbone', name: 'part.wishbone', text: 'part.sxsWishboneText', year: 1985,
+  { slot: 'frontSusp', id: 'sxsWishbone', name: 'part.wishbone', text: 'part.sxsWishboneText', year: 2005,
     mass: { sxs: 30 }, cost: { sxs: 2000 }, travel: 1, unsprung: 1, arm: 1, maxAngle: 1, mount: 1 },
-  { slot: 'frontSusp', id: 'longArms', name: 'part.longArms', text: 'part.longArmsText', year: 2004,
+  { slot: 'frontSusp', id: 'longArms', name: 'part.longArms', text: 'part.longArmsText', year: 2014,
     mass: { sxs: 34 }, cost: { sxs: 5500 }, travel: 1.2, unsprung: 1.05, arm: 1.15, maxAngle: 1, mount: 1 },
 
   // ── Rear suspension ──
@@ -308,9 +312,9 @@ export const PARTS: readonly Part[] = [
     mass: { heavy: 450 }, cost: { heavy: 8000 }, travel: 1, unsprung: 1, arm: 1, maxAngle: 1, mount: 1 },
   { slot: 'rearSusp', id: 'rearBeamCoil', name: 'part.beamCoil', text: 'part.beamCoilText', year: 1990,
     mass: { heavy: 430 }, cost: { heavy: 16000 }, travel: 1.15, unsprung: 0.95, arm: 1, maxAngle: 1, mount: 0.9 },
-  { slot: 'rearSusp', id: 'sxsTrailing', name: 'part.sxsTrailing', text: 'part.sxsTrailingText', year: 1985,
+  { slot: 'rearSusp', id: 'sxsTrailing', name: 'part.sxsTrailing', text: 'part.sxsTrailingText', year: 2005,
     mass: { sxs: 30 }, cost: { sxs: 2000 }, travel: 1, unsprung: 1, arm: 1, maxAngle: 1, mount: 1 },
-  { slot: 'rearSusp', id: 'longTrailing', name: 'part.longTrailing', text: 'part.longTrailingText', year: 2006,
+  { slot: 'rearSusp', id: 'longTrailing', name: 'part.longTrailing', text: 'part.longTrailingText', year: 2014,
     mass: { sxs: 35 }, cost: { sxs: 6000 }, travel: 1.2, unsprung: 1.05, arm: 1.15, maxAngle: 1, mount: 1 },
 
   // ── Dampers (all four corners) ──
@@ -323,9 +327,9 @@ export const PARTS: readonly Part[] = [
   { slot: 'dampers', id: 'remoteReservoir', name: 'part.remoteReservoir', text: 'part.remoteReservoirText', year: 1990,
     mass: { light4x4: 18, heavy: 90, sxs: 10 }, cost: { light4x4: 5500, heavy: 16000, sxs: 4000 },
     heat: 1.6, cool: 1.25, tempLimit: 10, clicks: { compLow: 3, compHigh: 0, rebound: 3 } },
-  // Bypass (1996): three outside tubes, so three steps towards each end. Soft through the middle with every tube open,
+  // Bypass (1986, as in real desert racing): three outside tubes, so three steps towards each end. Soft through the middle with every tube open,
   // then firmer as the piston passes each tube's last port (BYPASS_TUBES, below).
-  { slot: 'dampers', id: 'bypass', name: 'part.bypass', text: 'part.bypassText', year: 1996,
+  { slot: 'dampers', id: 'bypass', name: 'part.bypass', text: 'part.bypassText', year: 1986,
     mass: { light4x4: 26, heavy: 130, sxs: 15 }, cost: { light4x4: 9500, heavy: 28000, sxs: 7000 },
     heat: 2.2, cool: 1.5, tempLimit: 10, clicks: { compLow: 4, compHigh: 4, rebound: 4 },
     bypass: BYPASS_TUBES.external },
@@ -353,8 +357,8 @@ export const PARTS: readonly Part[] = [
     mass: { light4x4: 2, heavy: 10, sxs: 1 }, cost: { light4x4: 600, heavy: 2000, sxs: 400 }, rate: 1.2, progression: 10, strength: 1.2, damping: 0 },
   { slot: 'bumpStops', id: 'hydraulic', name: 'part.hydraulic', text: 'part.hydraulicText', year: 2003,
     mass: { light4x4: 8, heavy: 40, sxs: 4 }, cost: { light4x4: 4500, heavy: 14000, sxs: 3000 }, rate: 1.5, progression: 5, strength: 1.8, damping: 1 },
-  // Gas-charged (2023): a hydraulic stop with a nitrogen spring behind it, gentler at first touch and tougher still.
-  { slot: 'bumpStops', id: 'gasCharged', name: 'part.gasCharged', text: 'part.gasChargedText', year: 2023,
+  // Gas-charged (2010): a hydraulic stop with a nitrogen spring behind it, gentler at first touch and tougher still.
+  { slot: 'bumpStops', id: 'gasCharged', name: 'part.gasCharged', text: 'part.gasChargedText', year: 2010,
     mass: { light4x4: 7, heavy: 35, sxs: 3 }, cost: { light4x4: 6500, heavy: 19000, sxs: 4200 }, rate: 1.35, progression: 4.5, strength: 2, damping: 1 },
 
   // ── Anti-roll bars ──
@@ -428,11 +432,11 @@ export const PARTS: readonly Part[] = [
     mass: { heavy: 1150 }, cost: { heavy: 55000 }, power: 450 * kW, torque: 1.3 },
   { slot: 'engine', id: 'twinTurboDieselSix', name: 'part.twinTurboDieselSix', text: 'part.twinTurboDieselSixText', year: 2020,
     mass: { heavy: 1020 }, cost: { heavy: 72000 }, power: 500 * kW, torque: 1.35 },
-  { slot: 'engine', id: 'twin', name: 'part.twin', text: 'part.twinText', year: 1985,
+  { slot: 'engine', id: 'twin', name: 'part.twin', text: 'part.twinText', year: 2005,
     mass: { sxs: 55 }, cost: { sxs: 2500 }, power: 45 * kW, torque: 1 },
-  { slot: 'engine', id: 'triple', name: 'part.triple', text: 'part.tripleText', year: 1995,
+  { slot: 'engine', id: 'triple', name: 'part.triple', text: 'part.tripleText', year: 2011,
     mass: { sxs: 60 }, cost: { sxs: 4000 }, power: 75 * kW, torque: 1.15 },
-  { slot: 'engine', id: 'turboTwin', name: 'part.turboTwin', text: 'part.turboTwinText', year: 2008,
+  { slot: 'engine', id: 'turboTwin', name: 'part.turboTwin', text: 'part.turboTwinText', year: 2016,
     mass: { sxs: 62 }, cost: { sxs: 6000 }, power: 125 * kW, torque: 1.4 },
 
   // ── Light bar (night stages, after 1.20) ──

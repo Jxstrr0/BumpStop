@@ -27,7 +27,7 @@
  * Everything in `CareerState` is plain data, kept in the garage save (plan
  * PR 8, format 2). Pure and seeded: no DOM, no clock.
  */
-import { CLASSES, type ClassId } from '../data/classes'
+import { CLASSES, classFrom, classOut, type ClassId } from '../data/classes'
 import {
   CALENDAR, CAREER, CLASS_MONEY, CONTRACTS, DRIVER_TERMS, PRIVATEERS, QUIRK_IDS, QUIRKS, SPARE_PRICE, SPONSORS, TEAMS, TIERS, TRAVEL_DAYS,
   UPGRADES, type CalendarEvent, type QuirkId, type Sponsor, type TeamId, type Tier, type UpgradeId,
@@ -295,7 +295,8 @@ export function offers(c: CareerState): Contract[] {
     const rolled: ClassId = k === 0
       ? rng.pick(['light4x4', 'sxs'] as const)
       : rng.weighted(CLASSES.map((x) => ({ item: x.id, weight: x.id === 'light4x4' ? 2 : 1 })))
-    const cls = firstJob ? CONTRACTS.firstJob.cls : rolled
+    // A class that doesn't race yet (side-by-sides before 2005) sends a light 4x4 instead. Same dice either way.
+    const cls = firstJob ? CONTRACTS.firstJob.cls : classOut(rolled, c.year) ? rolled : 'light4x4'
     const rep = k === 0 ? 0 : CONTRACTS.classRep[cls] + rng.int(0, 3) * 5
     const share = rng.range(CONTRACTS.budget[0], CONTRACTS.budget[1])
     const budget = round(KITS[cls].budget * (firstJob ? CONTRACTS.firstJob.budget : share) * scale)
@@ -387,7 +388,8 @@ export function setContractBuild(c: CareerState, b: TruckBuild): void {
 }
 
 export function contractRules(c: CareerState, contract: Contract): BuildRules {
-  return { year: c.year, budget: contract.budget }
+  // The privateer's own truck is already theirs: its parts may stay on whatever the year (older saves).
+  return { year: c.year, budget: contract.budget, kept: privateerBuild(contract) }
 }
 
 /** What keeps the contract truck from being handed over: the build rules, under the privateer's budget. */
@@ -437,6 +439,7 @@ export function truckValue(c: CareerState): number {
 
 export function buyTruck(c: CareerState, cls: ClassId): void {
   if (c.own) throw new Error('The garage already has a truck: sell it first')
+  if (!classOut(cls, c.year)) throw new Error(`No ${cls} races until ${classFrom(cls)}`)
   const price = truckPrice(c, cls)
   if (c.money < price) throw new Error('Not enough money for the truck')
   c.money -= price
@@ -461,7 +464,10 @@ export function fitOwn(c: CareerState, b: TruckBuild): number {
   if (!c.own) throw new Error('No truck yet')
   if (c.job?.kind === 'own') throw new Error("The parts are locked during a raid")
   const cost = changeCost(c.own, b, CAREER.resale, discountOf(c))
-  for (const slot of SLOTS) if (!partOnSale(partIn(b, slot), c.year)) throw new Error(`The ${slot} part isn't out yet`)
+  // Parts already on the truck may stay, even from before their year (older saves); new ones must be out.
+  for (const slot of SLOTS) {
+    if (b.parts[slot] !== c.own.parts[slot] && !partOnSale(partIn(b, slot), c.year)) throw new Error(`The ${slot} part isn't out yet`)
+  }
   if (cost > 0 && cost > c.money) throw new Error('Not enough money for those parts')
   c.money -= cost
   logParts(c, c.own, b)
@@ -553,7 +559,7 @@ export function entryProblems(c: CareerState, driver: DriverId, bench?: TruckBui
   const cost = entryFee(c, cls) + driverFee(c, driver, cls) - sponsorPay(c, cls)
   if (cost > c.money && !isBroke(c)) out.push({ kind: 'money', need: cost })
   if (bench && (bench.cls !== cls || SLOTS.some((s) => bench.parts[s] !== c.own!.parts[s]))) out.push({ kind: 'parts' })
-  const problems = checkBuild(c.own, { year: c.year, budget: Infinity }).filter((p) => p.kind !== 'overBudget')
+  const problems = checkBuild(c.own, { year: c.year, budget: Infinity, kept: c.own }).filter((p) => p.kind !== 'overBudget')
   if (problems.length) out.push({ kind: 'build', problems })
   return out
 }

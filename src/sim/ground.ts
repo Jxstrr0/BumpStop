@@ -216,7 +216,7 @@ export function buildProfile(ground: GroundId, length: number, rng: Rng, mod?: G
     }
   }
 
-  // Night stages: the ruts the driver didn't see in the beam (`src/data/night.ts`). Their own stream, and only
+  // Unseen ruts, at night or in a dust storm: the ones the driver didn't see in time (`src/data/night.ts`). Their own stream, and only
   // drawn when there are some, so every daytime road stays exactly as it was.
   if (mod?.ruts && mod.ruts > 0) {
     const r = rng.fork('night-ruts')

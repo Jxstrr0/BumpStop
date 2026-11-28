@@ -17,11 +17,15 @@
  *   see. Slower everywhere, drifts and frost heaves that come unseen (the
  *   bumps hit as if bigger), a colder wind, and the tightest corner comes up
  *   before the driver sees it: Push slides into the snowbank, studs or not.
- * - **Dust storm** (hot summer stages): the driver can't see the ruts and
- *   rocks to pick a line round them, so every bump hits square (as if
- *   bigger), and a hot wind means the dampers have less room before fade.
- *   Slower, but harder on the truck: Steady on a rough stage can fade a
- *   stock truck's dampers, so it's the day for Conserve or bigger shocks.
+ * - **Dust storm** (hot summer stages): the driver can't see the road
+ *   ahead, so most of the ruts and holes come up unseen and are hit at
+ *   speed, like the ones outside the lamps on a night stage (`unseen`, the
+ *   same ruts as `RUTS_PER_KM` in `src/data/night.ts`). The bumps
+ *   themselves are no bigger: dust hides them, it doesn't grow them
+ *   (Kelbo, 28 November 2026; before, every bump was made 30% taller to
+ *   stand in for this). A hot wind means the dampers have less room before
+ *   fade. Slower, but harder on the truck, so it's the day for Conserve or
+ *   bigger shocks.
  *
  * The weather changes the ground the ride sim drives (`GroundMod`), so heat,
  * wear and breaks still come out of the physics. The rivals slow down by
@@ -45,8 +49,9 @@ export interface GroundMod {
   /** Tire grip. */
   grip: number
   /**
-   * Night stages only (`src/data/night.ts`): ruts per km the driver doesn't
-   * see in the beam, so they're hit at speed. Missing means none.
+   * Ruts per km the driver doesn't see in time, so they're hit at speed:
+   * outside the beam on a night stage (`src/data/night.ts`), or hidden in a
+   * dust storm (`unseen`). Missing means none.
    */
   ruts?: number
 }
@@ -71,7 +76,16 @@ export interface WeatherSpec {
   corner: number
   /** The rivals' chance of trouble on the stage, times this (scaled by how much of the stage it covers). */
   rivalRisk: number
+  /**
+   * Share of the ground's ruts (`RUTS_PER_KM` in `src/data/night.ts`) the
+   * driver can't see in time, so they're hit at speed, as at night. Missing
+   * means none.
+   */
+  unseen?: number
 }
+
+/** In a dust storm the driver sees this share of the ruts too late to go round them (the rest they spot and miss). */
+const DUST_UNSEEN = 0.8
 
 const SUMMER: readonly GroundId[] = ['graded', 'washboard', 'rough', 'whoops', 'rocks', 'jumps']
 const EVERYWHERE: readonly GroundId[] = [...SUMMER, 'iceHeaves', 'ice', 'snow']
@@ -106,11 +120,13 @@ export const WEATHER: Readonly<Record<WeatherId, WeatherSpec>> = {
     season: 'summer',
     airC: [19, 99],
     ground: SUMMER,
-    mod: { roughness: 1.2, roughnessLength: 1, features: 1.3, grip: 1 },
+    // The road is the road; the driver just can't see it. Most ruts come up unseen and are hit at speed.
+    mod: { roughness: 1, roughnessLength: 1, features: 1, grip: 1 },
     speed: { light4x4: 0.8, heavy: 0.8, sxs: 0.8 },
     airK: 5,
     corner: 1,
     rivalRisk: 1.4,
+    unseen: DUST_UNSEEN,
   },
 }
 

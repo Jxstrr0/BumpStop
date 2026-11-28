@@ -33,9 +33,17 @@ buy: the Zed-Two spool-valve dampers (2017, every class; they damp by
 where the wheel is in its travel, see `docs/RIDE-SIM.md`), a twin-turbo V6
 for the light 4x4 (2017), aramid rally tires and their studded twins
 (2018), forged beadlocks (2019), a twin-turbo diesel six for the heavy
-truck (2020) and gas-charged bump stops (2023). The side-by-side got no
+truck (2020). The side-by-side got no
 new engine: its quickest team already runs at the fastest pace the rivals
 allow, and more power tipped it past what a Push run can beat.
+
+**Real-history dates** (Kelbo, 28 November 2026): parts come out in about
+the year the real ones did. Side-by-sides race from 2005, with their
+tube frames, wishbones and trailing arms and the twin (2005), then the
+triple (2011), the long-travel arms (2014) and the turbo twin (2016);
+bypass shocks from 1986, as the desert trucks of the mid-80s had them;
+gas-charged bump stops from 2010. Parts already on a saved truck stay on
+it whatever their year (`kept` in `BuildRules`); only new ones must be out.
 
 Protection and spares are only weight for now: rock hits and the bivouac
 arrive with the raids (plan PR 7). Engine power is shown but the rigs set

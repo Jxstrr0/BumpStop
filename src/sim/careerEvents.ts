@@ -20,7 +20,7 @@
  * before has none, and a fresh series starts. Pure and seeded.
  */
 import { CLASS_MONEY, CAREER, DRIVER_TERMS, TIERS } from '../data/career'
-import { CLASSES, type ClassId } from '../data/classes'
+import { CLASSES, classOut, type ClassId } from '../data/classes'
 import { CONTESTS, EVENT_CAREER, ROUNDS, type ContestId } from '../data/contests'
 import type { TruckBuild } from '../data/kit'
 import { SLOTS } from '../data/parts'
@@ -184,6 +184,14 @@ export interface EventSettlement {
   rivals: RivalRuns[]
 }
 
+/**
+ * The classes with a series this year: no side-by-side series before
+ * side-by-sides race (2005), unless an older save's garage already has one.
+ */
+function racingClasses(c: CareerState): ClassId[] {
+  return CLASSES.map((x) => x.id).filter((cls) => classOut(cls, c.year) || cls === c.own?.cls)
+}
+
 /** Adds a round's series points to a class's table. */
 function award(s: EventSeason, id: ContestId, cls: ClassId, table: readonly ContestStanding[]): void {
   const byEvent = (s.points[id] ??= {})
@@ -219,7 +227,7 @@ export function settleEvent(c: CareerState): EventSettlement {
   c.money += prize - repairs
   c.rep += rep
   award(s, id, live.cls, table)
-  for (const cls of CLASSES.map((x) => x.id)) {
+  for (const cls of racingClasses(c)) {
     if (cls !== live.cls) award(s, id, cls, rivalsOnlyRound(c, i, cls))
   }
   s.done = i + 1
@@ -242,7 +250,7 @@ export function passRounds(c: CareerState, day: number): void {
   if (s.live && ROUNDS[s.live.round]!.day < day) settleEvent(c)
   while (s.done < ROUNDS.length && ROUNDS[s.done]!.day < day) {
     const i = s.done
-    for (const cls of CLASSES.map((x) => x.id)) award(s, ROUNDS[i]!.contest, cls, rivalsOnlyRound(c, i, cls))
+    for (const cls of racingClasses(c)) award(s, ROUNDS[i]!.contest, cls, rivalsOnlyRound(c, i, cls))
     s.done++
   }
 }
