@@ -135,6 +135,15 @@ rounds a year, in the summer gaps between the raids (`ROUNDS` in
 - At the end of the year each series has a champion. Win one in your class
   for 8,000 cr. and +3 reputation. The news says who won each series you
   scored in.
+- The screens: the Raid tab's **One-day events** panel lists the rounds
+  before the next raid (pick one, the driver on a timed event, the fees
+  and prizes, the series table so far), then the runs as in free play,
+  then what it paid and the series after it. "Leave the event" (two taps)
+  settles the round as it stands. The career panel says which events come
+  before the raid, with a button down to them; while an event is under way
+  it says so and holds the raid's jobs back. The calendar lists the
+  rounds; a raid's results card shows any series won at the end of the
+  year (`src/ui/contest.ts`, `src/ui/career.ts`).
 - A run's score is kept as it ends (`CareerState.events.live`), so a reload
   carries on mid-event. A save from before the events starts the series
   fresh, with no new save format.

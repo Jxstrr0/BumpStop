@@ -14,19 +14,29 @@
  *    changed on the Build tab: the next run takes whatever is on the bench.
  * 4. **The end:** the final standings, best run each.
  *
- * Free play only for now: in a career the events come later, with prizes.
- * Nothing here is saved; a reload goes back to the entry.
+ * In free play nothing here is saved; a reload goes back to the entry.
+ *
+ * **In a career** (after 1.33) the panel shows the rounds before the next
+ * raid instead (`src/sim/careerEvents.ts`): your own truck enters one for a
+ * fee, the runs go as above, each score is kept in the career as it ends (so
+ * a reload carries on), and the last run pays out and adds the series
+ * points. The career panel hands over `EventCareer` to reach the career.
  */
 import { makeSound } from '../audio/sound'
 import { heatShare } from '../audio/cues'
 import { CLASSES, type ClassId } from '../data/classes'
-import { CONTEST_IDS, CONTESTS, type ContestId, type ContestKind } from '../data/contests'
+import { CONTEST_IDS, CONTESTS, EVENT_CAREER, ROUNDS, type Contest, type ContestId, type ContestKind } from '../data/contests'
+import { CLASS_MONEY } from '../data/career'
 import { FAILURES } from '../data/failures'
-import { DRIVER_IDS, DRIVERS, PACES, type DriverId, type PaceId } from '../data/raids'
+import { DRIVER_IDS, DRIVERS, PACES, RAIDS, type DriverId, type PaceId, type Rival } from '../data/raids'
 import { RIG_VIEW, VIEW_3D, type RigPiece } from '../data/rigs'
 import { t, tf, type StringKey } from '../data/strings'
 import { checkBuild, type BuiltTruck } from '../sim/build'
-import { driverName } from '../sim/career'
+import { driverName, nextEvent, type CareerState } from '../sim/career'
+import {
+  addEventRun, benchMatches, enterEvent, eventDriverFee, eventEntryFee, eventField, eventProblems, roundNo, roundRivals, roundsBeforeRaid,
+  roundsOf, seriesTable, settleEvent, type EventEntry, type EventSettlement,
+} from '../sim/careerEvents'
 import {
   contestStandings, courseLength, courseSeed, eventRig, passKmh, rivalRuns, scoreEvent,
   type ContestRun, type RivalRuns,
@@ -40,7 +50,8 @@ import { el, num, reveal } from './dom'
 import { endOf, jumpTo } from './fixes'
 import { readFullPage, writeFullPage } from './fullPage'
 import { gradeChip, landingSummary } from './landingText'
-import { entrantName, ordinal, type RaidCareer } from './raid'
+import { dateText, eventProblemText } from './career'
+import { entrantName, ordinal } from './raid'
 import { crewNote, fixButtons, traceBlock, whereText } from './report'
 import { rigView } from './rigView'
 
@@ -97,6 +108,16 @@ function picker<T extends string>(ids: readonly T[], label: (id: T) => string, c
   return row
 }
 
+/** What the events need from the career (`careerPanel`): the career, and a way to save it. */
+export interface EventCareer {
+  /** The career, or null in free play. */
+  state(): CareerState | null
+  /** The career changed here: save it and draw the career panel again. */
+  changed(): void
+  /** The career panel calls `redraw` whenever the career changes there. */
+  listen(redraw: () => void): void
+}
+
 /** An event under way: what was picked at the entry, and the runs so far. */
 interface Entry {
   contest: ContestId
@@ -104,6 +125,25 @@ interface Entry {
   driver: DriverId
   runs: ContestRun[]
   rivals: RivalRuns[]
+  /** A career round: its place in `ROUNDS`, the rivals' field, and (once it's over) what it paid. */
+  round?: number
+  field?: readonly Rival[]
+  settlement?: EventSettlement
+}
+
+const money = (n: number) => tf('career.money', { n: num(Math.round(n)) })
+const signed = (n: number) => (n < 0 ? `−${money(-n)}` : `+${money(n)}`)
+const className = (cls: ClassId) => t(CLASSES.find((c) => c.id === cls)!.name)
+
+/** The course in a line: its length and how the runs go. */
+function courseText(c: Contest): string {
+  return c.kind === 'judged'
+    ? tf('contestUi.jumpLine', { runs: String(c.runs), speeds: c.speeds!.map((x) => num(x)).join(', ') })
+    : c.passes
+    ? tf('contestUi.passesLine', { km: num(courseLength(c) / 1000, 1), from: num(c.passes.startKmh), step: num(c.passes.stepKmh), runs: String(c.runs) })
+    : (c.timed?.laps ?? 1) > 1
+    ? tf('contestUi.lapsLine', { km: num(courseLength(c) / 1000, 1), laps: String(c.timed!.laps), runs: String(c.runs) })
+    : tf('contestUi.courseLine', { km: num(courseLength(c) / 1000, 1), runs: String(c.runs) })
 }
 
 /** A run being driven. */
@@ -120,7 +160,7 @@ interface Live {
   total: number
 }
 
-export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>): HTMLElement {
+export function contestPanel(store: BuildStore, career?: EventCareer): HTMLElement {
   const box = el('section', 'panel contest')
   box.id = 'contest'
   box.append(el('h2', '', t('contestUi.title')), el('p', 'lead', t('contestUi.lead')))
@@ -133,6 +173,8 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
   /** The jump contest's approach speed (km/h), from the event's list. */
   let kmh = 54
   let entry: Entry | null = null
+  /** The career round picked on the entry screen (a place in `ROUNDS`). */
+  let round = -1
   let live: Live | null = null
   let raf = 0
   let last = 0
@@ -228,10 +270,8 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     ended = false
     view3d.reset()
     layout()
-    if (career?.on()) {
-      show(el('p', 'small', t('contestUi.careerNote')))
-      return
-    }
+    const cs = career?.state()
+    if (cs) return careerEntry(cs)
     const about = el('p', 'small')
     const courseLine = el('p', 'small')
     const driverText = el('p', 'small')
@@ -239,13 +279,7 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     const sync = () => {
       const c = CONTESTS[contestId]
       about.textContent = t(c.text)
-      courseLine.textContent = c.kind === 'judged'
-        ? tf('contestUi.jumpLine', { runs: String(c.runs), speeds: c.speeds!.map((x) => num(x)).join(', ') })
-        : c.passes
-        ? tf('contestUi.passesLine', { km: num(courseLength(c) / 1000, 1), from: num(c.passes.startKmh), step: num(c.passes.stepKmh), runs: String(c.runs) })
-        : (c.timed?.laps ?? 1) > 1
-        ? tf('contestUi.lapsLine', { km: num(courseLength(c) / 1000, 1), laps: String(c.timed!.laps), runs: String(c.runs) })
-        : tf('contestUi.courseLine', { km: num(courseLength(c) / 1000, 1), runs: String(c.runs) })
+      courseLine.textContent = courseText(c)
       // The speed trial is driven at the set speeds, so the driver makes no odds there.
       driverBox.hidden = c.kind !== 'timed'
       driverText.textContent = tf('driver.about', { trade: t(DRIVERS[driver].name), text: t(DRIVERS[driver].text) })
@@ -280,6 +314,143 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     )
   }
 
+  // ── 1b. The career's entry: the rounds before the next raid ──
+
+  function careerEntry(c: CareerState): void {
+    // An entry under way (a reload, or back from the Build tab): carry on with it.
+    const under = c.events?.season === c.season ? c.events.live : undefined
+    if (under) {
+      entry = resumed(c, under)
+      return betweenScreen()
+    }
+    const raid = t(RAIDS[nextEvent(c).raid].name)
+    const nodes: Node[] = [el('p', 'small', t('contestUi.careerLead'))]
+    const open = roundsBeforeRaid(c)
+    if (!open.length) {
+      const done = c.events?.season === c.season ? c.events.done : 0
+      const later = ROUNDS.findIndex((r, i) => i >= done && r.day >= c.day)
+      const r = ROUNDS[later]
+      nodes.push(el('p', 'small', r
+        ? tf('contestUi.careerNoneYet', { raid, event: t(CONTESTS[r.contest].name), date: dateText(c.year, r.day) })
+        : t('contestUi.careerNoneYear')))
+      return show(...nodes)
+    }
+    if (!open.includes(round)) round = open[0]!
+    const i = round
+    const r = ROUNDS[i]!
+    const contest = CONTESTS[r.contest]
+    const roundRow = picker(open.map(String), (id) => {
+      const k = Number(id)
+      return tf('contestUi.roundName', { event: t(CONTESTS[ROUNDS[k]!.contest].name), round: String(roundNo(k)), date: dateText(c.year, ROUNDS[k]!.day) })
+    }, () => String(round), (id) => {
+      round = Number(id)
+      careerEntry(c)
+    })
+    roundRow.classList.add('round-row')
+    nodes.push(el('h3', 'raid-sub', tf('contestUi.pickRound', { raid })), roundRow,
+      el('h3', 'raid-sub', t(contest.name)),
+      el('p', 'small', tf('contestUi.roundLine', { round: String(roundNo(i)), of: String(roundsOf(r.contest)), date: dateText(c.year, r.day) })),
+      el('p', 'small', t(contest.text)), el('p', 'small', courseText(contest)))
+    // A timed event needs a driver (hired for the day); the crew drives the others.
+    if (contest.kind === 'timed') {
+      const about = el('p', 'small', tf('driver.about', { trade: t(DRIVERS[driver].name), text: t(DRIVERS[driver].text) }))
+      const row = picker(DRIVER_IDS, (id) => t(driverName(c, id)), () => driver, (id) => {
+        driver = id
+        careerEntry(c)
+      })
+      nodes.push(el('h4', '', t('raidUi.pickDriver')), row, about)
+    }
+    if (c.own) {
+      const cls = c.own.cls
+      const driverFee = eventDriverFee(r.contest, driver, cls)
+      nodes.push(
+        el('p', 'small', driverFee > 0
+          ? tf('career.fees', { entry: money(eventEntryFee(cls)), driver: money(driverFee) })
+          : tf('contestUi.careerFee', { entry: money(eventEntryFee(cls)) })),
+        el('p', 'small', tf('career.prizes', { list: EVENT_CAREER.prizes.map((p) => money(p * CLASS_MONEY[cls])).join(' · ') })),
+      )
+    }
+    const passed = open.indexOf(i)
+    if (passed > 0) nodes.push(el('p', 'small warm-text', passed === 1 ? t('contestUi.passNote1') : tf('contestUi.passNote', { n: String(passed) })))
+    const problems = eventProblems(c, i, driver, store.build())
+    if (problems.length) {
+      const ul = el('ul', 'problems')
+      for (const p of problems) {
+        ul.append(el('li', '', p.kind === 'busy' ? tf('contestUi.why.busy', { raid }) : p.kind === 'gone' ? t('contestUi.why.gone') : p.kind === 'noTruck' ? t('contestUi.why.noTruck') : eventProblemText(p)))
+      }
+      nodes.push(ul)
+    }
+    const enter = button(t('contestUi.enter'), 'btn start-btn')
+    enter.disabled = problems.length > 0
+    enter.addEventListener('click', () => {
+      // The truck on the bench may have changed since this screen was drawn.
+      if (eventProblems(c, i, driver, store.build()).length) return careerEntry(c)
+      const e = enterEvent(c, i, driver, store.build())
+      entry = resumed(c, e)
+      career!.changed()
+      betweenScreen()
+    })
+    nodes.push(enter)
+    if (c.own) nodes.push(seriesBlock(c, r.contest, c.own.cls))
+    show(...nodes)
+  }
+
+  /** The panel's entry for a career round (a new one, or one a reload carries on with). */
+  function resumed(c: CareerState, e: EventEntry): Entry {
+    const id = ROUNDS[e.round]!.contest
+    return {
+      contest: id, cls: e.cls, driver: e.driver, round: e.round, field: eventField(c, e.cls), rivals: roundRivals(c, e.round, e.cls),
+      // Only the scores are kept: enough for the standings.
+      runs: e.scores.map((score) => ({ pace: 'steady', score, broken: null, bottomOuts: 0, lost: 0 })),
+    }
+  }
+
+  /** A series' points table in a class: the top six, and your line if you're further down. */
+  function seriesBlock(c: CareerState, id: ContestId, cls: ClassId): HTMLElement {
+    const wrap = el('div')
+    wrap.append(el('h4', '', tf('contestUi.seriesHead', { event: t(CONTESTS[id].name), cls: className(cls).toLowerCase() })))
+    const rows = seriesTable(c, id, cls)
+    if (!rows.length) {
+      wrap.append(el('p', 'small', t('contestUi.seriesEmpty')))
+      return wrap
+    }
+    const field = eventField(c, cls)
+    const table = el('table', 'raid-table')
+    rows.forEach((row, k) => {
+      if (k >= 6 && row.who !== 'you') return
+      const tr = el('tr', row.who === 'you' ? 'you' : '')
+      tr.append(el('td', 'pos', String(k + 1)), el('td', 'who', entrantName(row.who, field)), el('td', 'time', tf('contestUi.points', { n: String(row.points) })))
+      table.append(tr)
+    })
+    wrap.append(table)
+    return wrap
+  }
+
+  /** What a career round paid, and the series after it. */
+  function payoutBlock(c: CareerState, s: EventSettlement): HTMLElement {
+    const wrap = el('div', 'career-results')
+    const ul = el('ul', 'raid-list')
+    const add = (key: StringKey, n: number) => {
+      if (n !== 0) ul.append(el('li', 'small', tf(key, { n: money(n) })))
+    }
+    add('career.paid.prize', s.prize)
+    add('career.paid.entry', s.paid)
+    add('career.paid.repairs', s.repairs)
+    ul.append(el('li', 'readout-line', tf('career.paid.total', { n: signed(s.money) })))
+    if (s.rep > 0) ul.append(el('li', 'small', tf('career.paid.rep', { n: String(s.rep) })))
+    ul.append(el('li', 'small', tf('contestUi.seriesPoints', { points: String(s.points), round: String(s.round), of: String(s.rounds) })))
+    wrap.append(el('h4', '', t('contestUi.payoutHead')), ul, seriesBlock(c, s.contest, s.cls))
+    return wrap
+  }
+
+  /** Why the next run can't start, in words, or '' if it can: another class on the bench, a career truck with unbought parts, or the build rules. */
+  function runProblem(e: Entry): string {
+    if (store.cls() !== e.cls) return t('contestUi.otherClass')
+    const cs = e.round !== undefined ? career?.state() : null
+    if (cs && !benchMatches(cs, store.build())) return t('career.why.parts')
+    return buildProblem()
+  }
+
   /** Why the truck on the bench can't go out, in words, or '' if it can. */
   function buildProblem(): string {
     const problems = checkBuild(store.truck().build, store.rules())
@@ -294,11 +465,16 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     const e = entry
     if (!e) return entryScreen()
     const c = CONTESTS[e.contest]
-    const nodes: Node[] = [el('h3', 'raid-sub', t(c.name))]
+    const over = e.runs.length >= c.runs || e.settlement !== undefined
+    const cs = e.round !== undefined ? career?.state() ?? null : null
+    const nodes: Node[] = [el('h3', 'raid-sub', e.round !== undefined
+      ? tf('contestUi.roundHead', { event: t(c.name), round: String(roundNo(e.round)), of: String(roundsOf(e.contest)) })
+      : t(c.name))]
     if (lastRun) nodes.push(resultBlock(e, lastRun.run, lastRun.report))
-    if (e.runs.length > 0) nodes.push(standingsBlock(e, e.runs.length === c.runs))
-    if (e.runs.length >= c.runs) {
-      const again = button(t('contestUi.again'), 'btn start-btn')
+    if (e.runs.length > 0 || over) nodes.push(standingsBlock(e, over))
+    if (over) {
+      if (cs && e.settlement) nodes.push(payoutBlock(cs, e.settlement))
+      const again = button(t(e.round !== undefined ? 'contestUi.backToEvents' : 'contestUi.again'), 'btn start-btn')
       again.addEventListener('click', () => entryScreen())
       show(...nodes, again)
       return
@@ -316,19 +492,32 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     const jumps = c.kind === 'judged'
     const heats = isRace(e.contest)
     const go = button(tf(jumps ? 'contestUi.startJump' : heats ? 'contestUi.startHeat' : 'contestUi.startRun', { n: String(n) }), 'btn start-btn')
-    const problem = store.cls() !== e.cls ? t('contestUi.otherClass') : buildProblem()
+    const problem = runProblem(e)
     const cant = el('p', 'small hot-text', problem)
     cant.hidden = problem === ''
     go.disabled = problem !== ''
     go.addEventListener('click', () => {
       // The truck may have changed on the Build tab since this screen was drawn.
-      const now = store.cls() !== e.cls ? t('contestUi.otherClass') : buildProblem()
+      const now = runProblem(e)
       cant.textContent = now
       cant.hidden = now === ''
       if (now === '') begin()
     })
     const retire = button(t('contestUi.leave'), 'btn small-btn')
-    retire.addEventListener('click', () => entryScreen())
+    let sure = false
+    retire.addEventListener('click', () => {
+      const career0 = e.round !== undefined ? career?.state() : null
+      if (!career0) return entryScreen()
+      // In the career, leaving settles the round as it stands: ask once.
+      if (!sure) {
+        sure = true
+        retire.textContent = t('contestUi.leaveSure')
+        return
+      }
+      e.settlement = settleEvent(career0)
+      career!.changed()
+      betweenScreen()
+    })
     nodes.push(el('h3', 'raid-sub', tf(jumps ? 'contestUi.jumpHead' : heats ? 'contestUi.heatHead' : 'contestUi.runHead', { n: String(n), of: String(c.runs) })))
     if (n > 1) nodes.push(el('p', 'small', t('contestUi.tuneNote')))
     // The speed trial's speeds are set: no pace call, and every run starts with cold oil.
@@ -400,7 +589,7 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
       const tr = el('tr', row.who === 'you' ? 'you' : '')
       tr.append(
         el('td', 'pos', row.best === null ? '–' : String(k + 1)),
-        el('td', 'who', entrantName(row.who)),
+        el('td', 'who', entrantName(row.who, e.field)),
         el('td', 'time', row.best === null ? t(kind === 'topSpeed' ? 'contestUi.noPass' : kind === 'judged' ? 'contestUi.noScore' : 'contestUi.noTime') : scoreText(kind, row.best)),
       )
       table.append(tr)
@@ -547,6 +736,13 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
     const result = lapResult(l.runner)
     const run = scoreEvent(c, result, l.speeds, e.driver, l.pace, l.kmh)
     e.runs.push(run)
+    // A career round keeps each score as it ends; the last one pays out. A fade needs no repair: the dampers cool.
+    const cs = e.round !== undefined ? career?.state() : null
+    if (cs) {
+      addEventRun(cs, run.score, run.broken !== null && run.broken.kind !== 'fade')
+      if (e.runs.length >= c.runs) e.settlement = settleEvent(cs)
+      career!.changed()
+    }
     if (run.broken) sound.broke(run.broken.kind)
     else sound.stop()
     const done = !run.broken && view3d.works() ? { mine: rollOut(l.runner), ghost: [] } : null
@@ -580,6 +776,10 @@ export function contestPanel(store: BuildStore, career?: Pick<RaidCareer, 'on'>)
 
   // A change of class or build can make the entry's truck line out of date; redraw the entry when it's showing.
   store.onChange(() => {
+    if (!entry && !live) entryScreen()
+  })
+  // The career moved on (a raid, a new truck, a job): the rounds on offer change with it.
+  career?.listen(() => {
     if (!entry && !live) entryScreen()
   })
   entryScreen()

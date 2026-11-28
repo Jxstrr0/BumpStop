@@ -81,7 +81,7 @@ function gameScreen(app: HTMLElement, garage: Garage): void {
     career: [head, ...(reminder ? [reminder] : []), loopPanel(help.element), career.element],
     build: [buildPanel(store, help.showTerm)],
     test: [shopPanel(store, garage.shop)],
-    raid: [raidPanel(store, garage.raid, career.raid), contestPanel(store, career.raid)],
+    raid: [raidPanel(store, garage.raid, career.raid), contestPanel(store, career.events)],
     more: [help.element, savesPanel(garage), settingsPanel(), devPanel(), roadbookStrip(), el('p', 'note', t('preview.note'))],
   })
   app.append(footer(), tabs.bar)
